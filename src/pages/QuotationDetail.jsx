@@ -6,12 +6,13 @@ import api from '@/services/api';
 import {
     FaFilePdf, FaCheckCircle, FaEdit, FaWhatsapp,
     FaPhone, FaCamera, FaCalculator, FaArrowLeft,
-    FaBoxOpen, FaStickyNote
+    FaBoxOpen, FaStickyNote, FaUnlock, FaExclamationTriangle,
 } from 'react-icons/fa';
 import AddQuotationModal from '@/components/AddQuotationModal';
 import { generateDocumentPDF } from '@/lib/generateDocumentPDF';
 import ConfirmQuotationModal from '@/components/ConfirmQuotationModal';
 import ProfilesReportModal from '../components/ProfilesReportModal';
+import { useAuth } from '@/context/AuthContext';
 
 const statusLabels = {
     Potencial: 'Potencial',
@@ -36,11 +37,15 @@ const clientStatusStyles = {
 export default function QuotationDetail() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const { user } = useAuth();
+    const isAdmin = user?.role === 'ADMIN';
+
     const [quotation, setQuotation] = useState(null);
     const [loading, setLoading] = useState(true);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+    const [isReopening, setIsReopening] = useState(false);
     const [glassColors, setGlassColors] = useState([]);
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
     const [reportData, setReportData] = useState([]);
@@ -52,7 +57,7 @@ export default function QuotationDetail() {
             const response = await api.get(`/quotations/${id}`);
             setQuotation(response.data);
         } catch (error) {
-            console.error("Error al obtener la cotización:", error);
+            console.error('Error al obtener la cotización:', error);
         } finally {
             setLoading(false);
         }
@@ -63,7 +68,7 @@ export default function QuotationDetail() {
             try {
                 const res = await api.get('/glass-colors');
                 setGlassColors(res.data);
-            } catch { }
+            } catch { /* silencioso */ }
         };
         fetchGlassColors();
         fetchQuotation();
@@ -80,7 +85,7 @@ export default function QuotationDetail() {
             await api.patch(`/clients/${quotation.client.id}/status`, { status: newStatus });
             setQuotation(prev => ({ ...prev, client: { ...prev.client, status: newStatus } }));
         } catch {
-            alert("No se pudo actualizar el estado del cliente.");
+            alert('No se pudo actualizar el estado del cliente.');
         } finally {
             setIsUpdatingStatus(false);
         }
@@ -94,7 +99,7 @@ export default function QuotationDetail() {
             const response = await api.get(`/reports/quotation/${quotation.id}/profiles`);
             setReportData(response.data);
         } catch {
-            alert("No se pudo generar el reporte de materiales");
+            alert('No se pudo generar el reporte de materiales');
             setIsReportModalOpen(false);
         } finally {
             setIsReportLoading(false);
@@ -103,7 +108,7 @@ export default function QuotationDetail() {
 
     const handleShareWhatsApp = () => {
         if (!quotation?.client?.phone) {
-            alert("Este cliente no tiene un número de teléfono registrado.");
+            alert('Este cliente no tiene un número de teléfono registrado.');
             return;
         }
         let phone = quotation.client.phone.replace(/[^0-9]/g, '');
@@ -112,7 +117,27 @@ export default function QuotationDetail() {
         window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
     };
 
-    // ── Loading / Error states ─────────────────────────────────────────────
+    // ── Reabrir cotización confirmada ────────────────────────────────────────
+    const handleReopen = async () => {
+        if (!confirm(
+            '¿Reabrir esta cotización?\n\n' +
+            'El pedido vinculado seguirá activo pero sus datos se actualizarán cuando vuelvas a confirmar. ' +
+            'Cualquier cambio que hagas en la cotización se reflejará en el pedido al re-confirmar.'
+        )) return;
+
+        setIsReopening(true);
+        try {
+            await api.post(`/quotations/${id}/reopen`);
+            await fetchQuotation();
+        } catch (err) {
+            const msg = err?.response?.data?.message || 'No se pudo reabrir la cotización.';
+            alert(msg);
+        } finally {
+            setIsReopening(false);
+        }
+    };
+
+    // ── Loading / Error ──────────────────────────────────────────────────────
     if (loading) {
         return (
             <div className="flex justify-center items-center py-32 text-gray-400">
@@ -134,6 +159,7 @@ export default function QuotationDetail() {
     }
 
     const isConfirmado = quotation.status === 'confirmado';
+    const isReopenada = !isConfirmado && !!quotation.generatedOrder;
     const windowCount = quotation.quotation_windows?.length || 0;
 
     return (
@@ -148,6 +174,20 @@ export default function QuotationDetail() {
                 Volver a Cotizaciones
             </Link>
 
+            {/* ── Banner de advertencia cuando está reabierta ── */}
+            {isReopenada && (
+                <div className="mb-4 flex items-start gap-3 bg-amber-50 border border-amber-300 rounded-xl px-4 py-3">
+                    <FaExclamationTriangle className="text-amber-500 mt-0.5 shrink-0" size={15} />
+                    <div>
+                        <p className="text-sm font-bold text-amber-800">Cotización reabierta para edición</p>
+                        <p className="text-xs text-amber-700 mt-0.5">
+                            El Pedido #{quotation.generatedOrder.id} sigue activo. Al re-confirmar esta cotización,
+                            el pedido se actualizará con las nuevas ventanas y el nuevo total.
+                        </p>
+                    </div>
+                </div>
+            )}
+
             {/* ── Header card ── */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 mb-5">
 
@@ -161,10 +201,12 @@ export default function QuotationDetail() {
                                 #{quotation.quotationNumber}
                             </span>
                             <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg border capitalize ${isConfirmado
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                : 'bg-amber-50 text-amber-700 border-amber-100'
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                    : isReopenada
+                                        ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                        : 'bg-amber-50 text-amber-700 border-amber-100'
                                 }`}>
-                                {quotation.status.replace('_', ' ')}
+                                {isConfirmado ? 'Confirmada' : isReopenada ? 'Reabierta — En Edición' : 'En Proceso'}
                             </span>
                             {quotation.include_iva && (
                                 <span className="text-xs font-semibold px-2.5 py-1 rounded-lg border bg-violet-50 text-violet-700 border-violet-200">
@@ -197,8 +239,7 @@ export default function QuotationDetail() {
                                     value={quotation.client?.status || ''}
                                     onChange={handleClientStatusChange}
                                     disabled={isUpdatingStatus}
-                                    className={`text-xs font-semibold px-2.5 py-1 rounded-lg border appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 transition-colors disabled:opacity-50 ${clientStatusStyles[quotation.client?.status] || 'bg-gray-100 text-gray-600 border-gray-200'
-                                        }`}
+                                    className={`text-xs font-semibold px-2.5 py-1 rounded-lg border appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 transition-colors disabled:opacity-50 ${clientStatusStyles[quotation.client?.status] || 'bg-gray-100 text-gray-600 border-gray-200'}`}
                                 >
                                     {Object.entries(statusLabels).map(([k, v]) => (
                                         <option key={k} value={k}>{v}</option>
@@ -215,11 +256,11 @@ export default function QuotationDetail() {
                     {/* Botones derecha */}
                     <div className="flex flex-wrap gap-2 justify-end flex-shrink-0">
 
-                        {/* Editar */}
+                        {/* Editar — disponible si no está confirmada */}
                         <button
                             onClick={() => setIsEditModalOpen(true)}
                             disabled={isConfirmado}
-                            title={isConfirmado ? 'No se puede editar una cotización confirmada' : 'Editar cotización'}
+                            title={isConfirmado ? 'Usa "Reabrir" para editar una cotización confirmada' : 'Editar cotización'}
                             className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                         >
                             <FaEdit size={13} /> Editar
@@ -252,21 +293,50 @@ export default function QuotationDetail() {
                             <FaWhatsapp size={13} /> WhatsApp
                         </button>
 
-                        {/* Confirmar / Ver Pedido */}
+                        {/* Botón principal: Reabrir / Re-confirmar / Ver Pedido / Confirmar */}
                         {isConfirmado ? (
-                            quotation.generatedOrder ? (
-                                <Link
-                                    to={`/orders/${quotation.generatedOrder.id}`}
-                                    className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-all"
+                            // Confirmada: mostrar "Ver Pedido" y si es admin, "Reabrir"
+                            <div className="flex gap-2">
+                                {quotation.generatedOrder && (
+                                    <Link
+                                        to={`/orders/${quotation.generatedOrder.id}`}
+                                        className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-all"
+                                    >
+                                        <FaBoxOpen size={13} /> Ver Pedido
+                                    </Link>
+                                )}
+                                {isAdmin && (
+                                    <button
+                                        onClick={handleReopen}
+                                        disabled={isReopening}
+                                        className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-xl border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                        title="Reabrir para editar y re-confirmar"
+                                    >
+                                        <FaUnlock size={13} />
+                                        {isReopening ? 'Reabriendo...' : 'Reabrir'}
+                                    </button>
+                                )}
+                            </div>
+                        ) : isReopenada ? (
+                            // Reabierta: puede editar (arriba ya está habilitado) y re-confirmar
+                            <div className="flex gap-2">
+                                {quotation.generatedOrder && (
+                                    <Link
+                                        to={`/orders/${quotation.generatedOrder.id}`}
+                                        className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-xl border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-all"
+                                    >
+                                        <FaBoxOpen size={13} /> Ver Pedido
+                                    </Link>
+                                )}
+                                <button
+                                    onClick={() => setIsConfirmModalOpen(true)}
+                                    className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm transition-all"
                                 >
-                                    <FaBoxOpen size={13} /> Ver Pedido
-                                </Link>
-                            ) : (
-                                <span className="inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-400 rounded-xl border border-gray-100 bg-gray-50">
-                                    <FaCheckCircle size={13} /> Confirmado
-                                </span>
-                            )
+                                    <FaCheckCircle size={13} /> Re-confirmar
+                                </button>
+                            </div>
                         ) : (
+                            // En proceso normal: confirmar por primera vez
                             <button
                                 onClick={() => setIsConfirmModalOpen(true)}
                                 className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm transition-all"
@@ -281,7 +351,10 @@ export default function QuotationDetail() {
                 <div className="mt-5 pt-4 border-t border-gray-100 flex justify-between items-center">
                     <div className="text-sm text-gray-500">
                         <span className="font-medium text-gray-700">Precio por m²:</span>{' '}
-                        {quotation.price_per_m2 ? formatCurrency(quotation.price_per_m2) : <span className="italic text-gray-400">Variable por ventana</span>}
+                        {quotation.price_per_m2
+                            ? formatCurrency(quotation.price_per_m2)
+                            : <span className="italic text-gray-400">Variable por ventana</span>
+                        }
                     </div>
                     <div className="text-right">
                         <p className="text-xs text-gray-400 mb-0.5">Total de la Cotización</p>
@@ -291,11 +364,9 @@ export default function QuotationDetail() {
                     </div>
                 </div>
 
-                {/* ✅ NUEVO — Notas y foto de referencia */}
+                {/* Notas y foto de referencia */}
                 {(quotation.notes || quotation.reference_image_url) && (
                     <div className="mt-4 pt-4 border-t border-gray-100 flex flex-col sm:flex-row gap-4">
-
-                        {/* Notas */}
                         {quotation.notes && (
                             <div className="flex-1 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
                                 <div className="flex items-center gap-1.5 mb-1.5">
@@ -307,22 +378,20 @@ export default function QuotationDetail() {
                                 </p>
                             </div>
                         )}
-
-                        {/* Foto de referencia */}
                         {quotation.reference_image_url && (
                             <div className="flex flex-col items-start gap-2">
                                 <div className="flex items-center gap-1.5">
                                     <FaCamera size={12} className="text-gray-400" />
                                     <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Foto de referencia</span>
                                 </div>
-
-                                <a href={`http://localhost:3000${quotation.reference_image_url}`}
+                                <a
+                                    href={`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${quotation.reference_image_url}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="block"
                                 >
                                     <img
-                                        src={`http://localhost:3000${quotation.reference_image_url}`}
+                                        src={`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${quotation.reference_image_url}`}
                                         alt="Foto de referencia"
                                         className="h-24 w-auto rounded-xl border border-gray-200 object-cover shadow-sm hover:opacity-90 transition-opacity cursor-pointer"
                                     />
@@ -383,7 +452,7 @@ export default function QuotationDetail() {
                                             <span className="font-semibold text-gray-800">{win.displayName}</span>
                                             {win.design_image_url && (
                                                 <a
-                                                    href={`http://localhost:3000${win.design_image_url}`}
+                                                    href={`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${win.design_image_url}`}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     title="Ver diseño adjunto"
@@ -442,38 +511,38 @@ export default function QuotationDetail() {
             </div>
 
             {/* ── Modales ── */}
-            {
-                isEditModalOpen && (
-                    <AddQuotationModal
-                        open={isEditModalOpen}
-                        onClose={() => setIsEditModalOpen(false)}
-                        quotationToEdit={quotation}
-                        onSave={() => { setIsEditModalOpen(false); fetchQuotation(); }}
-                    />
-                )
-            }
+            {isEditModalOpen && (
+                <AddQuotationModal
+                    open={isEditModalOpen}
+                    onClose={() => setIsEditModalOpen(false)}
+                    quotationToEdit={quotation}
+                    onSave={() => { setIsEditModalOpen(false); fetchQuotation(); }}
+                />
+            )}
 
-            {
-                isConfirmModalOpen && (
-                    <ConfirmQuotationModal
-                        open={isConfirmModalOpen}
-                        onClose={() => setIsConfirmModalOpen(false)}
-                        quotationId={quotation.id}
-                        onConfirmSuccess={(newOrderId) => navigate(`/orders/${newOrderId}`)}
-                    />
-                )
-            }
+            {isConfirmModalOpen && (
+                <ConfirmQuotationModal
+                    open={isConfirmModalOpen}
+                    onClose={() => setIsConfirmModalOpen(false)}
+                    quotationId={quotation.id}
+                    isReconfirm={isReopenada}
+                    excludeOrderId={isReopenada ? quotation.generatedOrder?.id : null}
+                    onConfirmSuccess={(newOrderId) => {
+                        // Si es re-confirmación, el orderId ya existe — navegar al pedido
+                        const targetOrderId = newOrderId || quotation.generatedOrder?.id;
+                        navigate(`/orders/${targetOrderId}`);
+                    }}
+                />
+            )}
 
-            {
-                isReportModalOpen && (
-                    <ProfilesReportModal
-                        data={reportData}
-                        isLoading={isReportLoading}
-                        onClose={() => setIsReportModalOpen(false)}
-                        showPrices={true}
-                    />
-                )
-            }
+            {isReportModalOpen && (
+                <ProfilesReportModal
+                    data={reportData}
+                    isLoading={isReportLoading}
+                    onClose={() => setIsReportModalOpen(false)}
+                    showPrices={true}
+                />
+            )}
         </div>
     );
 }

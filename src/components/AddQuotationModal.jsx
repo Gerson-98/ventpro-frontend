@@ -1,6 +1,6 @@
 // RUTA: src/components/AddQuotationModal.jsx
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Fragment } from 'react';
 import api from '@/services/api';
 import { FaPlus, FaTrashAlt, FaClone, FaUpload, FaCheckCircle, FaCamera } from 'react-icons/fa';
 import * as DialogPrimitive from "@radix-ui/react-dialog";
@@ -609,13 +609,13 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                         {quotation.reference_image_url ? (
                                             <div className="flex flex-col gap-2">
                                                 <a
-                                                    href={`http://localhost:3000${quotation.reference_image_url}`}
+                                                    href={`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${quotation.reference_image_url}`}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="block w-fit"
                                                 >
                                                     <img
-                                                        src={`http://localhost:3000${quotation.reference_image_url}`}
+                                                        src={`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${quotation.reference_image_url}`}
                                                         alt="Foto de referencia"
                                                         className="h-20 w-auto rounded-lg border border-gray-200 object-cover shadow-sm hover:opacity-90 transition-opacity"
                                                     />
@@ -677,8 +677,8 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                                 const showCostRow = win.window_type_id && win.width_m && win.height_m && win.color_id;
 
                                                 return (
-                                                    <>
-                                                        <tr key={win.tempId || win.id} className="border-b align-top hover:bg-gray-50">
+                                                    <Fragment key={win.tempId || win.id}>
+                                                        <tr className="border-b align-top hover:bg-gray-50">
 
                                                             {/* Tipo */}
                                                             <td className="p-2">
@@ -734,7 +734,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                                                         <input id={`file-upload-${index}`} type="file" className="hidden" accept="image/*" onChange={(e) => handleFileChange(index, e.target.files[0])} />
                                                                         {win.fileToUpload && <p className="text-xs text-gray-600 mt-1 truncate">Archivo: {win.fileToUpload.name}</p>}
                                                                         {win.design_image_url && !win.fileToUpload && (
-                                                                            <a href={`http://localhost:3000${win.design_image_url}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-green-600 mt-1">
+                                                                            <a href={`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${win.design_image_url}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-green-600 mt-1">
                                                                                 <FaCheckCircle /> Ver Diseño Cargado
                                                                             </a>
                                                                         )}
@@ -789,7 +789,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                                                 </td>
                                                             </tr>
                                                         )}
-                                                    </>
+                                                    </Fragment>
                                                 );
                                             })}
                                         </tbody>
