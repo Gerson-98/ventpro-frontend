@@ -588,6 +588,7 @@ export default function OrderDetail() {
           isLoading={isOptLoading}
           optimizationData={optimizationData}
           onClose={() => setShowOptModal(false)}
+          projectName={order?.project}
         />
       )}
 

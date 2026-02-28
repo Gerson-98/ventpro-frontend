@@ -112,8 +112,10 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
     const [showAddClientModal, setShowAddClientModal] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [loading, setLoading] = useState(false);
+    // Flag: indica que los catálogos ya fueron cargados — necesario para
+    // que el useEffect de edición pueda llamar findGroupAndVariants con datos.
+    const [catalogsLoaded, setCatalogsLoaded] = useState(false);
 
-    // ✅ Estado de la cotización — incluye notes y reference_image_url
     const [quotation, setQuotation] = useState({
         project: '',
         clientId: '',
@@ -127,96 +129,8 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
     const [windowCosts, setWindowCosts] = useState({});
     const [calculatingCost, setCalculatingCost] = useState({});
 
-    // ── Carga inicial ──────────────────────────────────────────────────────────
-    useEffect(() => {
-        if (open) {
-            const fetchCatalogs = async () => {
-                try {
-                    const [clientsRes, typesRes, pvcRes, glassRes] = await Promise.all([
-                        api.get('/clients'),
-                        api.get('/window-types'),
-                        api.get('/pvc-colors'),
-                        api.get('/glass-colors'),
-                    ]);
-                    setClients(clientsRes.data);
-                    const types = typesRes.data;
-                    setWindowTypes(types);
-                    setSelectorList(buildSelectorList(types));
-                    setPvcColors(pvcRes.data);
-                    setGlassColors(glassRes.data || []);
-                    setRealGlassTypes(
-                        (glassRes.data || []).filter(g =>
-                            g.name.toUpperCase() !== 'DUELA' &&
-                            g.name.toUpperCase() !== 'VIDRIO Y DUELA'
-                        )
-                    );
-                } catch (error) {
-                    console.error("Error cargando catálogos:", error);
-                }
-            };
-            fetchCatalogs();
-        }
-
-        if (quotationToEdit) {
-            setIsEditing(true);
-            setQuotation({
-                project: quotationToEdit.project,
-                clientId: quotationToEdit.clientId || '',
-                price_per_m2: quotationToEdit.price_per_m2 || '',
-                include_iva: Boolean(quotationToEdit.include_iva),
-                notes: quotationToEdit.notes || '',                             // ✅
-                reference_image_url: quotationToEdit.reference_image_url || '', // ✅
-                windows: (quotationToEdit.quotation_windows || []).map(win => {
-                    const found = findGroupAndVariants(win.window_type_id, windowTypes);
-                    return {
-                        id: win.id,
-                        displayName: win.displayName || win.window_type?.name || '',
-                        width_m: win.width_cm / 100,
-                        height_m: win.height_cm / 100,
-                        quantity: win.quantity || 1,
-                        price_per_m2: win.price_per_m2 || '',
-                        window_type_id: win.window_type_id,
-                        color_id: win.color_id,
-                        glass_color_id: win.glass_color_id,
-                        options: win.options || {},
-                        design_image_url: win.design_image_url,
-                        fileToUpload: null,
-                        tempId: `existing_${win.id}`,
-                        _groupId: found?.groupId || '',
-                        _variantValues: found?.variantValues || {},
-                        _optionGroups: [],
-                    };
-                }),
-            });
-        } else {
-            setIsEditing(false);
-            setWindowCosts({});
-            setCalculatingCost({});
-            setQuotation({
-                project: '',
-                clientId: '',
-                price_per_m2: '',
-                include_iva: false,
-                notes: '',
-                reference_image_url: '',
-                windows: [],
-            });
-        }
-    }, [open, quotationToEdit]);
-
-    // ── Cargar grupos dinámicos para un window_type_id ─────────────────────────
-    const loadOptionGroups = useCallback(async (windowTypeId) => {
-        if (!windowTypeId) return [];
-        try {
-            const res = await api.get(`/window-type-options?windowTypeId=${windowTypeId}`);
-            return Array.isArray(res.data) ? res.data : [];
-        } catch {
-            return [];
-        }
-    }, []);
-
-    // ── Calcular costo ─────────────────────────────────────────────────────────
-    const calculateWindowCost = async (win) => {
+    // ── Calcular costo de una ventana ──────────────────────────────────────────
+    const calculateWindowCost = useCallback(async (win) => {
         if (!win.window_type_id || !win.width_m || !win.height_m || !win.color_id) return;
         const key = win.tempId || win.id;
         setCalculatingCost(prev => ({ ...prev, [key]: true }));
@@ -242,7 +156,139 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
         } finally {
             setCalculatingCost(prev => ({ ...prev, [key]: false }));
         }
-    };
+    }, []);
+
+    // ── Cargar grupos dinámicos para un window_type_id ─────────────────────────
+    const loadOptionGroups = useCallback(async (windowTypeId) => {
+        if (!windowTypeId) return [];
+        try {
+            const res = await api.get(`/window-type-options?windowTypeId=${windowTypeId}`);
+            return Array.isArray(res.data) ? res.data : [];
+        } catch {
+            return [];
+        }
+    }, []);
+
+    // ── PASO 1: Cargar catálogos al abrir el modal ─────────────────────────────
+    // BUG CORREGIDO: antes ambos effectos corrían en paralelo. El de edición
+    // llamaba findGroupAndVariants con windowTypes=[] porque el fetch aún no
+    // había terminado → el selector aparecía vacío al editar.
+    // Solución: separar en dos useEffects con el flag catalogsLoaded.
+    useEffect(() => {
+        if (!open) {
+            setCatalogsLoaded(false);
+            return;
+        }
+
+        const fetchCatalogs = async () => {
+            setCatalogsLoaded(false);
+            try {
+                const [clientsRes, typesRes, pvcRes, glassRes] = await Promise.all([
+                    api.get('/clients'),
+                    api.get('/window-types'),
+                    api.get('/pvc-colors'),
+                    api.get('/glass-colors'),
+                ]);
+                setClients(clientsRes.data);
+                const types = typesRes.data;
+                setWindowTypes(types);
+                setSelectorList(buildSelectorList(types));
+                setPvcColors(pvcRes.data);
+                setGlassColors(glassRes.data || []);
+                setRealGlassTypes(
+                    (glassRes.data || []).filter(g =>
+                        g.name.toUpperCase() !== 'DUELA' &&
+                        g.name.toUpperCase() !== 'VIDRIO Y DUELA'
+                    )
+                );
+            } catch (error) {
+                console.error("Error cargando catálogos:", error);
+            } finally {
+                // Marcar como listo SIEMPRE, incluso si falló, para no bloquear el modal
+                setCatalogsLoaded(true);
+            }
+        };
+
+        fetchCatalogs();
+    }, [open]);
+
+    // ── PASO 2: Poblar el formulario DESPUÉS de que los catálogos estén listos ─
+    // BUG CORREGIDO: ahora esperamos catalogsLoaded=true y windowTypes poblado
+    // antes de llamar findGroupAndVariants y loadOptionGroups.
+    // BUG CORREGIDO: al editar, se disparan los cálculos de costo para que el
+    // resumen global aparezca inmediatamente sin necesidad de cambiar nada.
+    useEffect(() => {
+        if (!open || !catalogsLoaded) return;
+
+        if (quotationToEdit) {
+            setIsEditing(true);
+            setWindowCosts({});
+            setCalculatingCost({});
+
+            const buildEditWindows = async () => {
+                const windows = await Promise.all(
+                    (quotationToEdit.quotation_windows || []).map(async (win) => {
+                        // windowTypes ya está poblado aquí — findGroupAndVariants funciona
+                        const found = findGroupAndVariants(win.window_type_id, windowTypes);
+                        // Cargar option groups para restaurar opciones dinámicas (abatible, etc.)
+                        const optionGroups = win.window_type_id
+                            ? await loadOptionGroups(win.window_type_id)
+                            : [];
+
+                        return {
+                            id: win.id,
+                            displayName: win.displayName || win.windowType?.name || '',
+                            width_m: win.width_cm / 100,
+                            height_m: win.height_cm / 100,
+                            quantity: win.quantity || 1,
+                            price_per_m2: win.price_per_m2 || '',
+                            window_type_id: win.window_type_id,
+                            color_id: win.color_id,
+                            glass_color_id: win.glass_color_id || '',
+                            options: win.options || {},
+                            design_image_url: win.design_image_url || null,
+                            fileToUpload: null,
+                            tempId: `existing_${win.id}`,
+                            _groupId: found?.groupId || '',
+                            _variantValues: found?.variantValues || {},
+                            _optionGroups: optionGroups,
+                        };
+                    })
+                );
+
+                setQuotation({
+                    project: quotationToEdit.project,
+                    clientId: quotationToEdit.clientId || '',
+                    price_per_m2: quotationToEdit.price_per_m2 || '',
+                    include_iva: Boolean(quotationToEdit.include_iva),
+                    notes: quotationToEdit.notes || '',
+                    reference_image_url: quotationToEdit.reference_image_url || '',
+                    windows,
+                });
+
+                // Recalcular costos de todas las ventanas para mostrar el resumen global
+                for (const win of windows) {
+                    calculateWindowCost(win);
+                }
+            };
+
+            buildEditWindows();
+        } else {
+            setIsEditing(false);
+            setWindowCosts({});
+            setCalculatingCost({});
+            setQuotation({
+                project: '',
+                clientId: '',
+                price_per_m2: '',
+                include_iva: false,
+                notes: '',
+                reference_image_url: '',
+                windows: [],
+            });
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open, catalogsLoaded]);
 
     // ── Cambio en el primer select (grupo o tipo simple) ──────────────────────
     const handleGroupChange = async (index, value) => {
@@ -384,25 +430,6 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
         calculateWindowCost(updatedWindows[index]);
     };
 
-    // ── Cargar grupos al abrir cotización existente ───────────────────────────
-    useEffect(() => {
-        if (!isEditing || !quotation.windows.length) return;
-        const loadMissing = async () => {
-            const updated = await Promise.all(
-                quotation.windows.map(async (win) => {
-                    if (win.window_type_id && win._optionGroups.length === 0) {
-                        const groups = await loadOptionGroups(win.window_type_id);
-                        return { ...win, _optionGroups: groups };
-                    }
-                    return win;
-                })
-            );
-            setQuotation(prev => ({ ...prev, windows: updated }));
-        };
-        loadMissing();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isEditing]);
-
     const handleFileChange = (index, file) => {
         const updatedWindows = quotation.windows.map((win, i) =>
             i === index ? { ...win, fileToUpload: file, design_image_url: null } : win
@@ -460,6 +487,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
 
     const totalsInRealTime = calculateGrandTotal();
     const totalMaterialCost = Object.values(windowCosts).reduce((s, c) => s + (c?.costo_total || 0), 0);
+    const isCalculatingAny = Object.values(calculatingCost).some(Boolean);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -471,8 +499,8 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             price_per_m2: quotation.price_per_m2 ? Number(quotation.price_per_m2) : null,
             include_iva: Boolean(quotation.include_iva),
             total_price: freshTotals.total,
-            notes: quotation.notes || null,                             // ✅
-            reference_image_url: quotation.reference_image_url || null, // ✅
+            notes: quotation.notes || null,
+            reference_image_url: quotation.reference_image_url || null,
             windows: quotation.windows.map(win => ({
                 id: isEditing ? win.id : undefined,
                 displayName: win.displayName,
@@ -520,7 +548,10 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             <DialogPrimitive.Root open={open} onOpenChange={onClose}>
                 <DialogPrimitive.Portal>
                     <DialogPrimitive.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40" />
-                    <DialogContent className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white p-6 rounded-xl shadow-2xl w-full max-w-7xl max-h-[90vh] flex flex-col z-50">
+                    <DialogContent
+                        aria-describedby={undefined}
+                        className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white p-6 rounded-xl shadow-2xl w-full max-w-7xl max-h-[90vh] flex flex-col z-50"
+                    >
                         <DialogHeader>
                             <DialogTitle>Cotización de Proyecto</DialogTitle>
                             <DialogDescription>Detalles y cálculo de precios para el cliente.</DialogDescription>
@@ -585,9 +616,8 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                     </label>
                                 </div>
 
-                                {/* ✅ ── NOTAS Y FOTO DE REFERENCIA ── */}
+                                {/* ── NOTAS Y FOTO DE REFERENCIA ── */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                                    {/* Notas */}
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">
                                             Notas <span className="text-gray-400 font-normal">(opcional)</span>
@@ -601,7 +631,6 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                         />
                                     </div>
 
-                                    {/* Foto de referencia */}
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">
                                             Foto de referencia <span className="text-gray-400 font-normal">(opcional)</span>
@@ -662,19 +691,11 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                         </thead>
                                         <tbody className="divide-y divide-gray-200">
                                             {quotation.windows.map((win, index) => {
-                                                const selectedType = windowTypes.find(wt => wt.id === Number(win.window_type_id));
-                                                const typeName = selectedType?.name || '';
                                                 const selectedGlass = glassColors.find(gc => gc.id === Number(win.glass_color_id));
                                                 const needsAddGlass = selectedGlass?.name.toUpperCase() === 'VIDRIO Y DUELA';
-
                                                 const optionGroups = win._optionGroups || [];
                                                 const showUpload = optionGroups.some(wto => wto.group.key === 'diseno')
                                                     && win.options?.diseno === 'con_diseno';
-
-                                                const costKey = win.tempId || win.id;
-                                                const cost = windowCosts[costKey];
-                                                const isCalc = calculatingCost[costKey];
-                                                const showCostRow = win.window_type_id && win.width_m && win.height_m && win.color_id;
 
                                                 return (
                                                     <Fragment key={win.tempId || win.id}>
@@ -693,20 +714,53 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                                             {/* Medidas */}
                                                             <td className="p-2">
                                                                 <div className="flex items-center justify-center gap-1">
-                                                                    <input type="number" step="0.01" name="width_m" value={win.width_m || ''} onChange={(e) => handleWindowChange(index, e)} className="w-16 p-2 border rounded text-center" placeholder="Ancho" required />
+                                                                    <input
+                                                                        type="number"
+                                                                        step="0.01"
+                                                                        name="width_m"
+                                                                        value={win.width_m || ''}
+                                                                        onChange={(e) => handleWindowChange(index, e)}
+                                                                        className="w-16 p-2 border rounded text-center"
+                                                                        placeholder="Ancho"
+                                                                        required
+                                                                    />
                                                                     <span>×</span>
-                                                                    <input type="number" step="0.01" name="height_m" value={win.height_m || ''} onChange={(e) => handleWindowChange(index, e)} className="w-16 p-2 border rounded text-center" placeholder="Alto" required />
+                                                                    <input
+                                                                        type="number"
+                                                                        step="0.01"
+                                                                        name="height_m"
+                                                                        value={win.height_m || ''}
+                                                                        onChange={(e) => handleWindowChange(index, e)}
+                                                                        className="w-16 p-2 border rounded text-center"
+                                                                        placeholder="Alto"
+                                                                        required
+                                                                    />
                                                                 </div>
                                                             </td>
 
                                                             {/* Cantidad */}
                                                             <td className="p-2">
-                                                                <input type="number" name="quantity" value={win.quantity} onChange={(e) => handleWindowChange(index, e)} className="w-full p-2 border rounded text-center" required />
+                                                                <input
+                                                                    type="number"
+                                                                    name="quantity"
+                                                                    value={win.quantity}
+                                                                    onChange={(e) => handleWindowChange(index, e)}
+                                                                    className="w-full p-2 border rounded text-center"
+                                                                    required
+                                                                />
                                                             </td>
 
                                                             {/* Precio individual */}
                                                             <td className="p-2">
-                                                                <input type="number" step="0.01" name="price_per_m2" value={win.price_per_m2} onChange={(e) => handleWindowChange(index, e)} className="w-24 p-2 border rounded text-center" placeholder={quotation.price_per_m2 || 'Global'} />
+                                                                <input
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    name="price_per_m2"
+                                                                    value={win.price_per_m2}
+                                                                    onChange={(e) => handleWindowChange(index, e)}
+                                                                    className="w-24 p-2 border rounded text-center"
+                                                                    placeholder={quotation.price_per_m2 || 'Global'}
+                                                                />
                                                             </td>
 
                                                             {/* Opciones dinámicas */}
@@ -731,10 +785,25 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                                                         <label htmlFor={`file-upload-${index}`} className="flex items-center gap-2 text-sm text-blue-600 cursor-pointer hover:text-blue-800">
                                                                             <FaUpload /><span>Adjuntar Diseño</span>
                                                                         </label>
-                                                                        <input id={`file-upload-${index}`} type="file" className="hidden" accept="image/*" onChange={(e) => handleFileChange(index, e.target.files[0])} />
-                                                                        {win.fileToUpload && <p className="text-xs text-gray-600 mt-1 truncate">Archivo: {win.fileToUpload.name}</p>}
+                                                                        <input
+                                                                            id={`file-upload-${index}`}
+                                                                            type="file"
+                                                                            className="hidden"
+                                                                            accept="image/*"
+                                                                            onChange={(e) => handleFileChange(index, e.target.files[0])}
+                                                                        />
+                                                                        {win.fileToUpload && (
+                                                                            <p className="text-xs text-gray-600 mt-1 truncate">
+                                                                                Archivo: {win.fileToUpload.name}
+                                                                            </p>
+                                                                        )}
                                                                         {win.design_image_url && !win.fileToUpload && (
-                                                                            <a href={`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${win.design_image_url}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-green-600 mt-1">
+                                                                            <a
+                                                                                href={`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${win.design_image_url}`}
+                                                                                target="_blank"
+                                                                                rel="noopener noreferrer"
+                                                                                className="flex items-center gap-1 text-xs text-green-600 mt-1"
+                                                                            >
                                                                                 <FaCheckCircle /> Ver Diseño Cargado
                                                                             </a>
                                                                         )}
@@ -744,7 +813,13 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
 
                                                             {/* Color PVC */}
                                                             <td className="p-2">
-                                                                <select name="color_id" value={win.color_id} onChange={(e) => handleWindowChange(index, e)} className="w-full p-2 border rounded" required>
+                                                                <select
+                                                                    name="color_id"
+                                                                    value={win.color_id}
+                                                                    onChange={(e) => handleWindowChange(index, e)}
+                                                                    className="w-full p-2 border rounded"
+                                                                    required
+                                                                >
                                                                     <option value="">Seleccione...</option>
                                                                     {pvcColors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                                                 </select>
@@ -752,12 +827,22 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
 
                                                             {/* Color Vidrio */}
                                                             <td className="p-2">
-                                                                <select name="glass_color_id" value={win.glass_color_id} onChange={(e) => handleWindowChange(index, e)} className="w-full p-2 border rounded">
+                                                                <select
+                                                                    name="glass_color_id"
+                                                                    value={win.glass_color_id}
+                                                                    onChange={(e) => handleWindowChange(index, e)}
+                                                                    className="w-full p-2 border rounded"
+                                                                >
                                                                     <option value="">Seleccione...</option>
                                                                     {glassColors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                                                 </select>
                                                                 {needsAddGlass && (
-                                                                    <select value={win.options?.vidrio_adicional_id || ''} onChange={(e) => handleOptionChange(index, 'vidrio_adicional_id', e.target.value)} className="w-full p-2 border border-blue-400 rounded mt-2" required>
+                                                                    <select
+                                                                        value={win.options?.vidrio_adicional_id || ''}
+                                                                        onChange={(e) => handleOptionChange(index, 'vidrio_adicional_id', e.target.value)}
+                                                                        className="w-full p-2 border border-blue-400 rounded mt-2"
+                                                                        required
+                                                                    >
                                                                         <option value="">Seleccionar Vidrio...</option>
                                                                         {realGlassTypes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                                                     </select>
@@ -772,23 +857,6 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                                                 </div>
                                                             </td>
                                                         </tr>
-
-                                                        {/* FILA DE COSTO */}
-                                                        {showCostRow && (
-                                                            <tr key={`cost_${costKey}`} className="bg-amber-50 border-b border-amber-100">
-                                                                <td colSpan={8} className="px-4 py-1.5">
-                                                                    {isCalc ? (
-                                                                        <span className="text-xs text-gray-400 italic animate-pulse">⏳ Calculando costo de materiales...</span>
-                                                                    ) : cost ? (
-                                                                        <div className="flex items-center gap-6 text-xs">
-                                                                            <span className="text-gray-600">💰 Costo materiales: <span className="font-semibold text-gray-800 ml-1">Q {cost.costo_total.toFixed(2)}</span></span>
-                                                                            <span className="text-green-700 font-bold">✅ Precio mínimo sugerido: <span className="ml-1 text-green-800">Q {cost.precio_sugerido_minimo.toFixed(2)}</span></span>
-                                                                            <span className="text-gray-400 italic">(margen del 60%)</span>
-                                                                        </div>
-                                                                    ) : null}
-                                                                </td>
-                                                            </tr>
-                                                        )}
                                                     </Fragment>
                                                 );
                                             })}
@@ -801,17 +869,44 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                 </Button>
 
                                 {/* ── RESUMEN TOTALES ── */}
-                                <div className="bg-gray-50 p-4 border rounded-lg mt-6 flex justify-between items-end">
-                                    {totalMaterialCost > 0 && (
-                                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
-                                            <p className="text-xs text-amber-700 font-semibold uppercase mb-1">Análisis de Costos del Proyecto</p>
-                                            <div className="flex gap-6">
-                                                <span className="text-gray-600">Costo total materiales: <span className="font-bold text-gray-800 ml-1">Q {totalMaterialCost.toFixed(2)}</span></span>
-                                                <span className="text-green-700 font-bold">Precio mínimo del proyecto: <span className="ml-1">Q {(totalMaterialCost / 0.40).toFixed(2)}</span></span>
+                                <div className="bg-gray-50 p-4 border rounded-lg mt-6 flex justify-between items-end gap-4">
+
+                                    {/* Análisis de costos global del proyecto — eliminado por ventana */}
+                                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm min-w-0 flex-1">
+                                        <p className="text-xs text-amber-700 font-semibold uppercase mb-2 tracking-wide">
+                                            Análisis de Costos del Proyecto
+                                        </p>
+                                        {isCalculatingAny ? (
+                                            <span className="text-xs text-gray-400 italic animate-pulse">
+                                                ⏳ Calculando costo de materiales...
+                                            </span>
+                                        ) : totalMaterialCost > 0 ? (
+                                            <div className="flex flex-wrap gap-x-6 gap-y-1">
+                                                <span className="text-gray-600">
+                                                    Costo total materiales:{' '}
+                                                    <span className="font-bold text-gray-800 ml-1">
+                                                        Q {totalMaterialCost.toFixed(2)}
+                                                    </span>
+                                                </span>
+                                                <span className="text-green-700 font-bold">
+                                                    Precio mínimo sugerido:{' '}
+                                                    <span className="ml-1 text-green-800">
+                                                        Q {(totalMaterialCost / 0.40).toFixed(2)}
+                                                    </span>
+                                                </span>
+                                                <span className="text-gray-400 italic text-xs self-center">
+                                                    (margen del 60%)
+                                                </span>
                                             </div>
-                                        </div>
-                                    )}
-                                    <div className="space-y-1 w-64 ml-auto">
+                                        ) : (
+                                            <span className="text-xs text-gray-400 italic">
+                                                Completa tipo, medidas y color PVC para ver el análisis.
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    {/* Totales */}
+                                    <div className="space-y-1 w-64 flex-shrink-0">
                                         <div className="flex justify-between text-sm text-gray-600">
                                             <span>Sub-total:</span>
                                             <span>Q {totalsInRealTime.subTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
@@ -824,7 +919,9 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                         )}
                                         <div className="flex justify-between items-center pt-2 border-t border-gray-300">
                                             <span className="text-lg font-bold text-gray-800">TOTAL:</span>
-                                            <span className="text-2xl font-black text-blue-700">Q {totalsInRealTime.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                                            <span className="text-2xl font-black text-blue-700">
+                                                Q {totalsInRealTime.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                            </span>
                                         </div>
                                     </div>
                                 </div>
