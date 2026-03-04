@@ -43,6 +43,7 @@ export default function AccessoryRulesTab() {
 
     const [selectedTypeId, setSelectedTypeId] = useState("");
     const [showModal, setShowModal] = useState(false);
+    const [showSidebar, setShowSidebar] = useState(false);
     const [editingRule, setEditingRule] = useState(null);
     const [formData, setFormData] = useState(EMPTY_FORM);
     const [formError, setFormError] = useState("");
@@ -199,13 +200,46 @@ export default function AccessoryRulesTab() {
         }
     };
 
+    // ── Nombre del tipo seleccionado ──────────────────────────────────────────
+    const selectedTypeName = windowTypes.find((t) => String(t.id) === selectedTypeId)?.name;
+
+    // ── Contenido sidebar (compartido drawer/panel) ───────────────────────────
+    const SidebarContent = () => (
+        <div className="border border-gray-200 rounded-lg overflow-hidden">
+            {windowTypes.map((wt) => {
+                const count = countByType[wt.id] || 0;
+                const isSelected = String(wt.id) === selectedTypeId;
+                return (
+                    <button
+                        key={wt.id}
+                        onClick={() => {
+                            setSelectedTypeId(String(wt.id));
+                            setShowSidebar(false);
+                        }}
+                        className={`w-full text-left px-3 py-2.5 text-sm border-b border-gray-100 last:border-0 flex justify-between items-center transition-colors ${isSelected
+                            ? "bg-blue-600 text-white"
+                            : "hover:bg-gray-50 active:bg-gray-100 text-gray-700"
+                            }`}
+                    >
+                        <span className="truncate pr-2">{wt.name}</span>
+                        <span className={`flex-shrink-0 text-xs font-bold px-1.5 py-0.5 rounded-full ${isSelected ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-500"
+                            }`}>
+                            {count}
+                        </span>
+                    </button>
+                );
+            })}
+        </div>
+    );
+
     // ── Render ─────────────────────────────────────────────────────────────────
     return (
-        <div className="bg-white p-6 rounded-lg shadow-md">
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-md">
 
-            <div className="mb-6">
-                <h2 className="text-2xl font-semibold text-gray-800">Reglas de Accesorios</h2>
-                <p className="text-gray-500 text-sm mt-0.5">
+            {/* Header */}
+            <div className="mb-4 sm:mb-6">
+                <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">Reglas de Accesorios</h2>
+                <p className="text-gray-500 text-xs sm:text-sm mt-0.5">
                     Define qué accesorios lleva cada tipo de ventana — fijos siempre, o condicionales según las opciones elegidas.
                 </p>
             </div>
@@ -225,148 +259,211 @@ export default function AccessoryRulesTab() {
                     Cargando...
                 </div>
             ) : (
-                <div className="flex gap-6">
-
-                    {/* Sidebar */}
-                    <div className="w-64 flex-shrink-0">
-                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 px-1">
-                            Tipo de Ventana
-                        </p>
-                        <div className="border border-gray-200 rounded-lg overflow-hidden">
-                            {windowTypes.map((wt) => {
-                                const count = countByType[wt.id] || 0;
-                                const isSelected = String(wt.id) === selectedTypeId;
-                                return (
-                                    <button
-                                        key={wt.id}
-                                        onClick={() => setSelectedTypeId(String(wt.id))}
-                                        className={`w-full text-left px-3 py-2.5 text-sm border-b border-gray-100 last:border-0 flex justify-between items-center transition-colors ${isSelected
-                                                ? "bg-blue-600 text-white"
-                                                : "hover:bg-gray-50 text-gray-700"
-                                            }`}
-                                    >
-                                        <span className="truncate pr-2">{wt.name}</span>
-                                        <span className={`flex-shrink-0 text-xs font-bold px-1.5 py-0.5 rounded-full ${isSelected ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-500"
-                                            }`}>
-                                            {count}
-                                        </span>
-                                    </button>
-                                );
-                            })}
-                        </div>
+                <>
+                    {/* ── Botón trigger sidebar — solo móvil ── */}
+                    <div className="lg:hidden mb-4 flex items-center gap-3">
+                        <button
+                            onClick={() => setShowSidebar(true)}
+                            className="flex items-center gap-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 px-3 py-2 rounded-lg active:bg-blue-100"
+                        >
+                            <span>Tipo:</span>
+                            <span className="truncate max-w-[160px]">{selectedTypeName || "Seleccionar"}</span>
+                            <span className="text-[10px] bg-blue-200 text-blue-700 rounded-full px-1.5 py-0.5 font-bold flex-shrink-0">
+                                {filteredRules.length}
+                            </span>
+                        </button>
                     </div>
 
-                    {/* Panel derecho */}
-                    <div className="flex-1 min-w-0">
-                        {selectedTypeId ? (
-                            <>
-                                <div className="flex justify-between items-center mb-3">
-                                    <div>
-                                        <p className="font-semibold text-gray-800">
-                                            {windowTypes.find((t) => String(t.id) === selectedTypeId)?.name}
-                                        </p>
-                                        <p className="text-xs text-gray-400">
-                                            {filteredRules.length} regla{filteredRules.length !== 1 ? "s" : ""} configurada{filteredRules.length !== 1 ? "s" : ""}
-                                        </p>
-                                    </div>
-                                    <button
-                                        onClick={openCreate}
-                                        className="flex items-center gap-2 bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition text-sm"
-                                    >
-                                        <FaPlus size={11} /> Añadir Regla
-                                    </button>
+                    {/* ── Drawer sidebar — móvil ── */}
+                    {showSidebar && (
+                        <div className="lg:hidden fixed inset-0 z-50 flex justify-end">
+                            <div className="absolute inset-0 bg-black/40" onClick={() => setShowSidebar(false)} />
+                            <div className="relative z-10 w-72 max-w-[85vw] h-full bg-white overflow-y-auto p-4 shadow-2xl">
+                                <div className="flex items-center justify-between mb-3">
+                                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                                        Tipo de Ventana
+                                    </p>
+                                    <button onClick={() => setShowSidebar(false)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
                                 </div>
+                                <SidebarContent />
+                            </div>
+                        </div>
+                    )}
 
-                                {filteredRules.length === 0 ? (
-                                    <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-lg text-gray-400">
-                                        <p>Sin reglas configuradas.</p>
-                                        <p className="text-xs mt-1">Haz clic en "Añadir Regla" para comenzar.</p>
+                    <div className="flex gap-6">
+
+                        {/* ── Sidebar estático — desktop ── */}
+                        <div className="hidden lg:block w-64 flex-shrink-0">
+                            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 px-1">
+                                Tipo de Ventana
+                            </p>
+                            <SidebarContent />
+                        </div>
+
+                        {/* ── Panel derecho ── */}
+                        <div className="flex-1 min-w-0">
+                            {selectedTypeId ? (
+                                <>
+                                    <div className="flex items-start justify-between gap-3 mb-3">
+                                        <div>
+                                            <p className="font-semibold text-gray-800 text-sm sm:text-base">
+                                                {selectedTypeName}
+                                            </p>
+                                            <p className="text-xs text-gray-400">
+                                                {filteredRules.length} regla{filteredRules.length !== 1 ? "s" : ""} configurada{filteredRules.length !== 1 ? "s" : ""}
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={openCreate}
+                                            className="flex items-center gap-2 bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 active:bg-blue-800 transition text-xs sm:text-sm flex-shrink-0"
+                                        >
+                                            <FaPlus size={11} /> Añadir Regla
+                                        </button>
                                     </div>
-                                ) : (
-                                    <div className="border border-gray-200 rounded-lg overflow-hidden">
-                                        <table className="min-w-full text-sm">
-                                            <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
-                                                <tr>
-                                                    <th className="py-2.5 px-3 text-left">Accesorio</th>
-                                                    <th className="py-2.5 px-3 text-center">Cant.</th>
-                                                    <th className="py-2.5 px-3 text-left">Tipo</th>
-                                                    <th className="py-2.5 px-3 text-left">Condición</th>
-                                                    <th className="py-2.5 px-3 text-center">Acciones</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-gray-100">
+
+                                    {filteredRules.length === 0 ? (
+                                        <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-lg text-gray-400">
+                                            <p className="text-sm">Sin reglas configuradas.</p>
+                                            <p className="text-xs mt-1">Haz clic en "Añadir Regla" para comenzar.</p>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            {/* ── Tabla desktop (md+) ── */}
+                                            <div className="hidden md:block border border-gray-200 rounded-lg overflow-hidden">
+                                                <table className="min-w-full text-sm">
+                                                    <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
+                                                        <tr>
+                                                            <th className="py-2.5 px-3 text-left">Accesorio</th>
+                                                            <th className="py-2.5 px-3 text-center">Cant.</th>
+                                                            <th className="py-2.5 px-3 text-left">Tipo</th>
+                                                            <th className="py-2.5 px-3 text-left">Condición</th>
+                                                            <th className="py-2.5 px-3 text-center">Acciones</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-gray-100">
+                                                        {filteredRules.map((rule) => (
+                                                            <tr key={rule.id} className="hover:bg-gray-50 transition-colors">
+                                                                <td className="py-2 px-3 font-medium text-gray-800">
+                                                                    {rule.material?.name ?? getMatName(rule.material_id)}
+                                                                </td>
+                                                                <td className="py-2 px-3 text-center font-mono font-bold text-gray-700">
+                                                                    {rule.quantity}
+                                                                </td>
+                                                                <td className="py-2 px-3">
+                                                                    <RuleBadge rule={rule} />
+                                                                </td>
+                                                                <td className="py-2 px-3 text-xs text-gray-500">
+                                                                    {rule.option_group ? (
+                                                                        <span>
+                                                                            <span className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">
+                                                                                {getGroupLabel(rule.option_group)}
+                                                                            </span>
+                                                                            {" = "}
+                                                                            <span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">
+                                                                                {getValueLabel(rule.option_group, rule.option_key)}
+                                                                            </span>
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="text-gray-400 italic">Siempre aplica</span>
+                                                                    )}
+                                                                </td>
+                                                                <td className="py-2 px-3 text-center">
+                                                                    <div className="flex justify-center gap-3">
+                                                                        <button onClick={() => openEdit(rule)} className="text-blue-500 hover:text-blue-700 transition" title="Editar">
+                                                                            <FaEdit size={14} />
+                                                                        </button>
+                                                                        <button onClick={() => handleDelete(rule.id)} className="text-red-400 hover:text-red-600 transition" title="Eliminar">
+                                                                            <FaTrashAlt size={13} />
+                                                                        </button>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+
+                                            {/* ── Cards móvil (< md) ── */}
+                                            <div className="md:hidden border border-gray-200 rounded-lg overflow-hidden divide-y divide-gray-100">
                                                 {filteredRules.map((rule) => (
-                                                    <tr key={rule.id} className="hover:bg-gray-50 transition-colors">
-                                                        <td className="py-2 px-3 font-medium text-gray-800">
-                                                            {rule.material?.name ?? getMatName(rule.material_id)}
-                                                        </td>
-                                                        <td className="py-2 px-3 text-center font-mono font-bold text-gray-700">
-                                                            {rule.quantity}
-                                                        </td>
-                                                        <td className="py-2 px-3">
-                                                            <RuleBadge rule={rule} />
-                                                        </td>
-                                                        <td className="py-2 px-3 text-xs text-gray-500">
-                                                            {rule.option_group ? (
-                                                                <span>
-                                                                    <span className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">
-                                                                        {getGroupLabel(rule.option_group)}
+                                                    <div key={rule.id} className="p-3">
+                                                        <div className="flex items-start justify-between gap-2 mb-2">
+                                                            <div className="min-w-0">
+                                                                <p className="font-medium text-sm text-gray-800 truncate">
+                                                                    {rule.material?.name ?? getMatName(rule.material_id)}
+                                                                </p>
+                                                                <div className="flex items-center gap-2 mt-1">
+                                                                    <RuleBadge rule={rule} />
+                                                                    <span className="text-xs text-gray-500 font-mono font-bold">
+                                                                        ×{rule.quantity}
                                                                     </span>
-                                                                    {" = "}
-                                                                    <span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">
-                                                                        {getValueLabel(rule.option_group, rule.option_key)}
-                                                                    </span>
-                                                                </span>
-                                                            ) : (
-                                                                <span className="text-gray-400 italic">Siempre aplica</span>
-                                                            )}
-                                                        </td>
-                                                        <td className="py-2 px-3 text-center">
-                                                            <div className="flex justify-center gap-3">
-                                                                <button onClick={() => openEdit(rule)} className="text-blue-500 hover:text-blue-700 transition" title="Editar">
-                                                                    <FaEdit size={14} />
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center gap-2 flex-shrink-0">
+                                                                <button
+                                                                    onClick={() => openEdit(rule)}
+                                                                    className="text-blue-500 p-1.5 rounded-lg border border-blue-100 active:bg-blue-50"
+                                                                >
+                                                                    <FaEdit size={13} />
                                                                 </button>
-                                                                <button onClick={() => handleDelete(rule.id)} className="text-red-400 hover:text-red-600 transition" title="Eliminar">
-                                                                    <FaTrashAlt size={13} />
+                                                                <button
+                                                                    onClick={() => handleDelete(rule.id)}
+                                                                    className="text-red-400 p-1.5 rounded-lg border border-red-100 active:bg-red-50"
+                                                                >
+                                                                    <FaTrashAlt size={12} />
                                                                 </button>
                                                             </div>
-                                                        </td>
-                                                    </tr>
+                                                        </div>
+                                                        {rule.option_group && (
+                                                            <div className="text-xs text-gray-500 mt-1.5">
+                                                                <span className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">
+                                                                    {getGroupLabel(rule.option_group)}
+                                                                </span>
+                                                                {" = "}
+                                                                <span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">
+                                                                    {getValueLabel(rule.option_group, rule.option_key)}
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
-                            </>
-                        ) : (
-                            <div className="text-center py-16 text-gray-400">
-                                Selecciona un tipo de ventana para ver sus reglas.
-                            </div>
-                        )}
+                                            </div>
+                                        </>
+                                    )}
+                                </>
+                            ) : (
+                                <div className="text-center py-16 text-gray-400 text-sm">
+                                    Selecciona un tipo de ventana para ver sus reglas.
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
+                </>
             )}
 
-            {/* ── MODAL ── */}
+            {/* ── MODAL — bottom sheet móvil / centrado sm+ ── */}
             {showModal && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-                    <div className="bg-white rounded-xl w-full max-w-md shadow-2xl border border-gray-100 relative">
+                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white w-full flex flex-col rounded-t-2xl sm:rounded-xl h-[90dvh] sm:h-auto sm:max-h-[90vh] sm:max-w-md overflow-hidden shadow-2xl">
 
-                        <div className="flex justify-between items-center p-6 pb-4 border-b border-gray-100">
+                        {/* Drag handle móvil */}
+                        <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mt-3 sm:hidden" />
+
+                        {/* Header */}
+                        <div className="flex justify-between items-center px-5 pt-4 pb-3 sm:p-6 sm:pb-4 border-b border-gray-100">
                             <div>
-                                <h3 className="text-lg font-semibold text-gray-800">
+                                <h3 className="text-base sm:text-lg font-semibold text-gray-800">
                                     {editingRule ? "Editar Regla" : "Nueva Regla de Accesorio"}
                                 </h3>
-                                <p className="text-xs text-blue-600 mt-0.5">
-                                    {windowTypes.find((t) => String(t.id) === selectedTypeId)?.name}
-                                </p>
+                                <p className="text-xs text-blue-600 mt-0.5">{selectedTypeName}</p>
                             </div>
                             <button onClick={closeModal} className="text-gray-400 hover:text-gray-600 w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100">
                                 <FaTimes />
                             </button>
                         </div>
 
-                        <form onSubmit={handleSave} className="p-6 space-y-4">
+                        {/* Body scrollable */}
+                        <form onSubmit={handleSave} className="overflow-y-auto flex-1 px-5 py-4 sm:p-6 space-y-4">
 
                             {/* Accesorio */}
                             <div>
@@ -406,18 +503,18 @@ export default function AccessoryRulesTab() {
                                         type="button"
                                         onClick={() => setField("isFija", true)}
                                         className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border text-sm font-medium transition ${formData.isFija
-                                                ? "bg-green-50 border-green-400 text-green-700"
-                                                : "bg-white border-gray-300 text-gray-500 hover:border-gray-400"
+                                            ? "bg-green-50 border-green-400 text-green-700"
+                                            : "bg-white border-gray-300 text-gray-500 hover:border-gray-400"
                                             }`}
                                     >
-                                        <FaLock size={12} /> Fija — siempre aplica
+                                        <FaLock size={12} /> Fija
                                     </button>
                                     <button
                                         type="button"
                                         onClick={() => setField("isFija", false)}
                                         className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border text-sm font-medium transition ${!formData.isFija
-                                                ? "bg-blue-50 border-blue-400 text-blue-700"
-                                                : "bg-white border-gray-300 text-gray-500 hover:border-gray-400"
+                                            ? "bg-blue-50 border-blue-400 text-blue-700"
+                                            : "bg-white border-gray-300 text-gray-500 hover:border-gray-400"
                                             }`}
                                     >
                                         <FaUnlock size={12} /> Condicional
@@ -425,14 +522,13 @@ export default function AccessoryRulesTab() {
                                 </div>
                             </div>
 
-                            {/* Campos condicionales — desde BD */}
+                            {/* Campos condicionales */}
                             {!formData.isFija && (
                                 <div className="p-4 bg-blue-50 rounded-lg border border-blue-100 space-y-3">
                                     <p className="text-xs text-blue-600 font-medium">
                                         Solo aplica cuando la opción del cotizador coincida con:
                                     </p>
 
-                                    {/* Grupo */}
                                     <div>
                                         <label className="block text-xs font-medium text-gray-600 mb-1">
                                             Grupo de opción <span className="text-red-500">*</span>
@@ -449,14 +545,11 @@ export default function AccessoryRulesTab() {
                                         >
                                             <option value="">— Seleccionar grupo —</option>
                                             {optionGroups.map(g => (
-                                                <option key={g.id} value={g.key}>
-                                                    {g.label}
-                                                </option>
+                                                <option key={g.id} value={g.key}>{g.label}</option>
                                             ))}
                                         </select>
                                     </div>
 
-                                    {/* Valor */}
                                     <div>
                                         <label className="block text-xs font-medium text-gray-600 mb-1">
                                             Valor <span className="text-red-500">*</span>
@@ -470,9 +563,7 @@ export default function AccessoryRulesTab() {
                                         >
                                             <option value="">— Seleccionar valor —</option>
                                             {selectedGroupValues.map(v => (
-                                                <option key={v.id} value={v.key}>
-                                                    {v.label}
-                                                </option>
+                                                <option key={v.id} value={v.key}>{v.label}</option>
                                             ))}
                                         </select>
                                         {!formData.option_group && (
@@ -480,16 +571,14 @@ export default function AccessoryRulesTab() {
                                         )}
                                     </div>
 
-                                    {/* Preview */}
                                     {formData.option_group && formData.option_key && (
-                                        <div className="text-xs text-blue-700 bg-blue-100 rounded p-2 font-mono">
+                                        <div className="text-xs text-blue-700 bg-blue-100 rounded p-2 font-mono break-all">
                                             {`options["${formData.option_group}"] === "${formData.option_key}"`}
                                         </div>
                                     )}
                                 </div>
                             )}
 
-                            {/* Error */}
                             {formError && (
                                 <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm flex items-center gap-2">
                                     <FaExclamationTriangle size={13} /> {formError}
@@ -497,7 +586,7 @@ export default function AccessoryRulesTab() {
                             )}
 
                             {/* Botones */}
-                            <div className="flex justify-end gap-3 pt-2">
+                            <div className="flex justify-end gap-3 pt-2 pb-2">
                                 <button
                                     type="button"
                                     onClick={closeModal}

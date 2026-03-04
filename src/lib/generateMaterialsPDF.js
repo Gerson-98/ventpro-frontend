@@ -5,7 +5,7 @@ import autoTable from "jspdf-autotable";
 
 const formatCurrency = (amount) => `Q${Number(amount || 0).toFixed(2)}`;
 
-export function generateMaterialsPDF({ reportData, projectName, orderId, isConsolidated = false }) {
+export function generateMaterialsPDF({ reportData, projectName, orderId, isConsolidated = false, showPrices = true }) {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
 
   const pageW = doc.internal.pageSize.getWidth();
@@ -124,15 +124,16 @@ export function generateMaterialsPDF({ reportData, projectName, orderId, isConso
       { header: "Color", align: "left" },
       { header: "Perfil", align: "left" },
       { header: "Cant.", align: "center" },
-      { header: "P. Unitario", align: "right" },
-      { header: "Total", align: "right" },
+      ...(showPrices ? [
+        { header: "P. Unitario", align: "right" },
+        { header: "Total", align: "right" },
+      ] : []),
     ],
     profiles.map(i => [
       i.color || "—",
       i.nombre,
       String(i.cantidad),
-      formatCurrency(i.precioUnitario),
-      formatCurrency(i.precioTotal),
+      ...(showPrices ? [formatCurrency(i.precioUnitario), formatCurrency(i.precioTotal)] : []),
     ])
   );
 
@@ -143,14 +144,15 @@ export function generateMaterialsPDF({ reportData, projectName, orderId, isConso
     [
       { header: "Accesorio", align: "left" },
       { header: "Cant.", align: "center" },
-      { header: "P. Unitario", align: "right" },
-      { header: "Total", align: "right" },
+      ...(showPrices ? [
+        { header: "P. Unitario", align: "right" },
+        { header: "Total", align: "right" },
+      ] : []),
     ],
     accessories.map(i => [
       i.nombre,
       String(i.cantidad),
-      formatCurrency(i.precioUnitario),
-      formatCurrency(i.precioTotal),
+      ...(showPrices ? [formatCurrency(i.precioUnitario), formatCurrency(i.precioTotal)] : []),
     ])
   );
 
@@ -161,42 +163,46 @@ export function generateMaterialsPDF({ reportData, projectName, orderId, isConso
     [
       { header: "Tipo de Vidrio", align: "left" },
       { header: "Planchas", align: "center" },
-      { header: "P. Unitario", align: "right" },
-      { header: "Total", align: "right" },
+      ...(showPrices ? [
+        { header: "P. Unitario", align: "right" },
+        { header: "Total", align: "right" },
+      ] : []),
     ],
     glasses.map(i => [
       i.nombre,
       String(i.cantidad),
-      formatCurrency(i.precioUnitario),
-      formatCurrency(i.precioTotal),
+      ...(showPrices ? [formatCurrency(i.precioUnitario), formatCurrency(i.precioTotal)] : []),
     ])
   );
 
-  // ── Total general ──
-  const grandTotal = Array.isArray(reportData)
-    ? reportData.reduce((sum, i) => sum + (i.precioTotal || 0), 0)
-    : 0;
+  // ── Total general (solo si showPrices=true) ──
+  if (showPrices) {
+    const grandTotal = Array.isArray(reportData)
+      ? reportData.reduce((sum, i) => sum + (i.precioTotal || 0), 0)
+      : 0;
 
-  // Caja de total
-  const totalBoxH = 14;
-  doc.setFillColor(30, 64, 175);
-  doc.roundedRect(pageW - margin.right - 70, currentY, 70, totalBoxH, 2, 2, "F");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
-  doc.setTextColor(219, 234, 254);
-  doc.text("COSTO TOTAL DE MATERIALES", pageW - margin.right - 4, currentY + 5, { align: "right" });
-  doc.setFontSize(13);
-  doc.setTextColor(255, 255, 255);
-  doc.text(formatCurrency(grandTotal), pageW - margin.right - 4, currentY + 11.5, { align: "right" });
+    const totalBoxH = 14;
+    doc.setFillColor(30, 64, 175);
+    doc.roundedRect(pageW - margin.right - 70, currentY, 70, totalBoxH, 2, 2, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(219, 234, 254);
+    doc.text("COSTO TOTAL DE MATERIALES", pageW - margin.right - 4, currentY + 5, { align: "right" });
+    doc.setFontSize(13);
+    doc.setTextColor(255, 255, 255);
+    doc.text(formatCurrency(grandTotal), pageW - margin.right - 4, currentY + 11.5, { align: "right" });
 
-  currentY += totalBoxH + 8;
+    currentY += totalBoxH + 8;
+  }
 
   // ── Nota al pie ──
   setBody();
   doc.setFontSize(7.5);
   doc.setTextColor(148, 163, 184);
   doc.text(
-    "Este documento es para uso interno y de proveedores. Los precios son de costo de materiales.",
+    showPrices
+      ? "Este documento es para uso interno y de proveedores. Los precios son de costo de materiales."
+      : "Lista de materiales para proveedor. Documento generado por VentPro.",
     margin.left,
     currentY
   );

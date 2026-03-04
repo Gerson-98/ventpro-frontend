@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "@/services/api";
-import { FaPlus, FaTrashAlt, FaSearch } from "react-icons/fa";
+import { FaPlus, FaSearch } from "react-icons/fa";
 import AddQuotationModal from "@/components/AddQuotationModal";
 
 const clientStatusStyles = {
@@ -89,27 +89,29 @@ export default function Quotations() {
 
     return (
         <div className="min-h-screen bg-gray-50">
-            <div className="max-w-7xl mx-auto px-6 py-8">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 sm:py-8">
 
                 {/* ── Header ── */}
-                <div className="flex justify-between items-center mb-8">
+                <div className="flex justify-between items-start mb-6">
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Cotizaciones</h1>
-                        <p className="text-gray-500 text-sm mt-1">
+                        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">Cotizaciones</h1>
+                        <p className="text-gray-500 text-xs sm:text-sm mt-1">
                             {totals.total} cotizaciones · {totals.confirmadas} confirmadas · {totals.enProceso} en proceso
                         </p>
                     </div>
                     <button
                         onClick={() => setShowModal(true)}
-                        className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl font-medium shadow-sm hover:bg-blue-700 active:scale-95 transition-all text-sm"
+                        className="flex items-center gap-2 bg-blue-600 text-white px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl font-medium shadow-sm hover:bg-blue-700 active:scale-95 transition-all text-sm flex-shrink-0"
                     >
-                        <FaPlus size={12} /> Nueva Cotización
+                        <FaPlus size={12} />
+                        <span className="hidden sm:inline">Nueva Cotización</span>
+                        <span className="sm:hidden">Nueva</span>
                     </button>
                 </div>
 
                 {/* ── Filtros ── */}
-                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 mb-5 flex flex-wrap gap-3 items-center">
-                    <div className="relative flex-grow min-w-48">
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-3 sm:p-4 mb-5 flex flex-col sm:flex-row flex-wrap gap-3 items-stretch sm:items-center">
+                    <div className="relative flex-grow min-w-0">
                         <FaSearch className="absolute top-1/2 left-3.5 -translate-y-1/2 text-gray-400" size={13} />
                         <input
                             type="text"
@@ -119,26 +121,22 @@ export default function Quotations() {
                             className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none bg-gray-50 focus:bg-white transition-colors"
                         />
                     </div>
-                    <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium text-gray-500 whitespace-nowrap">Estado cotización</span>
+                    <div className="flex gap-2 flex-wrap">
                         <select
                             value={filters.quotationStatus}
                             onChange={(e) => setFilters(p => ({ ...p, quotationStatus: e.target.value }))}
-                            className="border border-gray-200 rounded-xl py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-gray-50"
+                            className="flex-1 sm:flex-none border border-gray-200 rounded-xl py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-gray-50"
                         >
                             <option value="all">Todas</option>
                             <option value="en proceso">En Proceso</option>
                             <option value="confirmado">Confirmado</option>
                         </select>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium text-gray-500 whitespace-nowrap">Estado cliente</span>
                         <select
                             value={filters.clientStatus}
                             onChange={(e) => setFilters(p => ({ ...p, clientStatus: e.target.value }))}
-                            className="border border-gray-200 rounded-xl py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-gray-50"
+                            className="flex-1 sm:flex-none border border-gray-200 rounded-xl py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-gray-50"
                         >
-                            <option value="all">Todos</option>
+                            <option value="all">Todos los clientes</option>
                             {Object.entries(clientStatusLabels).map(([k, v]) => (
                                 <option key={k} value={k}>{v}</option>
                             ))}
@@ -146,7 +144,7 @@ export default function Quotations() {
                     </div>
                 </div>
 
-                {/* ── Tabla ── */}
+                {/* ── Tabla (md+) / Cards (móvil) ── */}
                 <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                     {loading ? (
                         <div className="flex justify-center items-center py-20 text-gray-400">
@@ -156,96 +154,126 @@ export default function Quotations() {
                             </svg>
                             Cargando...
                         </div>
-                    ) : (
-                        <table className="min-w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-gray-100 bg-gray-50/70">
-                                    <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">#</th>
-                                    <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Proyecto</th>
-                                    <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Cliente</th>
-                                    <th className="py-3 px-5 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Estado Cliente</th>
-                                    <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Fecha</th>
-                                    <th className="py-3 px-5 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Estado</th>
-                                    <th className="py-3 px-5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Total</th>
-                                    <th className="py-3 px-5 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Acción</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-50">
-                                {filteredQuotations.length === 0 ? (
-                                    <tr>
-                                        <td colSpan="8" className="text-center py-16 text-gray-400">
-                                            <div className="flex flex-col items-center gap-2">
-                                                <FaSearch size={24} className="opacity-30" />
-                                                <p className="font-medium">Sin resultados</p>
-                                                <p className="text-xs">Intenta ajustar los filtros o la búsqueda</p>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    filteredQuotations.map((quote) => (
-                                        <tr
-                                            key={quote.id}
-                                            className="hover:bg-blue-50/40 cursor-pointer transition-colors group"
-                                            onClick={() => navigate(`/quotations/${quote.id}`)}
-                                        >
-                                            <td className="py-3.5 px-5">
-                                                <span className="font-mono text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
-                                                    {quote.quotationNumber}
-                                                </span>
-                                            </td>
-                                            <td className="py-3.5 px-5 font-semibold text-gray-800">
-                                                {quote.project}
-                                            </td>
-                                            <td className="py-3.5 px-5 text-gray-600">
-                                                {quote.client?.name || <span className="text-gray-300 italic">Sin cliente</span>}
-                                            </td>
-                                            <td className="py-3.5 px-5 text-center">
-                                                {quote.client?.status && (
-                                                    <span className={`inline-block px-2.5 py-0.5 text-xs font-semibold rounded-full ${clientStatusStyles[quote.client.status]}`}>
-                                                        {clientStatusLabels[quote.client.status]}
-                                                    </span>
-                                                )}
-                                            </td>
-                                            <td className="py-3.5 px-5 text-gray-500 text-xs">
-                                                {formatDate(quote.createdAt)}
-                                            </td>
-                                            <td className="py-3.5 px-5 text-center">
-                                                <span className={`inline-block px-2.5 py-0.5 text-xs font-semibold rounded-full capitalize ${quote.status === 'confirmado'
-                                                        ? 'bg-emerald-100 text-emerald-700'
-                                                        : 'bg-amber-100 text-amber-700'
-                                                    }`}>
-                                                    {quote.status.replace('_', ' ')}
-                                                </span>
-                                            </td>
-                                            <td className="py-3.5 px-5 text-right font-mono font-semibold text-gray-800">
-                                                Q {quote.total_price?.toFixed(2) || '0.00'}
-                                            </td>
-                                            <td className="py-3.5 px-5 text-center">
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); handleDelete(quote.id); }}
-                                                    className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                                                    title="Eliminar"
-                                                >
-                                                    <FaTrashAlt size={13} />
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    )}
-
-                    {/* Footer de tabla */}
-                    {!loading && filteredQuotations.length > 0 && (
-                        <div className="px-5 py-3 border-t border-gray-100 bg-gray-50/50 flex justify-between items-center">
-                            <span className="text-xs text-gray-400">
-                                Mostrando {filteredQuotations.length} de {quotations.length} cotizaciones
-                            </span>
-                            <span className="text-xs font-semibold text-gray-600">
-                                Total visible: Q {filteredQuotations.reduce((s, q) => s + (q.total_price || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                            </span>
+                    ) : filteredQuotations.length === 0 ? (
+                        <div className="text-center py-16 text-gray-400">
+                            <div className="flex flex-col items-center gap-2">
+                                <FaSearch size={24} className="opacity-30" />
+                                <p className="font-medium">Sin resultados</p>
+                                <p className="text-xs">Intenta ajustar los filtros o la búsqueda</p>
+                            </div>
                         </div>
+                    ) : (
+                        <>
+                            {/* ── TABLA — solo en md+ ── */}
+                            <div className="hidden md:block overflow-x-auto">
+                                <table className="min-w-full text-sm">
+                                    <thead>
+                                        <tr className="border-b border-gray-100 bg-gray-50/70">
+                                            <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">#</th>
+                                            <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Proyecto</th>
+                                            <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Cliente</th>
+                                            <th className="py-3 px-5 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Estado Cliente</th>
+                                            <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Fecha</th>
+                                            <th className="py-3 px-5 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Estado</th>
+                                            <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Vendedor</th>
+                                            <th className="py-3 px-5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-50">
+                                        {filteredQuotations.map((quote) => (
+                                            <tr
+                                                key={quote.id}
+                                                className="hover:bg-blue-50/40 cursor-pointer transition-colors group"
+                                                onClick={() => navigate(`/quotations/${quote.id}`)}
+                                            >
+                                                <td className="py-3.5 px-5">
+                                                    <span className="font-mono text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
+                                                        {quote.quotationNumber}
+                                                    </span>
+                                                </td>
+                                                <td className="py-3.5 px-5 font-semibold text-gray-800">{quote.project}</td>
+                                                <td className="py-3.5 px-5 text-gray-600">
+                                                    {quote.client?.name || <span className="text-gray-300 italic">Sin cliente</span>}
+                                                </td>
+                                                <td className="py-3.5 px-5 text-center">
+                                                    {quote.client?.status && (
+                                                        <span className={`inline-block px-2.5 py-0.5 text-xs font-semibold rounded-full ${clientStatusStyles[quote.client.status]}`}>
+                                                            {clientStatusLabels[quote.client.status]}
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="py-3.5 px-5 text-gray-500 text-xs">{formatDate(quote.createdAt)}</td>
+                                                <td className="py-3.5 px-5 text-center">
+                                                    <span className={`inline-block px-2.5 py-0.5 text-xs font-semibold rounded-full capitalize ${quote.status === 'confirmado' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                                                        {quote.status.replace('_', ' ')}
+                                                    </span>
+                                                </td>
+                                                <td className="py-3.5 px-5 text-xs text-gray-500">
+                                                    {quote.user?.name || <span className="text-gray-300 italic">—</span>}
+                                                </td>
+                                                <td className="py-3.5 px-5 text-right font-mono font-semibold text-gray-800">
+                                                    Q {quote.total_price?.toFixed(2) || '0.00'}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {/* ── CARDS — solo en móvil (< md) ── */}
+                            <div className="md:hidden divide-y divide-gray-100">
+                                {filteredQuotations.map((quote) => (
+                                    <div
+                                        key={quote.id}
+                                        className="p-4 hover:bg-blue-50/30 active:bg-blue-50 cursor-pointer transition-colors"
+                                        onClick={() => navigate(`/quotations/${quote.id}`)}
+                                    >
+                                        {/* Fila 1: número + estado cotización */}
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="font-mono text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
+                                                {quote.quotationNumber}
+                                            </span>
+                                            <span className={`inline-block px-2.5 py-0.5 text-xs font-semibold rounded-full capitalize ${quote.status === 'confirmado' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                                                {quote.status.replace('_', ' ')}
+                                            </span>
+                                        </div>
+                                        {/* Fila 2: proyecto */}
+                                        <p className="font-semibold text-gray-900 text-sm mb-1 truncate">{quote.project}</p>
+                                        {/* Fila 3: cliente + estado cliente */}
+                                        <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                            <span className="text-xs text-gray-500">
+                                                {quote.client?.name || <span className="italic text-gray-300">Sin cliente</span>}
+                                            </span>
+                                            {quote.client?.status && (
+                                                <span className={`inline-block px-2 py-0.5 text-[10px] font-semibold rounded-full ${clientStatusStyles[quote.client.status]}`}>
+                                                    {clientStatusLabels[quote.client.status]}
+                                                </span>
+                                            )}
+                                        </div>
+                                        {/* Fila 4: fecha + vendedor + total */}
+                                        <div className="flex items-center justify-between text-xs text-gray-400">
+                                            <span>{formatDate(quote.createdAt)}</span>
+                                            <span className="font-mono font-bold text-gray-800 text-sm">
+                                                Q {quote.total_price?.toFixed(2) || '0.00'}
+                                            </span>
+                                        </div>
+                                        {quote.user?.name && (
+                                            <p className="text-[10px] text-gray-400 mt-1">Vendedor: {quote.user.name}</p>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Footer */}
+                            <div className="px-4 sm:px-5 py-3 border-t border-gray-100 bg-gray-50/50 flex justify-between items-center">
+                                <span className="text-xs text-gray-400">
+                                    {filteredQuotations.length} de {quotations.length} cotizaciones
+                                </span>
+                                <span className="text-xs font-semibold text-gray-600">
+                                    Q {filteredQuotations.reduce((s, q) => s + (q.total_price || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                </span>
+                            </div>
+                        </>
                     )}
                 </div>
             </div>

@@ -11,11 +11,6 @@ import { Calendar } from "@/components/ui/calendar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import "react-day-picker/dist/style.css";
 
-// Props:
-//   quotationId     — id de la cotización a confirmar
-//   isReconfirm     — true cuando ya existía un pedido (cotización reabierta)
-//   excludeOrderId  — id del pedido existente a excluir del calendario
-//   onConfirmSuccess(orderId) — callback con el id del pedido resultante
 export default function ConfirmQuotationModal({
     open,
     onClose,
@@ -23,6 +18,7 @@ export default function ConfirmQuotationModal({
     onConfirmSuccess,
     isReconfirm = false,
     excludeOrderId = null,
+    initialDates = null,
 }) {
     const [range, setRange] = useState({ from: null, to: null });
     const [loading, setLoading] = useState(false);
@@ -30,19 +26,20 @@ export default function ConfirmQuotationModal({
     const [bookedRanges, setBookedRanges] = useState([]);
     const [isScheduleLoading, setIsScheduleLoading] = useState(true);
 
-    // ── Carga pedidos agendados excluyendo el pedido propio ──────────────────
     useEffect(() => {
         if (!open) return;
+        if (initialDates?.from && initialDates?.to) {
+            setRange({ from: new Date(initialDates.from), to: new Date(initialDates.to) });
+        } else {
+            setRange({ from: null, to: null });
+        }
+
         const fetchScheduledOrders = async () => {
             setIsScheduleLoading(true);
             try {
                 const response = await api.get('/orders/scheduled');
                 const all = response.data || [];
-                // En re-confirmación, excluir el pedido vinculado para que
-                // sus propias fechas no aparezcan bloqueadas en el calendario
-                const filtered = excludeOrderId
-                    ? all.filter(o => o.id !== excludeOrderId)
-                    : all;
+                const filtered = excludeOrderId ? all.filter(o => o.id !== excludeOrderId) : all;
                 setBookedRanges(filtered);
             } catch {
                 console.error("Error al cargar el calendario");
@@ -51,13 +48,9 @@ export default function ConfirmQuotationModal({
             }
         };
         fetchScheduledOrders();
-    }, [open, excludeOrderId]);
+    }, [open, excludeOrderId, initialDates]);
 
-    const handleClose = () => {
-        setRange({ from: null, to: null });
-        setError("");
-        onClose();
-    };
+    const handleClose = () => { setRange({ from: null, to: null }); setError(""); onClose(); };
 
     const handleSubmit = async () => {
         if (!range.from || !range.to) {
@@ -81,22 +74,12 @@ export default function ConfirmQuotationModal({
         }
     };
 
-    // ── Días deshabilitados ──────────────────────────────────────────────────
     const isDayDisabled = (day) => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        if (day < today) return true;
-        for (const order of bookedRanges) {
-            const start = new Date(order.installationStartDate);
-            const end = new Date(order.installationEndDate);
-            start.setHours(0, 0, 0, 0);
-            end.setHours(0, 0, 0, 0);
-            if (day >= start && day <= end) return true;
-        }
-        return false;
+        return day < today;
     };
 
-    // ── Lista de días ocupados para el modifier visual ────────────────────────
     const bookedDaysList = bookedRanges.flatMap((order) => {
         const days = [];
         const current = new Date(order.installationStartDate);
@@ -110,40 +93,32 @@ export default function ConfirmQuotationModal({
         return days;
     });
 
-    // ── Derivados ────────────────────────────────────────────────────────────
     const isReady = range.from && range.to;
     const duration = isReady ? differenceInCalendarDays(range.to, range.from) + 1 : null;
-
     const selectionHint = !range.from
         ? "Haz click en la fecha de inicio"
         : !range.to
             ? "Ahora haz click en la fecha de fin"
             : null;
 
-    const headerGradient = isReconfirm
-        ? "bg-gradient-to-br from-amber-500 to-amber-600"
-        : "bg-gradient-to-br from-emerald-600 to-emerald-700";
-    const confirmBtnClass = isReconfirm
-        ? "rounded-xl bg-amber-500 hover:bg-amber-600 text-white px-6"
-        : "rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-6";
-    const rangeCardClass = isReconfirm
-        ? "bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-3"
-        : "bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 flex items-start gap-3";
+    const headerGradient = isReconfirm ? "bg-gradient-to-br from-amber-500 to-amber-600" : "bg-gradient-to-br from-emerald-600 to-emerald-700";
+    const confirmBtnClass = isReconfirm ? "rounded-xl bg-amber-500 hover:bg-amber-600 text-white px-6 w-full sm:w-auto" : "rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-6 w-full sm:w-auto";
+    const rangeCardClass = isReconfirm ? "bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-3" : "bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 flex items-start gap-3";
 
     return (
         <Dialog open={open} onOpenChange={handleClose}>
             <DialogContent
-                className="sm:max-w-[480px] p-0 overflow-hidden rounded-2xl flex flex-col max-h-[90vh]"
+                className="w-[calc(100%-1.5rem)] sm:max-w-[480px] p-0 overflow-hidden rounded-2xl flex flex-col max-h-[92dvh]"
                 aria-describedby={undefined}
             >
-                {/* ── Header fijo ── */}
-                <div className={`${headerGradient} px-6 py-5 flex-shrink-0`}>
+                {/* Header */}
+                <div className={`${headerGradient} px-5 sm:px-6 py-4 sm:py-5 flex-shrink-0`}>
                     <DialogHeader>
-                        <DialogTitle className="text-white text-xl font-bold flex items-center gap-2.5">
-                            {isReconfirm ? <RefreshCw size={22} /> : <CalendarCheck2 size={22} />}
+                        <DialogTitle className="text-white text-lg sm:text-xl font-bold flex items-center gap-2.5">
+                            {isReconfirm ? <RefreshCw size={20} /> : <CalendarCheck2 size={20} />}
                             {isReconfirm ? "Re-agendar Instalación" : "Agendar Instalación"}
                         </DialogTitle>
-                        <p className="text-white/80 text-sm mt-1">
+                        <p className="text-white/80 text-xs sm:text-sm mt-1">
                             {isReconfirm
                                 ? "El pedido existente se actualizará con las nuevas fechas y ventanas."
                                 : "Selecciona el rango de fechas para la instalación."
@@ -152,14 +127,14 @@ export default function ConfirmQuotationModal({
                     </DialogHeader>
                 </div>
 
-                {/* ── Contenido scrolleable ── */}
-                <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
+                {/* Cuerpo scrolleable */}
+                <div className="overflow-y-auto flex-1 px-4 sm:px-6 py-4 sm:py-5 space-y-4">
 
                     {/* Leyenda */}
-                    <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500">
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
                         <div className="flex items-center gap-1.5">
                             <span className="w-3 h-3 rounded-full bg-red-400 inline-block" />
-                            Ocupado (otro pedido)
+                            Con instalación
                         </div>
                         <div className="flex items-center gap-1.5">
                             <span className="w-3 h-3 rounded-full bg-emerald-500 inline-block" />
@@ -167,7 +142,7 @@ export default function ConfirmQuotationModal({
                         </div>
                         <div className="flex items-center gap-1.5">
                             <span className="w-3 h-3 rounded-full bg-gray-200 inline-block" />
-                            No disponible (pasado)
+                            No disponible
                         </div>
                     </div>
 
@@ -179,7 +154,7 @@ export default function ConfirmQuotationModal({
                     )}
 
                     {/* Calendario */}
-                    <div className="flex justify-center">
+                    <div className="flex justify-center overflow-x-auto">
                         {isScheduleLoading ? (
                             <div className="flex flex-col items-center gap-2 py-8 text-gray-400">
                                 <svg className="animate-spin w-6 h-6" fill="none" viewBox="0 0 24 24">
@@ -192,10 +167,7 @@ export default function ConfirmQuotationModal({
                             <Calendar
                                 mode="range"
                                 selected={range}
-                                onSelect={(val) => {
-                                    setRange(val || { from: null, to: null });
-                                    setError("");
-                                }}
+                                onSelect={(val) => { setRange(val || { from: null, to: null }); setError(""); }}
                                 locale={es}
                                 disabled={isDayDisabled}
                                 modifiers={{ booked: bookedDaysList }}
@@ -239,12 +211,9 @@ export default function ConfirmQuotationModal({
                                         {format(range.from, "EEEE d 'de' MMMM", { locale: es })}
                                     </span>
                                     {duration > 1 && (
-                                        <>
-                                            {" → "}
-                                            <span className="font-medium">
-                                                {format(range.to, "EEEE d 'de' MMMM yyyy", { locale: es })}
-                                            </span>
-                                        </>
+                                        <>{" → "}<span className="font-medium">
+                                            {format(range.to, "EEEE d 'de' MMMM yyyy", { locale: es })}
+                                        </span></>
                                     )}
                                     {duration === 1 && (
                                         <span className={`text-xs ${isReconfirm ? 'text-amber-600' : 'text-emerald-600'}`}>
@@ -252,14 +221,14 @@ export default function ConfirmQuotationModal({
                                         </span>
                                     )}
                                 </p>
-                                <p className={`text-xs mt-1 ${isReconfirm ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                <p className={`text-xs mt-1 font-medium ${isReconfirm ? 'text-amber-600' : 'text-emerald-600'}`}>
                                     {duration} {duration === 1 ? "día" : "días"} de instalación
                                 </p>
                             </div>
                         </div>
                     )}
 
-                    {/* Instalaciones agendadas (otros pedidos) */}
+                    {/* Instalaciones agendadas */}
                     {bookedRanges.length > 0 && (
                         <div className="text-xs text-gray-500 space-y-1.5">
                             <p className="font-semibold text-gray-600 uppercase tracking-wide text-[10px]">
@@ -268,7 +237,7 @@ export default function ConfirmQuotationModal({
                             {bookedRanges.map(order => (
                                 <div key={order.id} className="flex items-center gap-2">
                                     <span className="w-2 h-2 rounded-full bg-red-400 flex-shrink-0" />
-                                    <span className="font-medium text-gray-700 truncate max-w-[160px]">
+                                    <span className="font-medium text-gray-700 truncate max-w-[140px] sm:max-w-[160px]">
                                         {order.project}
                                     </span>
                                     <span className="text-gray-400 ml-auto whitespace-nowrap">
@@ -291,24 +260,20 @@ export default function ConfirmQuotationModal({
                     )}
                 </div>
 
-                {/* ── Footer fijo ── */}
-                <div className="flex-shrink-0 px-6 py-4 border-t border-gray-100 bg-white flex justify-end gap-2.5">
+                {/* Footer — col en móvil, row en sm+ */}
+                <div className="flex-shrink-0 px-4 sm:px-6 py-4 border-t border-gray-100 bg-white flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-2.5">
                     <Button
                         type="button"
                         variant="outline"
                         onClick={handleClose}
                         disabled={loading}
-                        className="rounded-xl"
+                        className="rounded-xl w-full sm:w-auto"
                     >
                         Cancelar
                     </Button>
-                    <Button
-                        onClick={handleSubmit}
-                        disabled={!isReady || loading}
-                        className={confirmBtnClass}
-                    >
+                    <Button onClick={handleSubmit} disabled={!isReady || loading} className={confirmBtnClass}>
                         {loading ? (
-                            <span className="flex items-center gap-2">
+                            <span className="flex items-center justify-center gap-2">
                                 <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
@@ -316,14 +281,13 @@ export default function ConfirmQuotationModal({
                                 {isReconfirm ? "Actualizando..." : "Confirmando..."}
                             </span>
                         ) : (
-                            <span className="flex items-center gap-2">
+                            <span className="flex items-center justify-center gap-2">
                                 {isReconfirm ? <RefreshCw size={15} /> : <CalendarCheck2 size={15} />}
                                 {isReconfirm ? "Re-confirmar Pedido" : "Confirmar Cotización"}
                             </span>
                         )}
                     </Button>
                 </div>
-
             </DialogContent>
         </Dialog>
     );

@@ -7,7 +7,7 @@ import api from "@/services/api";
 export default function WindowOptionAssignTab() {
     const [windowTypes, setWindowTypes] = useState([]);
     const [optionGroups, setOptionGroups] = useState([]);
-    const [assignments, setAssignments] = useState([]); // todos los window_type_options
+    const [assignments, setAssignments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [selectedTypeId, setSelectedTypeId] = useState("");
@@ -17,6 +17,9 @@ export default function WindowOptionAssignTab() {
     const [selectedGroupId, setSelectedGroupId] = useState("");
     const [saving, setSaving] = useState(false);
     const [formError, setFormError] = useState("");
+
+    // Drawer sidebar (móvil)
+    const [showSidebar, setShowSidebar] = useState(false);
 
     // ── Carga ────────────────────────────────────────────────────────────────
     const fetchAll = async () => {
@@ -44,18 +47,16 @@ export default function WindowOptionAssignTab() {
 
     useEffect(() => { fetchAll(); }, []);
 
-    // ── Asignaciones del tipo seleccionado ───────────────────────────────────
-    const currentAssignments = useMemo(() => {
-        return assignments.filter(a => String(a.window_type_id) === selectedTypeId);
-    }, [assignments, selectedTypeId]);
+    // ── Derivados ────────────────────────────────────────────────────────────
+    const currentAssignments = useMemo(() =>
+        assignments.filter(a => String(a.window_type_id) === selectedTypeId),
+        [assignments, selectedTypeId]);
 
-    // Grupos que AÚN NO están asignados al tipo seleccionado
     const availableGroups = useMemo(() => {
         const assignedGroupIds = new Set(currentAssignments.map(a => a.group_id));
         return optionGroups.filter(g => !assignedGroupIds.has(g.id));
     }, [optionGroups, currentAssignments]);
 
-    // Conteo de grupos asignados por tipo (para el sidebar)
     const countByType = useMemo(() => {
         const map = {};
         assignments.forEach(a => {
@@ -64,14 +65,13 @@ export default function WindowOptionAssignTab() {
         return map;
     }, [assignments]);
 
+    const selectedTypeName = windowTypes.find(t => String(t.id) === selectedTypeId)?.name ?? "";
+
     // ── Asignar grupo ────────────────────────────────────────────────────────
     const handleAssign = async (e) => {
         e.preventDefault();
         setFormError("");
-        if (!selectedGroupId) {
-            setFormError("Selecciona un grupo.");
-            return;
-        }
+        if (!selectedGroupId) { setFormError("Selecciona un grupo."); return; }
         setSaving(true);
         try {
             await api.post("/window-type-options", {
@@ -101,13 +101,47 @@ export default function WindowOptionAssignTab() {
         }
     };
 
+    // ── Contenido del sidebar (compartido entre drawer y panel estático) ──────
+    const SidebarContent = () => (
+        <div className="border border-gray-200 rounded-lg overflow-hidden">
+            {windowTypes.map((wt) => {
+                const count = countByType[wt.id] || 0;
+                const isSelected = String(wt.id) === selectedTypeId;
+                return (
+                    <button
+                        key={wt.id}
+                        onClick={() => {
+                            setSelectedTypeId(String(wt.id));
+                            setShowSidebar(false); // cerrar drawer en móvil
+                        }}
+                        className={`w-full text-left px-3 py-2.5 text-sm border-b border-gray-100 last:border-0 flex justify-between items-center transition-colors ${isSelected
+                                ? "bg-blue-600 text-white"
+                                : "hover:bg-gray-50 active:bg-gray-100 text-gray-700"
+                            }`}
+                    >
+                        <span className="truncate pr-2">{wt.name}</span>
+                        <span className={`flex-shrink-0 text-xs font-bold px-1.5 py-0.5 rounded-full ${isSelected
+                                ? "bg-blue-500 text-white"
+                                : count > 0
+                                    ? "bg-blue-100 text-blue-600"
+                                    : "bg-gray-100 text-gray-400"
+                            }`}>
+                            {count}
+                        </span>
+                    </button>
+                );
+            })}
+        </div>
+    );
+
     // ── Render ───────────────────────────────────────────────────────────────
     return (
-        <div className="bg-white p-6 rounded-lg shadow-md">
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-md">
 
-            <div className="mb-6">
-                <h2 className="text-2xl font-semibold text-gray-800">Asignación de Opciones</h2>
-                <p className="text-gray-500 text-sm mt-0.5">
+            {/* Encabezado */}
+            <div className="mb-4 sm:mb-6">
+                <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">Asignación de Opciones</h2>
+                <p className="text-gray-500 text-xs sm:text-sm mt-0.5">
                     Define qué grupos de opciones aparecen en el cotizador para cada tipo de ventana.
                 </p>
             </div>
@@ -129,44 +163,75 @@ export default function WindowOptionAssignTab() {
             ) : (
                 <div className="flex gap-6">
 
-                    {/* Sidebar */}
-                    <div className="w-64 flex-shrink-0">
+                    {/* ── Trigger drawer (< lg) ── */}
+                    <div className="lg:hidden mb-4 w-full flex-shrink-0">
                         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 px-1">
                             Tipo de Ventana
                         </p>
-                        <div className="border border-gray-200 rounded-lg overflow-hidden">
-                            {windowTypes.map((wt) => {
-                                const count = countByType[wt.id] || 0;
-                                const isSelected = String(wt.id) === selectedTypeId;
-                                return (
-                                    <button
-                                        key={wt.id}
-                                        onClick={() => setSelectedTypeId(String(wt.id))}
-                                        className={`w-full text-left px-3 py-2.5 text-sm border-b border-gray-100 last:border-0 flex justify-between items-center transition-colors ${isSelected
-                                                ? "bg-blue-600 text-white"
-                                                : "hover:bg-gray-50 text-gray-700"
-                                            }`}
-                                    >
-                                        <span className="truncate pr-2">{wt.name}</span>
-                                        <span className={`flex-shrink-0 text-xs font-bold px-1.5 py-0.5 rounded-full ${isSelected ? "bg-blue-500 text-white" : count > 0 ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-400"
-                                            }`}>
-                                            {count}
-                                        </span>
-                                    </button>
-                                );
-                            })}
-                        </div>
+                        <button
+                            onClick={() => setShowSidebar(true)}
+                            className="w-full flex items-center justify-between px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50 hover:bg-gray-100 active:bg-gray-200 transition-colors text-sm"
+                        >
+                            <span className="font-medium text-gray-800 truncate pr-2">
+                                {selectedTypeName || "Seleccionar tipo..."}
+                            </span>
+                            <span className="flex items-center gap-2 flex-shrink-0">
+                                {selectedTypeId && (
+                                    <span className="text-xs font-bold bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full">
+                                        {countByType[Number(selectedTypeId)] || 0}
+                                    </span>
+                                )}
+                                <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                                </svg>
+                            </span>
+                        </button>
                     </div>
 
-                    {/* Panel derecho */}
-                    <div className="flex-1 min-w-0">
+                    {/* ── Drawer sidebar (< lg) ── */}
+                    {showSidebar && (
+                        <div className="lg:hidden fixed inset-0 z-50 flex justify-end">
+                            {/* overlay */}
+                            <div
+                                className="absolute inset-0 bg-black/40"
+                                onClick={() => setShowSidebar(false)}
+                            />
+                            {/* panel */}
+                            <div className="relative z-10 w-72 max-w-[85vw] h-full bg-white overflow-y-auto shadow-2xl flex flex-col">
+                                <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100">
+                                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                                        Tipo de Ventana
+                                    </p>
+                                    <button
+                                        onClick={() => setShowSidebar(false)}
+                                        className="text-gray-400 hover:text-gray-600 w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+                                <div className="p-4 flex-1">
+                                    <SidebarContent />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── Sidebar estático (lg+) ── */}
+                    <div className="hidden lg:block w-64 flex-shrink-0">
+                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 px-1">
+                            Tipo de Ventana
+                        </p>
+                        <SidebarContent />
+                    </div>
+
+                    {/* ── Panel derecho ── */}
+                    <div className="flex-1 min-w-0 w-full">
                         {selectedTypeId ? (
                             <>
-                                <div className="flex justify-between items-center mb-4">
-                                    <div>
-                                        <p className="font-semibold text-gray-800">
-                                            {windowTypes.find(t => String(t.id) === selectedTypeId)?.name}
-                                        </p>
+                                {/* Sub-header */}
+                                <div className="flex items-start justify-between gap-3 mb-4">
+                                    <div className="min-w-0">
+                                        <p className="font-semibold text-gray-800 truncate">{selectedTypeName}</p>
                                         <p className="text-xs text-gray-400 mt-0.5">
                                             {currentAssignments.length === 0
                                                 ? "Sin grupos asignados — no aparecerán opciones en el cotizador."
@@ -177,10 +242,12 @@ export default function WindowOptionAssignTab() {
                                     <button
                                         onClick={() => { setSelectedGroupId(""); setFormError(""); setShowModal(true); }}
                                         disabled={availableGroups.length === 0}
-                                        className="flex items-center gap-2 bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                                        className="flex-shrink-0 flex items-center gap-2 bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 active:bg-blue-800 transition text-xs sm:text-sm disabled:opacity-40 disabled:cursor-not-allowed"
                                         title={availableGroups.length === 0 ? "Todos los grupos ya están asignados" : ""}
                                     >
-                                        <FaPlus size={11} /> Asignar Grupo
+                                        <FaPlus size={11} />
+                                        <span className="hidden sm:inline">Asignar Grupo</span>
+                                        <span className="sm:hidden">Asignar</span>
                                     </button>
                                 </div>
 
@@ -195,29 +262,45 @@ export default function WindowOptionAssignTab() {
                                         {currentAssignments.map((a, idx) => (
                                             <div
                                                 key={a.id}
-                                                className="flex items-center gap-4 px-4 py-3 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors"
+                                                className="flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-3 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors"
                                             >
-                                                {/* Número de orden */}
+                                                {/* Número */}
                                                 <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 text-xs font-bold flex items-center justify-center flex-shrink-0">
                                                     {idx + 1}
                                                 </span>
 
                                                 {/* Info del grupo */}
                                                 <div className="flex-1 min-w-0">
-                                                    <p className="text-sm font-semibold text-gray-800">
-                                                        {a.group?.label || '—'}
+                                                    <p className="text-sm font-semibold text-gray-800 truncate">
+                                                        {a.group?.label || "—"}
                                                     </p>
                                                     <p className="text-xs text-gray-400 font-mono">
                                                         {a.group?.key}
-                                                        <span className="ml-2 not-italic text-gray-300">·</span>
-                                                        <span className="ml-2 not-italic">
+                                                        <span className="mx-1.5 not-italic text-gray-300">·</span>
+                                                        <span className="not-italic">
                                                             {a.group?.values?.length || 0} opciones
                                                         </span>
                                                     </p>
+
+                                                    {/* Preview chips — en móvil va debajo del info */}
+                                                    {(a.group?.values?.length || 0) > 0 && (
+                                                        <div className="flex gap-1 flex-wrap mt-1.5 sm:hidden">
+                                                            {(a.group.values || []).slice(0, 3).map(v => (
+                                                                <span key={v.key} className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-full">
+                                                                    {v.label}
+                                                                </span>
+                                                            ))}
+                                                            {(a.group.values.length || 0) > 3 && (
+                                                                <span className="text-[10px] text-gray-400">
+                                                                    +{a.group.values.length - 3} más
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </div>
 
-                                                {/* Preview de valores */}
-                                                <div className="flex gap-1 flex-wrap max-w-xs">
+                                                {/* Preview chips desktop (sm+) */}
+                                                <div className="hidden sm:flex gap-1 flex-wrap max-w-[200px]">
                                                     {(a.group?.values || []).slice(0, 4).map(v => (
                                                         <span key={v.key} className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
                                                             {v.label}
@@ -230,10 +313,10 @@ export default function WindowOptionAssignTab() {
                                                     )}
                                                 </div>
 
-                                                {/* Botón quitar */}
+                                                {/* Quitar */}
                                                 <button
                                                     onClick={() => handleRemove(a.id, a.group?.label)}
-                                                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"
+                                                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 active:bg-red-100 rounded-lg transition-colors flex-shrink-0"
                                                     title="Quitar grupo"
                                                 >
                                                     <FaTrashAlt size={13} />
@@ -244,7 +327,7 @@ export default function WindowOptionAssignTab() {
                                 )}
                             </>
                         ) : (
-                            <div className="text-center py-16 text-gray-400">
+                            <div className="text-center py-16 text-gray-400 text-sm">
                                 Selecciona un tipo de ventana.
                             </div>
                         )}
@@ -252,20 +335,30 @@ export default function WindowOptionAssignTab() {
                 </div>
             )}
 
-            {/* ── MODAL: Asignar grupo ── */}
+            {/* ── MODAL: Asignar grupo — bottom sheet móvil / centrado sm+ ── */}
             {showModal && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-                    <div className="bg-white rounded-xl w-full max-w-sm shadow-2xl">
-                        <div className="flex justify-between items-center p-5 border-b">
+                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white w-full flex flex-col rounded-t-2xl sm:rounded-xl sm:max-w-sm shadow-2xl overflow-hidden">
+
+                        {/* Drag handle */}
+                        <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mt-3 sm:hidden" />
+
+                        {/* Header */}
+                        <div className="flex items-start justify-between px-5 pt-4 pb-3 sm:px-5 sm:py-4 border-b border-gray-100 flex-shrink-0">
                             <div>
-                                <h3 className="font-semibold text-gray-800">Asignar Grupo</h3>
-                                <p className="text-xs text-blue-600 mt-0.5">
-                                    {windowTypes.find(t => String(t.id) === selectedTypeId)?.name}
-                                </p>
+                                <h3 className="font-semibold text-gray-800 text-sm sm:text-base">Asignar Grupo</h3>
+                                <p className="text-xs text-blue-600 mt-0.5">{selectedTypeName}</p>
                             </div>
-                            <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100 text-lg">×</button>
+                            <button
+                                onClick={() => setShowModal(false)}
+                                className="text-gray-400 hover:text-gray-600 w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100 text-lg flex-shrink-0"
+                            >
+                                ×
+                            </button>
                         </div>
-                        <form onSubmit={handleAssign} className="p-5 space-y-4">
+
+                        {/* Body */}
+                        <form onSubmit={handleAssign} className="px-5 py-4 sm:py-5 space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
                                     Grupo de opciones <span className="text-red-500">*</span>
@@ -294,9 +387,19 @@ export default function WindowOptionAssignTab() {
                                 <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-2">{formError}</p>
                             )}
 
-                            <div className="flex justify-end gap-2 pt-1">
-                                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 text-sm bg-gray-100 rounded-lg hover:bg-gray-200 transition">Cancelar</button>
-                                <button type="submit" disabled={saving || !selectedGroupId} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-60">
+                            <div className="flex gap-2 pb-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowModal(false)}
+                                    className="flex-1 sm:flex-none px-4 py-2.5 sm:py-2 text-sm bg-gray-100 rounded-lg hover:bg-gray-200 active:bg-gray-300 transition"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={saving || !selectedGroupId}
+                                    className="flex-1 sm:flex-none px-4 py-2.5 sm:py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 transition disabled:opacity-60"
+                                >
                                     {saving ? "Asignando..." : "Asignar"}
                                 </button>
                             </div>

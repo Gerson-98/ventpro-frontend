@@ -26,13 +26,12 @@ function StatusBadge({ status }) {
   );
 }
 
-// Genera iniciales y color de avatar determinístico
 function Avatar({ name }) {
   const initials = name ? name.split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase() : "?";
   const colors = ['bg-blue-500', 'bg-violet-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500', 'bg-cyan-500', 'bg-indigo-500'];
   const color = colors[name?.charCodeAt(0) % colors.length] || 'bg-slate-500';
   return (
-    <div className={`w-9 h-9 rounded-full ${color} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
+    <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full ${color} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
       {initials}
     </div>
   );
@@ -121,22 +120,24 @@ export default function Clients() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-6xl mx-auto px-6 py-8 space-y-6">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-5 sm:py-8 space-y-5 sm:space-y-6">
 
         {/* ── Header ── */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Clientes</h1>
-            <p className="text-gray-500 text-sm mt-1">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">Clientes</h1>
+            <p className="text-gray-500 text-xs sm:text-sm mt-1">
               {clients.length} registrados · {clients.filter(c => c.status === 'Cliente_Activo').length} activos
             </p>
           </div>
           {!showForm && (
             <button
               onClick={() => setShowForm(true)}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white px-5 py-2.5 rounded-xl font-medium shadow-sm transition-all text-sm"
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl font-medium shadow-sm transition-all text-sm flex-shrink-0"
             >
-              <FaPlus size={11} /> Nuevo Cliente
+              <FaPlus size={11} />
+              <span className="hidden sm:inline">Nuevo Cliente</span>
+              <span className="sm:hidden">Nuevo</span>
             </button>
           )}
         </div>
@@ -144,10 +145,9 @@ export default function Clients() {
         {/* ── Formulario ── */}
         {showForm && (
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-            {/* Header del form */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50/60">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100 bg-gray-50/60">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
                   <FaUser size={13} className="text-blue-600" />
                 </div>
                 <div>
@@ -157,15 +157,18 @@ export default function Clients() {
                   <p className="text-xs text-gray-400">Completa los datos del cliente</p>
                 </div>
               </div>
-              <button onClick={cancelForm} className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors">
+              <button
+                onClick={cancelForm}
+                className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors"
+              >
                 <FaTimes size={14} />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <form onSubmit={handleSubmit} className="p-4 sm:p-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Nombre */}
-                <div className="md:col-span-2">
+                <div className="sm:col-span-2">
                   <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Nombre *</label>
                   <input
                     type="text"
@@ -228,14 +231,14 @@ export default function Clients() {
                 </div>
               </div>
 
-              <div className="flex gap-3 mt-6 pt-4 border-t border-gray-100">
+              <div className="flex gap-3 mt-5 pt-4 border-t border-gray-100">
                 <button
                   type="submit"
                   disabled={saving}
                   className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all active:scale-95"
                 >
                   <FaCheck size={11} />
-                  {saving ? 'Guardando...' : editingId ? 'Actualizar Cliente' : 'Guardar Cliente'}
+                  {saving ? 'Guardando...' : editingId ? 'Actualizar' : 'Guardar'}
                 </button>
                 <button
                   type="button"
@@ -250,8 +253,8 @@ export default function Clients() {
         )}
 
         {/* ── Filtros ── */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-3 flex flex-wrap gap-3 items-center">
-          <div className="relative flex-grow min-w-48">
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-3 flex flex-col sm:flex-row flex-wrap gap-3 items-stretch sm:items-center">
+          <div className="relative flex-grow min-w-0">
             <FaSearch className="absolute top-1/2 left-3.5 -translate-y-1/2 text-gray-400" size={12} />
             <input
               type="text"
@@ -261,22 +264,24 @@ export default function Clients() {
               className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none bg-gray-50 focus:bg-white transition-colors"
             />
           </div>
-          <select
-            value={statusFilter}
-            onChange={e => setStatusFilter(e.target.value)}
-            className="border border-gray-200 rounded-xl py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-gray-50"
-          >
-            <option value="all">Todos los estados</option>
-            {Object.entries(STATUS_CONFIG).map(([key, { label }]) => (
-              <option key={key} value={key}>{label}</option>
-            ))}
-          </select>
-          <span className="ml-auto text-xs text-gray-400">
-            {filtered.length} cliente{filtered.length !== 1 ? 's' : ''}
-          </span>
+          <div className="flex items-center gap-2">
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+              className="flex-1 sm:flex-none border border-gray-200 rounded-xl py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-gray-50"
+            >
+              <option value="all">Todos los estados</option>
+              {Object.entries(STATUS_CONFIG).map(([key, { label }]) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
+            </select>
+            <span className="text-xs text-gray-400 whitespace-nowrap">
+              {filtered.length} cliente{filtered.length !== 1 ? 's' : ''}
+            </span>
+          </div>
         </div>
 
-        {/* ── Tabla ── */}
+        {/* ── Tabla (sm+) / Cards (móvil) ── */}
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
           {loading ? (
             <div className="flex justify-center items-center py-16 text-gray-400 text-sm gap-2">
@@ -295,62 +300,106 @@ export default function Clients() {
               <p className="text-xs">Intenta ajustar los filtros o agrega un nuevo cliente</p>
             </div>
           ) : (
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50/70">
-                  <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Cliente</th>
-                  <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Estado</th>
-                  <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Teléfono</th>
-                  <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Correo</th>
-                  <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Dirección</th>
-                  <th className="py-3 px-5 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
+            <>
+              {/* ── TABLA — sm+ ── */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50/70">
+                      <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Cliente</th>
+                      <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Estado</th>
+                      <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Teléfono</th>
+                      <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Correo</th>
+                      <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Dirección</th>
+                      <th className="py-3 px-5 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {filtered.map(client => (
+                      <tr key={client.id} className="hover:bg-blue-50/30 transition-colors group">
+                        <td className="py-3.5 px-5">
+                          <div className="flex items-center gap-3">
+                            <Avatar name={client.name} />
+                            <span className="font-semibold text-gray-800">{client.name}</span>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-5">
+                          <StatusBadge status={client.status} />
+                        </td>
+                        <td className="py-3.5 px-5 text-gray-500">{client.phone || <span className="text-gray-300">—</span>}</td>
+                        <td className="py-3.5 px-5 text-gray-500">{client.email || <span className="text-gray-300">—</span>}</td>
+                        <td className="py-3.5 px-5 text-gray-500 max-w-[200px] truncate">{client.address || <span className="text-gray-300">—</span>}</td>
+                        <td className="py-3.5 px-5">
+                          {/* En desktop: visible solo on hover. En tablet: siempre visible */}
+                          <div className="flex items-center justify-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => handleEdit(client)}
+                              className="p-2 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                              title="Editar"
+                            >
+                              <FaEdit size={13} />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(client.id)}
+                              className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                              title="Eliminar"
+                            >
+                              <FaTrashAlt size={13} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* ── CARDS — móvil (< sm) ── */}
+              <div className="sm:hidden divide-y divide-gray-100">
                 {filtered.map(client => (
-                  <tr key={client.id} className="hover:bg-blue-50/30 transition-colors group">
-                    <td className="py-3.5 px-5">
-                      <div className="flex items-center gap-3">
+                  <div key={client.id} className="p-4">
+                    {/* Fila: avatar + nombre + acciones */}
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-3 min-w-0">
                         <Avatar name={client.name} />
-                        <span className="font-semibold text-gray-800">{client.name}</span>
+                        <span className="font-semibold text-gray-800 text-sm truncate">{client.name}</span>
                       </div>
-                    </td>
-                    <td className="py-3.5 px-5">
-                      <StatusBadge status={client.status} />
-                    </td>
-                    <td className="py-3.5 px-5 text-gray-500">{client.phone || <span className="text-gray-300">—</span>}</td>
-                    <td className="py-3.5 px-5 text-gray-500">{client.email || <span className="text-gray-300">—</span>}</td>
-                    <td className="py-3.5 px-5 text-gray-500 max-w-[200px] truncate">{client.address || <span className="text-gray-300">—</span>}</td>
-                    <td className="py-3.5 px-5">
-                      <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-1 flex-shrink-0">
                         <button
                           onClick={() => handleEdit(client)}
                           className="p-2 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                          title="Editar"
                         >
                           <FaEdit size={13} />
                         </button>
                         <button
                           onClick={() => handleDelete(client.id)}
                           className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                          title="Eliminar"
                         >
                           <FaTrashAlt size={13} />
                         </button>
                       </div>
-                    </td>
-                  </tr>
+                    </div>
+                    {/* Badge de estado */}
+                    <div className="mb-2">
+                      <StatusBadge status={client.status} />
+                    </div>
+                    {/* Datos de contacto */}
+                    <div className="space-y-0.5 text-xs text-gray-500">
+                      {client.phone && <p>📞 {client.phone}</p>}
+                      {client.email && <p>✉️ {client.email}</p>}
+                      {client.address && <p className="truncate">📍 {client.address}</p>}
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
-          )}
+              </div>
 
-          {!loading && filtered.length > 0 && (
-            <div className="px-5 py-3 border-t border-gray-100 bg-gray-50/50">
-              <span className="text-xs text-gray-400">
-                Mostrando {filtered.length} de {clients.length} clientes
-              </span>
-            </div>
+              {/* Footer */}
+              <div className="px-5 py-3 border-t border-gray-100 bg-gray-50/50">
+                <span className="text-xs text-gray-400">
+                  {filtered.length} de {clients.length} clientes
+                </span>
+              </div>
+            </>
           )}
         </div>
       </div>

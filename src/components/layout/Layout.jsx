@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Outlet, Link, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 
@@ -12,12 +13,15 @@ const icons = {
   resumen: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" /></svg>,
   consolidado: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" /></svg>,
   ganancias: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941" /></svg>,
+  hamburger: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>,
+  close: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>,
 };
 
-function NavLink({ to, label, icon, active }) {
+function NavLink({ to, label, icon, active, onClick }) {
   return (
     <Link
       to={to}
+      onClick={onClick}
       className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 ${active
         ? "bg-white text-slate-900 shadow-sm"
         : "text-slate-400 hover:text-white hover:bg-white/10"
@@ -41,6 +45,7 @@ function NavSection({ label, children }) {
 }
 
 export default function Layout() {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const { user, logout } = useAuth();
 
@@ -66,82 +71,132 @@ export default function Layout() {
     return "Panel";
   };
 
-  return (
-    <div className="flex h-screen bg-slate-100 font-sans">
-      <aside className="w-56 flex-shrink-0 bg-slate-900 flex flex-col border-r border-slate-800">
-        <div className="px-4 py-5 border-b border-slate-800">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-blue-500 flex items-center justify-center flex-shrink-0">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" className="w-4 h-4">
-                <path d="M11.47 3.84a.75.75 0 011.06 0l8.69 8.69a.75.75 0 101.06-1.06l-8.689-8.69a2.25 2.25 0 00-3.182 0l-8.69 8.69a.75.75 0 001.061 1.06l8.69-8.69z" />
-                <path d="M12 5.432l8.159 8.159c.03.03.06.058.091.086v6.198c0 1.035-.84 1.875-1.875 1.875H15a.75.75 0 01-.75-.75v-4.5a.75.75 0 00-.75-.75h-3a.75.75 0 00-.75.75V21a.75.75 0 01-.75.75H5.625a1.875 1.875 0 01-1.875-1.875v-6.198a2.29 2.29 0 00.091-.086L12 5.43z" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-white font-bold text-sm leading-none">VentPro</p>
-              <p className="text-slate-500 text-[10px] leading-none mt-0.5">Panel de gestión</p>
-            </div>
+  const closeSidebar = () => setSidebarOpen(false);
+
+  // Contenido del sidebar — mismo para desktop y drawer móvil
+  const SidebarContent = () => (
+    <>
+      {/* Logo */}
+      <div className="px-4 py-5 border-b border-slate-800">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-lg bg-blue-500 flex items-center justify-center flex-shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" className="w-4 h-4">
+              <path d="M11.47 3.84a.75.75 0 011.06 0l8.69 8.69a.75.75 0 101.06-1.06l-8.689-8.69a2.25 2.25 0 00-3.182 0l-8.69 8.69a.75.75 0 001.061 1.06l8.69-8.69z" />
+              <path d="M12 5.432l8.159 8.159c.03.03.06.058.091.086v6.198c0 1.035-.84 1.875-1.875 1.875H15a.75.75 0 01-.75-.75v-4.5a.75.75 0 00-.75-.75h-3a.75.75 0 00-.75.75V21a.75.75 0 01-.75.75H5.625a1.875 1.875 0 01-1.875-1.875v-6.198a2.29 2.29 0 00.091-.086L12 5.43z" />
+            </svg>
           </div>
-        </div>
-
-        <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-0.5">
-          {isAdmin && (
-            <NavLink to="/" label="Inicio" icon={icons.inicio} active={p === "/"} />
-          )}
-          {isVendor && (
-            <NavLink to="/my-dashboard" label="Mi Resumen" icon={icons.resumen} active={p === "/my-dashboard"} />
-          )}
-
-          <NavSection label="Operaciones">
-            <NavLink to="/quotations" label="Cotizaciones" icon={icons.coti} active={p === "/quotations" || p.startsWith("/quotations/")} />
-            {isAdmin && (
-              <NavLink to="/orders" label="Pedidos" icon={icons.pedidos} active={p === "/orders" || p.startsWith("/orders/")} />
-            )}
-            <NavLink to="/calendar" label="Calendario" icon={icons.calendar} active={p === "/calendar"} />
-          </NavSection>
-
-          <NavSection label="Clientes">
-            <NavLink to="/clients" label="Clientes" icon={icons.clientes} active={p === "/clients"} />
-          </NavSection>
-
-          {isAdmin && (
-            <NavSection label="Administración">
-              <NavLink to="/admin" label="Panel Admin" icon={icons.admin} active={p.startsWith("/admin")} />
-              <NavLink to="/materiales-consolidado" label="Consolidado" icon={icons.consolidado} active={p === "/materiales-consolidado"} />
-              <NavLink to="/ganancias" label="Ganancias" icon={icons.ganancias} active={p === "/ganancias"} />
-            </NavSection>
-          )}
-        </nav>
-
-        <div className="px-3 py-4 border-t border-slate-800">
-          <div className="flex items-center gap-2.5 px-2 py-2 mb-2 rounded-lg bg-slate-800/60">
-            <div className="w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-              {initials}
-            </div>
-            <div className="min-w-0">
-              <p className="text-white text-xs font-semibold truncate leading-tight">{user?.name}</p>
-              <p className="text-slate-500 text-[10px] leading-tight capitalize">{user?.role?.toLowerCase()}</p>
-            </div>
+          <div>
+            <p className="text-white font-bold text-sm leading-none">VentPro</p>
+            <p className="text-slate-500 text-[10px] leading-none mt-0.5">Panel de gestión</p>
           </div>
+          {/* Botón cerrar — solo visible en móvil dentro del drawer */}
           <button
-            onClick={logout}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-red-400 hover:bg-red-400/10 transition-all duration-150"
+            onClick={closeSidebar}
+            className="ml-auto lg:hidden text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
           >
-            {icons.logout}
-            Cerrar sesión
+            {icons.close}
           </button>
         </div>
+      </div>
+
+      {/* Nav */}
+      <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-0.5">
+        {isAdmin && (
+          <NavLink to="/" label="Inicio" icon={icons.inicio} active={p === "/"} onClick={closeSidebar} />
+        )}
+        {isVendor && (
+          <NavLink to="/my-dashboard" label="Mi Resumen" icon={icons.resumen} active={p === "/my-dashboard"} onClick={closeSidebar} />
+        )}
+
+        <NavSection label="Operaciones">
+          <NavLink to="/quotations" label="Cotizaciones" icon={icons.coti} active={p === "/quotations" || p.startsWith("/quotations/")} onClick={closeSidebar} />
+          {isAdmin && (
+            <NavLink to="/orders" label="Pedidos" icon={icons.pedidos} active={p === "/orders" || p.startsWith("/orders/")} onClick={closeSidebar} />
+          )}
+          <NavLink to="/calendar" label="Calendario" icon={icons.calendar} active={p === "/calendar"} onClick={closeSidebar} />
+        </NavSection>
+
+        <NavSection label="Clientes">
+          <NavLink to="/clients" label="Clientes" icon={icons.clientes} active={p === "/clients"} onClick={closeSidebar} />
+        </NavSection>
+
+        {isAdmin && (
+          <NavSection label="Administración">
+            <NavLink to="/admin" label="Panel Admin" icon={icons.admin} active={p.startsWith("/admin")} onClick={closeSidebar} />
+            <NavLink to="/materiales-consolidado" label="Consolidado" icon={icons.consolidado} active={p === "/materiales-consolidado"} onClick={closeSidebar} />
+            <NavLink to="/ganancias" label="Ganancias" icon={icons.ganancias} active={p === "/ganancias"} onClick={closeSidebar} />
+          </NavSection>
+        )}
+      </nav>
+
+      {/* Usuario + Logout */}
+      <div className="px-3 py-4 border-t border-slate-800">
+        <div className="flex items-center gap-2.5 px-2 py-2 mb-2 rounded-lg bg-slate-800/60">
+          <div className="w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+            {initials}
+          </div>
+          <div className="min-w-0">
+            <p className="text-white text-xs font-semibold truncate leading-tight">{user?.name}</p>
+            <p className="text-slate-500 text-[10px] leading-tight capitalize">{user?.role?.toLowerCase()}</p>
+          </div>
+        </div>
+        <button
+          onClick={logout}
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-red-400 hover:bg-red-400/10 transition-all duration-150"
+        >
+          {icons.logout}
+          Cerrar sesión
+        </button>
+      </div>
+    </>
+  );
+
+  return (
+    <div className="flex h-screen bg-slate-100 font-sans">
+
+      {/* ── SIDEBAR DESKTOP (lg+): siempre visible, fijo ── */}
+      <aside className="hidden lg:flex w-56 flex-shrink-0 bg-slate-900 flex-col border-r border-slate-800">
+        <SidebarContent />
       </aside>
 
-      <main className="flex-1 overflow-y-auto bg-slate-100">
-        <header className="sticky top-0 z-10 bg-white border-b border-slate-200 px-8 py-3.5 flex items-center justify-between">
-          <div>
-            <h2 className="text-sm font-semibold text-slate-800 capitalize">{pageTitle()}</h2>
-            <p className="text-xs text-slate-400">
-              {new Date().toLocaleDateString("es-GT", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
-            </p>
+      {/* ── DRAWER MÓVIL: overlay + panel deslizante ── */}
+      {/* Overlay oscuro */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={closeSidebar}
+        />
+      )}
+      {/* Panel del drawer */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 flex flex-col border-r border-slate-800 transform transition-transform duration-300 ease-in-out lg:hidden ${sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+      >
+        <SidebarContent />
+      </aside>
+
+      {/* ── CONTENIDO PRINCIPAL ── */}
+      <main className="flex-1 overflow-y-auto overflow-x-hidden bg-slate-100 min-w-0">
+
+        {/* Header */}
+        <header className="sticky top-0 z-10 bg-white border-b border-slate-200 px-4 sm:px-6 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            {/* Botón hamburguesa — solo móvil/tablet */}
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors flex-shrink-0"
+              aria-label="Abrir menú"
+            >
+              {icons.hamburger}
+            </button>
+            <div className="min-w-0">
+              <h2 className="text-sm font-semibold text-slate-800 capitalize truncate">{pageTitle()}</h2>
+              <p className="text-xs text-slate-400 hidden sm:block">
+                {new Date().toLocaleDateString("es-GT", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <span className="text-xs text-slate-400 hidden sm:block">
               Bienvenido, <span className="font-medium text-slate-600">{user?.name?.split(" ")[0]}</span>
             </span>
@@ -150,7 +205,9 @@ export default function Layout() {
             </div>
           </div>
         </header>
-        <div className="p-8">
+
+        {/* Página */}
+        <div className="p-4 sm:p-6 lg:p-8">
           <Outlet />
         </div>
       </main>

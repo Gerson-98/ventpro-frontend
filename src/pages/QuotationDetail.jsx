@@ -117,7 +117,6 @@ export default function QuotationDetail() {
         window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
     };
 
-    // ── Reabrir cotización confirmada ────────────────────────────────────────
     const handleReopen = async () => {
         if (!confirm(
             '¿Reabrir esta cotización?\n\n' +
@@ -137,7 +136,6 @@ export default function QuotationDetail() {
         }
     };
 
-    // ── Loading / Error ──────────────────────────────────────────────────────
     if (loading) {
         return (
             <div className="flex justify-center items-center py-32 text-gray-400">
@@ -161,20 +159,21 @@ export default function QuotationDetail() {
     const isConfirmado = quotation.status === 'confirmado';
     const isReopenada = !isConfirmado && !!quotation.generatedOrder;
     const windowCount = quotation.quotation_windows?.length || 0;
+    const API_BASE = import.meta.env.VITE_API_URL?.replace(/\/+$/, '') || 'http://localhost:3000';
 
     return (
-        <div className="max-w-5xl mx-auto px-4 py-6">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5 sm:py-6">
 
-            {/* ── Breadcrumb ── */}
+            {/* Breadcrumb */}
             <Link
                 to="/quotations"
-                className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-blue-600 mb-6 transition-colors group"
+                className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-blue-600 mb-5 transition-colors group"
             >
                 <FaArrowLeft size={11} className="group-hover:-translate-x-0.5 transition-transform" />
                 Volver a Cotizaciones
             </Link>
 
-            {/* ── Banner de advertencia cuando está reabierta ── */}
+            {/* Banner reabierta */}
             {isReopenada && (
                 <div className="mb-4 flex items-start gap-3 bg-amber-50 border border-amber-300 rounded-xl px-4 py-3">
                     <FaExclamationTriangle className="text-amber-500 mt-0.5 shrink-0" size={15} />
@@ -189,13 +188,13 @@ export default function QuotationDetail() {
             )}
 
             {/* ── Header card ── */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 mb-5">
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6 mb-5">
 
-                {/* Top: info + botones */}
-                <div className="flex justify-between items-start gap-4">
+                {/* Info + botones */}
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
 
                     {/* Info izquierda */}
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 w-full">
                         <div className="flex items-center gap-2 mb-2 flex-wrap">
                             <span className="font-mono text-xs font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-100">
                                 #{quotation.quotationNumber}
@@ -215,24 +214,21 @@ export default function QuotationDetail() {
                             )}
                         </div>
 
-                        <h1 className="text-2xl font-bold text-gray-900 tracking-tight truncate">
+                        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight break-words">
                             {quotation.project}
                         </h1>
 
-                        <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2">
-                            {/* Cliente */}
+                        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
                             <div className="flex items-center gap-2">
                                 <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Cliente</span>
                                 <span className="text-sm font-semibold text-gray-700">{quotation.client?.name || 'N/A'}</span>
                             </div>
-                            {/* Teléfono */}
                             {quotation.client?.phone && (
                                 <div className="flex items-center gap-1.5 text-sm text-gray-500">
                                     <FaPhone size={11} />
                                     <span>{quotation.client.phone}</span>
                                 </div>
                             )}
-                            {/* Estado cliente */}
                             <div className="flex items-center gap-2">
                                 <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Estado</span>
                                 <select
@@ -253,102 +249,98 @@ export default function QuotationDetail() {
                         </p>
                     </div>
 
-                    {/* Botones derecha */}
-                    <div className="flex flex-wrap gap-2 justify-end flex-shrink-0">
-
-                        {/* Editar — disponible si no está confirmada */}
+                    {/* Botones de acción — scroll horizontal en móvil si hay muchos */}
+                    <div className="flex flex-wrap gap-2 w-full sm:w-auto sm:justify-end">
                         <button
                             onClick={() => setIsEditModalOpen(true)}
                             disabled={isConfirmado}
                             title={isConfirmado ? 'Usa "Reabrir" para editar una cotización confirmada' : 'Editar cotización'}
-                            className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                         >
-                            <FaEdit size={13} /> Editar
+                            <FaEdit size={12} />
+                            <span>Editar</span>
                         </button>
 
-                        {/* Materiales */}
                         <button
                             onClick={handleCalculateMaterial}
-                            className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-xl border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-all"
-                            title="Ver reporte de materiales"
+                            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium rounded-xl border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-all"
                         >
-                            <FaCalculator size={13} /> Materiales
+                            <FaCalculator size={12} />
+                            <span>Materiales</span>
                         </button>
 
-                        {/* PDF */}
                         <button
                             onClick={() => generateDocumentPDF(quotation)}
-                            className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-xl border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition-all"
-                            title="Descargar PDF"
+                            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium rounded-xl border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition-all"
                         >
-                            <FaFilePdf size={13} /> PDF
+                            <FaFilePdf size={12} />
+                            <span>PDF</span>
                         </button>
 
-                        {/* WhatsApp */}
                         <button
                             onClick={handleShareWhatsApp}
-                            className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-xl border border-green-200 bg-green-50 text-green-700 hover:bg-green-100 transition-all"
-                            title="Compartir por WhatsApp"
+                            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium rounded-xl border border-green-200 bg-green-50 text-green-700 hover:bg-green-100 transition-all"
                         >
-                            <FaWhatsapp size={13} /> WhatsApp
+                            <FaWhatsapp size={12} />
+                            <span className="hidden sm:inline">WhatsApp</span>
+                            <span className="sm:hidden">WA</span>
                         </button>
 
-                        {/* Botón principal: Reabrir / Re-confirmar / Ver Pedido / Confirmar */}
                         {isConfirmado ? (
-                            // Confirmada: mostrar "Ver Pedido" y si es admin, "Reabrir"
-                            <div className="flex gap-2">
+                            <>
                                 {quotation.generatedOrder && (
                                     <Link
                                         to={`/orders/${quotation.generatedOrder.id}`}
-                                        className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-all"
+                                        className="inline-flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-all"
                                     >
-                                        <FaBoxOpen size={13} /> Ver Pedido
+                                        <FaBoxOpen size={12} />
+                                        <span>Ver Pedido</span>
                                     </Link>
                                 )}
                                 {isAdmin && (
                                     <button
                                         onClick={handleReopen}
                                         disabled={isReopening}
-                                        className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-xl border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                                        title="Reabrir para editar y re-confirmar"
+                                        className="inline-flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium rounded-xl border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                                     >
-                                        <FaUnlock size={13} />
-                                        {isReopening ? 'Reabriendo...' : 'Reabrir'}
+                                        <FaUnlock size={12} />
+                                        <span>{isReopening ? 'Reabriendo...' : 'Reabrir'}</span>
                                     </button>
                                 )}
-                            </div>
+                            </>
                         ) : isReopenada ? (
-                            // Reabierta: puede editar (arriba ya está habilitado) y re-confirmar
-                            <div className="flex gap-2">
+                            <>
                                 {quotation.generatedOrder && (
                                     <Link
                                         to={`/orders/${quotation.generatedOrder.id}`}
-                                        className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-xl border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-all"
+                                        className="inline-flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium rounded-xl border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-all"
                                     >
-                                        <FaBoxOpen size={13} /> Ver Pedido
+                                        <FaBoxOpen size={12} />
+                                        <span>Ver Pedido</span>
                                     </Link>
                                 )}
                                 <button
                                     onClick={() => setIsConfirmModalOpen(true)}
-                                    className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm transition-all"
+                                    className="inline-flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm transition-all"
                                 >
-                                    <FaCheckCircle size={13} /> Re-confirmar
+                                    <FaCheckCircle size={12} />
+                                    <span>Re-confirmar</span>
                                 </button>
-                            </div>
+                            </>
                         ) : (
-                            // En proceso normal: confirmar por primera vez
                             <button
                                 onClick={() => setIsConfirmModalOpen(true)}
-                                className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm transition-all"
+                                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm transition-all"
                             >
-                                <FaCheckCircle size={13} /> Confirmar
+                                <FaCheckCircle size={12} />
+                                <span>Confirmar</span>
                             </button>
                         )}
                     </div>
                 </div>
 
-                {/* Divider + Totales */}
-                <div className="mt-5 pt-4 border-t border-gray-100 flex justify-between items-center">
+                {/* Totales */}
+                <div className="mt-5 pt-4 border-t border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                     <div className="text-sm text-gray-500">
                         <span className="font-medium text-gray-700">Precio por m²:</span>{' '}
                         {quotation.price_per_m2
@@ -356,15 +348,15 @@ export default function QuotationDetail() {
                             : <span className="italic text-gray-400">Variable por ventana</span>
                         }
                     </div>
-                    <div className="text-right">
+                    <div className="sm:text-right">
                         <p className="text-xs text-gray-400 mb-0.5">Total de la Cotización</p>
-                        <p className="text-3xl font-black text-gray-900 tracking-tight">
+                        <p className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
                             {formatCurrency(quotation.total_price)}
                         </p>
                     </div>
                 </div>
 
-                {/* Notas y foto de referencia */}
+                {/* Notas y foto */}
                 {(quotation.notes || quotation.reference_image_url) && (
                     <div className="mt-4 pt-4 border-t border-gray-100 flex flex-col sm:flex-row gap-4">
                         {quotation.notes && (
@@ -385,13 +377,13 @@ export default function QuotationDetail() {
                                     <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Foto de referencia</span>
                                 </div>
                                 <a
-                                    href={`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${quotation.reference_image_url}`}
+                                    href={`${API_BASE}${quotation.reference_image_url}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="block"
                                 >
                                     <img
-                                        src={`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${quotation.reference_image_url}`}
+                                        src={`${API_BASE}${quotation.reference_image_url}`}
                                         alt="Foto de referencia"
                                         className="h-24 w-auto rounded-xl border border-gray-200 object-cover shadow-sm hover:opacity-90 transition-opacity cursor-pointer"
                                     />
@@ -402,115 +394,194 @@ export default function QuotationDetail() {
                 )}
             </div>
 
-            {/* ── Tabla de ventanas ── */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-x-auto">
-                <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+            {/* ── Tabla de ventanas (md+) / Cards (móvil) ── */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex justify-between items-center">
                     <h2 className="text-base font-bold text-gray-800">Detalle de Ventanas</h2>
                     <span className="text-xs font-semibold text-gray-400 bg-gray-100 px-2.5 py-1 rounded-lg">
                         {windowCount} ítem{windowCount !== 1 ? 's' : ''}
                     </span>
                 </div>
 
-                <table className="min-w-full text-sm table-fixed">
-                    <colgroup>
-                        <col className="w-16" />
-                        <col className="w-auto" />
-                        <col className="w-44" />
-                        <col className="w-36" />
-                        <col className="w-36" />
-                        <col className="w-32" />
-                    </colgroup>
-                    <thead>
-                        <tr className="bg-gray-50/70 border-b border-gray-100">
-                            <th className="py-3 px-5 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Cant.</th>
-                            <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Tipo de Ventana</th>
-                            <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Dimensiones</th>
-                            <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Color PVC</th>
-                            <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Vidrio</th>
-                            <th className="py-3 px-5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Precio</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                        {quotation.quotation_windows?.map((win) => {
-                            const isVidrioYDuela = win.glassColor?.name?.toUpperCase() === 'VIDRIO Y DUELA';
-                            const additionalGlass = isVidrioYDuela && win.options?.vidrio_adicional_id
-                                ? glassColors.find(g => g.id === Number(win.options.vidrio_adicional_id))
-                                : null;
+                {windowCount === 0 ? (
+                    <p className="py-12 text-center text-gray-400 text-sm">No hay ventanas en esta cotización.</p>
+                ) : (
+                    <>
+                        {/* ── TABLA — md+ ── */}
+                        <div className="hidden md:block overflow-x-auto">
+                            <table className="min-w-full text-sm">
+                                <colgroup>
+                                    <col className="w-16" />
+                                    <col className="w-auto" />
+                                    <col className="w-44" />
+                                    <col className="w-36" />
+                                    <col className="w-36" />
+                                    <col className="w-32" />
+                                </colgroup>
+                                <thead>
+                                    <tr className="bg-gray-50/70 border-b border-gray-100">
+                                        <th className="py-3 px-5 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Cant.</th>
+                                        <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Tipo de Ventana</th>
+                                        <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Dimensiones</th>
+                                        <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Color PVC</th>
+                                        <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Vidrio</th>
+                                        <th className="py-3 px-5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Precio</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50">
+                                    {quotation.quotation_windows?.map((win) => {
+                                        const isVidrioYDuela = win.glassColor?.name?.toUpperCase() === 'VIDRIO Y DUELA';
+                                        const additionalGlass = isVidrioYDuela && win.options?.vidrio_adicional_id
+                                            ? glassColors.find(g => g.id === Number(win.options.vidrio_adicional_id))
+                                            : null;
+                                        return (
+                                            <tr key={win.id} className="hover:bg-slate-50/60 transition-colors">
+                                                <td className="py-3.5 px-5 text-center">
+                                                    <span className="w-7 h-7 inline-flex items-center justify-center bg-blue-50 text-blue-700 font-bold text-xs rounded-lg">
+                                                        {win.quantity}
+                                                    </span>
+                                                </td>
+                                                <td className="py-3.5 px-5">
+                                                    <div className="flex flex-col gap-1.5">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="font-semibold text-gray-800">{win.displayName}</span>
+                                                            {win.design_image_url && (
+                                                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-md border border-blue-100">
+                                                                    <FaCamera size={9} /> Diseño
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        {win.design_image_url && (
+                                                            <a
+                                                                href={`${API_BASE}${win.design_image_url}`}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="block w-fit group/img"
+                                                            >
+                                                                <img
+                                                                    src={`${API_BASE}${win.design_image_url}`}
+                                                                    alt={`Diseño ${win.displayName}`}
+                                                                    className="h-14 w-auto rounded-lg border border-blue-100 object-cover shadow-sm group-hover/img:opacity-80 group-hover/img:shadow-md transition-all"
+                                                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                                                />
+                                                            </a>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td className="py-3.5 px-5 font-mono text-xs text-gray-600">
+                                                    {(win.width_cm / 100).toFixed(2)}m × {(win.height_cm / 100).toFixed(2)}m
+                                                    <span className="ml-1.5 text-gray-400">
+                                                        ({((win.width_cm / 100) * (win.height_cm / 100)).toFixed(2)} m²)
+                                                    </span>
+                                                </td>
+                                                <td className="py-3.5 px-5 text-gray-600">{win.pvcColor?.name}</td>
+                                                <td className="py-3.5 px-5">
+                                                    {isVidrioYDuela && additionalGlass ? (
+                                                        <div className="text-xs">
+                                                            <span className="text-gray-600">{win.glassColor.name}</span>
+                                                            <span className="text-blue-600 font-semibold block">+ {additionalGlass.name}</span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-gray-600">{win.glassColor?.name || '—'}</span>
+                                                    )}
+                                                </td>
+                                                <td className="py-3.5 px-5 text-right font-mono font-semibold text-gray-800">
+                                                    {formatCurrency(win.price)}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                                <tfoot className="border-t-2 border-gray-200 bg-gray-50/70">
+                                    <tr>
+                                        <td colSpan={5} className="py-3 px-5 text-sm font-semibold text-gray-600 text-right">
+                                            Total de la cotización
+                                        </td>
+                                        <td className="py-3 px-5 text-right font-mono font-black text-gray-900">
+                                            {formatCurrency(quotation.total_price)}
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
 
-                            return (
-                                <tr key={win.id} className="hover:bg-slate-50/60 transition-colors">
-                                    {/* Cantidad */}
-                                    <td className="py-3.5 px-5 text-center">
-                                        <span className="w-7 h-7 inline-flex items-center justify-center bg-blue-50 text-blue-700 font-bold text-xs rounded-lg">
-                                            {win.quantity}
-                                        </span>
-                                    </td>
-
-                                    {/* Tipo */}
-                                    <td className="py-3.5 px-5">
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-semibold text-gray-800">{win.displayName}</span>
-                                            {win.design_image_url && (
-                                                <a
-                                                    href={`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${win.design_image_url}`}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    title="Ver diseño adjunto"
-                                                    className="text-blue-400 hover:text-blue-600 transition-colors"
-                                                >
-                                                    <FaCamera size={13} />
-                                                </a>
-                                            )}
-                                        </div>
-                                    </td>
-
-                                    {/* Dimensiones */}
-                                    <td className="py-3.5 px-5 font-mono text-xs text-gray-600">
-                                        {(win.width_cm / 100).toFixed(2)}m × {(win.height_cm / 100).toFixed(2)}m
-                                        <span className="ml-1.5 text-gray-400 not-italic">
-                                            ({((win.width_cm / 100) * (win.height_cm / 100)).toFixed(2)} m²)
-                                        </span>
-                                    </td>
-
-                                    {/* Color PVC */}
-                                    <td className="py-3.5 px-5 text-gray-600">{win.pvcColor?.name}</td>
-
-                                    {/* Vidrio */}
-                                    <td className="py-3.5 px-5">
-                                        {isVidrioYDuela && additionalGlass ? (
-                                            <div className="text-xs">
-                                                <span className="text-gray-600">{win.glassColor.name}</span>
-                                                <span className="text-blue-600 font-semibold block">+ {additionalGlass.name}</span>
+                        {/* ── CARDS — móvil (< md) ── */}
+                        <div className="md:hidden divide-y divide-gray-100">
+                            {quotation.quotation_windows?.map((win) => {
+                                const isVidrioYDuela = win.glassColor?.name?.toUpperCase() === 'VIDRIO Y DUELA';
+                                const additionalGlass = isVidrioYDuela && win.options?.vidrio_adicional_id
+                                    ? glassColors.find(g => g.id === Number(win.options.vidrio_adicional_id))
+                                    : null;
+                                return (
+                                    <div key={win.id} className="p-4">
+                                        {/* Nombre + cantidad + precio */}
+                                        <div className="flex items-start justify-between gap-2 mb-2">
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <span className="w-6 h-6 inline-flex items-center justify-center bg-blue-50 text-blue-700 font-bold text-xs rounded-lg flex-shrink-0">
+                                                    {win.quantity}
+                                                </span>
+                                                <span className="font-semibold text-gray-800 text-sm truncate">{win.displayName}</span>
                                             </div>
-                                        ) : (
-                                            <span className="text-gray-600">{win.glassColor?.name || '—'}</span>
+                                            <span className="font-mono font-semibold text-gray-800 text-sm flex-shrink-0">
+                                                {formatCurrency(win.price)}
+                                            </span>
+                                        </div>
+
+                                        {/* Imagen de diseño si existe */}
+                                        {win.design_image_url && (
+                                            <a
+                                                href={`${API_BASE}${win.design_image_url}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="block w-fit mb-2"
+                                            >
+                                                <img
+                                                    src={`${API_BASE}${win.design_image_url}`}
+                                                    alt={`Diseño ${win.displayName}`}
+                                                    className="h-12 w-auto rounded-lg border border-blue-100 object-cover shadow-sm"
+                                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                                />
+                                            </a>
                                         )}
-                                    </td>
 
-                                    {/* Precio */}
-                                    <td className="py-3.5 px-5 text-right font-mono font-semibold text-gray-800">
-                                        {formatCurrency(win.price)}
-                                    </td>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-
-                    {/* Footer con total */}
-                    <tfoot className="border-t-2 border-gray-200 bg-gray-50/70">
-                        <tr>
-                            <td colSpan={5} className="py-3 px-5 text-sm font-semibold text-gray-600 text-right">
-                                Total de la cotización
-                            </td>
-                            <td className="py-3 px-5 text-right font-mono font-black text-gray-900">
-                                {formatCurrency(quotation.total_price)}
-                            </td>
-                        </tr>
-                    </tfoot>
-                </table>
+                                        {/* Detalles en grid compacto */}
+                                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-500">
+                                            <span>
+                                                Dim:{' '}
+                                                <span className="font-mono text-gray-700">
+                                                    {(win.width_cm / 100).toFixed(2)}m × {(win.height_cm / 100).toFixed(2)}m
+                                                </span>
+                                            </span>
+                                            <span>
+                                                Área:{' '}
+                                                <span className="text-gray-700">
+                                                    {((win.width_cm / 100) * (win.height_cm / 100)).toFixed(2)} m²
+                                                </span>
+                                            </span>
+                                            <span>PVC: <span className="text-gray-700">{win.pvcColor?.name || '—'}</span></span>
+                                            <span>
+                                                Vidrio:{' '}
+                                                <span className="text-gray-700">
+                                                    {isVidrioYDuela && additionalGlass
+                                                        ? `${win.glassColor.name} + ${additionalGlass.name}`
+                                                        : win.glassColor?.name || '—'}
+                                                </span>
+                                            </span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                            {/* Footer total */}
+                            <div className="px-4 py-3 bg-gray-50/70 border-t-2 border-gray-200 flex justify-between items-center">
+                                <span className="text-sm font-semibold text-gray-600">Total de la cotización</span>
+                                <span className="font-mono font-black text-gray-900">{formatCurrency(quotation.total_price)}</span>
+                            </div>
+                        </div>
+                    </>
+                )}
             </div>
 
-            {/* ── Modales ── */}
+            {/* Modales */}
             {isEditModalOpen && (
                 <AddQuotationModal
                     open={isEditModalOpen}
@@ -527,8 +598,11 @@ export default function QuotationDetail() {
                     quotationId={quotation.id}
                     isReconfirm={isReopenada}
                     excludeOrderId={isReopenada ? quotation.generatedOrder?.id : null}
+                    initialDates={isReopenada && quotation.generatedOrder ? {
+                        from: quotation.generatedOrder.installationStartDate,
+                        to: quotation.generatedOrder.installationEndDate,
+                    } : null}
                     onConfirmSuccess={(newOrderId) => {
-                        // Si es re-confirmación, el orderId ya existe — navegar al pedido
                         const targetOrderId = newOrderId || quotation.generatedOrder?.id;
                         navigate(`/orders/${targetOrderId}`);
                     }}
@@ -541,6 +615,7 @@ export default function QuotationDetail() {
                     isLoading={isReportLoading}
                     onClose={() => setIsReportModalOpen(false)}
                     showPrices={true}
+                    projectName={quotation?.project}
                 />
             )}
         </div>

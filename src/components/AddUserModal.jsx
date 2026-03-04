@@ -12,7 +12,7 @@ export default function AddUserModal({ open, onClose, onSave }) {
         name: '',
         email: '',
         password: '',
-        role: 'VENDEDOR', // Por seguridad, el rol por defecto es el de menos privilegios
+        role: 'VENDEDOR',
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -31,7 +31,7 @@ export default function AddUserModal({ open, onClose, onSave }) {
         setError('');
         try {
             await api.post('/users', formData);
-            onSave(); // Llama a la función onSave para cerrar y recargar
+            onSave();
         } catch (err) {
             setError(err.response?.data?.message || 'Error al crear el usuario.');
             console.error("Error creating user:", err);
@@ -42,11 +42,13 @@ export default function AddUserModal({ open, onClose, onSave }) {
 
     return (
         <Dialog open={open} onOpenChange={onClose}>
-            <DialogContent>
+            {/* max-h + overflow para que no se salga de pantalla en móvil */}
+            <DialogContent className="w-[calc(100%-2rem)] sm:max-w-md max-h-[92dvh] overflow-y-auto rounded-2xl sm:rounded-xl p-5 sm:p-6">
                 <DialogHeader>
-                    <DialogTitle>Crear Nuevo Usuario</DialogTitle>
+                    <DialogTitle className="text-base sm:text-lg">Crear Nuevo Usuario</DialogTitle>
                 </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4 py-4">
+
+                <form onSubmit={handleSubmit} className="space-y-4 pt-2">
                     <div>
                         <Label htmlFor="name">Nombre Completo</Label>
                         <Input id="name" name="name" value={formData.name} onChange={handleChange} required disabled={loading} />
@@ -67,18 +69,21 @@ export default function AddUserModal({ open, onClose, onSave }) {
                             value={formData.role}
                             onChange={handleChange}
                             disabled={loading}
-                            className="w-full h-10 border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 border rounded-md"
+                            className="w-full h-10 border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 border rounded-md"
                         >
                             <option value="VENDEDOR">Vendedor</option>
                             <option value="ADMINISTRADOR">Administrador</option>
                         </select>
                     </div>
+
                     {error && <p className="text-sm text-center text-red-500">{error}</p>}
-                    <DialogFooter>
-                        <Button type="button" variant="secondary" onClick={onClose} disabled={loading}>
+
+                    {/* Botones full-width en móvil, inline en sm+ */}
+                    <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-2 pt-2">
+                        <Button type="button" variant="secondary" onClick={onClose} disabled={loading} className="w-full sm:w-auto">
                             Cancelar
                         </Button>
-                        <Button type="submit" disabled={loading}>
+                        <Button type="submit" disabled={loading} className="w-full sm:w-auto">
                             {loading ? 'Creando...' : 'Crear Usuario'}
                         </Button>
                     </DialogFooter>

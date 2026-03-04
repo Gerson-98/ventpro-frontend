@@ -8,7 +8,7 @@ import { FaSearch, FaCalendarAlt, FaClipboardList, FaCheckCircle, FaClock } from
 const ORDER_STATUS_LABELS = {
     en_proceso: 'En Proceso',
     en_fabricacion: 'En Fabricación',
-    listo_para_instalar: 'Listo para Instalar',
+    listo_para_instalar: 'Listo p/ Instalar',
     en_ruta: 'En Ruta',
     completado: 'Completado',
     cancelado: 'Cancelado',
@@ -36,14 +36,14 @@ function StatCard({ icon, label, value, sub, color }) {
         indigo: 'bg-indigo-50 text-indigo-600',
     };
     return (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 flex items-center gap-4">
-            <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${colors[color]}`}>
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-5 flex items-center gap-3 sm:gap-4">
+            <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${colors[color]}`}>
                 {icon}
             </div>
-            <div>
-                <p className="text-xs text-gray-500 font-medium">{label}</p>
-                <p className="text-2xl font-bold text-gray-900 leading-tight">{value}</p>
-                {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+            <div className="min-w-0">
+                <p className="text-xs text-gray-500 font-medium truncate">{label}</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900 leading-tight truncate">{value}</p>
+                {sub && <p className="text-xs text-gray-400 mt-0.5 truncate hidden sm:block">{sub}</p>}
             </div>
         </div>
     );
@@ -87,7 +87,6 @@ export default function MyDashboard() {
             });
     }, [quotations, searchQ, qStatusFilter]);
 
-    // Pedidos que vienen de cotizaciones del vendedor (ya filtradas por backend) + buscador
     const filteredOrders = useMemo(() => {
         return orders.filter(o => {
             if (!searchO) return true;
@@ -103,7 +102,6 @@ export default function MyDashboard() {
         const totalVentasCotizaciones = quotations
             .filter(q => q.status === 'confirmado')
             .reduce((sum, q) => sum + (q.total_price || 0), 0);
-
         return {
             totalCotizaciones: quotations.length,
             confirmadas: quotations.filter(q => q.status === 'confirmado').length,
@@ -114,11 +112,11 @@ export default function MyDashboard() {
 
     return (
         <div className="min-h-screen bg-gray-50">
-            <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 sm:py-8 space-y-6 sm:space-y-8">
 
                 {/* ── Header ── */}
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
+                    <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
                         Mi Resumen
                     </h1>
                     <p className="text-gray-500 text-sm mt-1">
@@ -127,28 +125,28 @@ export default function MyDashboard() {
                 </div>
 
                 {/* ── Stats ── */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                     <StatCard
-                        icon={<FaClipboardList size={18} />}
+                        icon={<FaClipboardList size={17} />}
                         label="Total Cotizaciones"
                         value={stats.totalCotizaciones}
                         color="blue"
                     />
                     <StatCard
-                        icon={<FaCheckCircle size={18} />}
+                        icon={<FaCheckCircle size={17} />}
                         label="Confirmadas"
                         value={stats.confirmadas}
                         color="emerald"
                     />
                     <StatCard
-                        icon={<FaClock size={18} />}
+                        icon={<FaClock size={17} />}
                         label="En Proceso"
                         value={stats.pendientes}
                         color="amber"
                     />
                     <StatCard
-                        icon={<FaCalendarAlt size={18} />}
-                        label="Ventas Confirmadas"
+                        icon={<FaCalendarAlt size={17} />}
+                        label="Ventas Confirm."
                         value={`Q ${stats.totalVentas.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
                         sub="suma de cotizaciones confirmadas"
                         color="indigo"
@@ -158,7 +156,7 @@ export default function MyDashboard() {
                 {/* ── Sección Cotizaciones ── */}
                 <section>
                     <div className="flex items-center justify-between mb-3">
-                        <h2 className="text-lg font-semibold text-gray-800">Mis Cotizaciones</h2>
+                        <h2 className="text-base sm:text-lg font-semibold text-gray-800">Mis Cotizaciones</h2>
                         <button
                             onClick={() => navigate('/quotations')}
                             className="text-sm text-blue-600 hover:underline font-medium"
@@ -168,8 +166,8 @@ export default function MyDashboard() {
                     </div>
 
                     {/* Filtros cotizaciones */}
-                    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-3 mb-3 flex flex-wrap gap-3 items-center">
-                        <div className="relative flex-grow min-w-48">
+                    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-3 mb-3 flex flex-col sm:flex-row gap-2 sm:gap-3">
+                        <div className="relative flex-grow min-w-0">
                             <FaSearch className="absolute top-1/2 left-3 -translate-y-1/2 text-gray-400" size={12} />
                             <input
                                 type="text"
@@ -182,7 +180,7 @@ export default function MyDashboard() {
                         <select
                             value={qStatusFilter}
                             onChange={e => setQStatusFilter(e.target.value)}
-                            className="border border-gray-200 rounded-xl py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-gray-50"
+                            className="flex-shrink-0 border border-gray-200 rounded-xl py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-gray-50"
                         >
                             <option value="all">Todos los estados</option>
                             <option value="en proceso">En Proceso</option>
@@ -205,46 +203,83 @@ export default function MyDashboard() {
                                 <p className="text-sm font-medium">Sin resultados</p>
                             </div>
                         ) : (
-                            <table className="min-w-full text-sm">
-                                <thead>
-                                    <tr className="border-b border-gray-100 bg-gray-50/70">
-                                        <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">#</th>
-                                        <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Proyecto</th>
-                                        <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Cliente</th>
-                                        <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Fecha</th>
-                                        <th className="py-3 px-5 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Estado</th>
-                                        <th className="py-3 px-5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Total</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-50">
+                            <>
+                                {/* ── TABLA — md+ ── */}
+                                <div className="hidden md:block overflow-x-auto">
+                                    <table className="min-w-full text-sm">
+                                        <thead>
+                                            <tr className="border-b border-gray-100 bg-gray-50/70">
+                                                <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">#</th>
+                                                <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Proyecto</th>
+                                                <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Cliente</th>
+                                                <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Fecha</th>
+                                                <th className="py-3 px-5 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Estado</th>
+                                                <th className="py-3 px-5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-50">
+                                            {filteredQuotations.slice(0, 10).map(q => (
+                                                <tr
+                                                    key={q.id}
+                                                    onClick={() => navigate(`/quotations/${q.id}`)}
+                                                    className="hover:bg-blue-50/40 cursor-pointer transition-colors"
+                                                >
+                                                    <td className="py-3 px-5">
+                                                        <span className="font-mono text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
+                                                            {q.quotationNumber}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-3 px-5 font-semibold text-gray-800">{q.project}</td>
+                                                    <td className="py-3 px-5 text-gray-600">{q.client?.name || <span className="text-gray-300 italic">Sin cliente</span>}</td>
+                                                    <td className="py-3 px-5 text-gray-500 text-xs">{formatDate(q.createdAt)}</td>
+                                                    <td className="py-3 px-5 text-center">
+                                                        <span className={`inline-block px-2.5 py-0.5 text-xs font-semibold rounded-full capitalize ${q.status === 'confirmado' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                                                            {q.status?.replace('_', ' ')}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-3 px-5 text-right font-mono font-semibold text-gray-800">
+                                                        Q {(q.total_price || 0).toFixed(2)}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                {/* ── CARDS — móvil (< md) ── */}
+                                <div className="md:hidden divide-y divide-gray-100">
                                     {filteredQuotations.slice(0, 10).map(q => (
-                                        <tr
+                                        <div
                                             key={q.id}
                                             onClick={() => navigate(`/quotations/${q.id}`)}
-                                            className="hover:bg-blue-50/40 cursor-pointer transition-colors"
+                                            className="p-4 cursor-pointer hover:bg-blue-50/30 active:bg-blue-50 transition-colors"
                                         >
-                                            <td className="py-3 px-5">
-                                                <span className="font-mono text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
-                                                    {q.quotationNumber}
+                                            <div className="flex items-start justify-between gap-2 mb-1.5">
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <span className="font-mono text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md flex-shrink-0">
+                                                        {q.quotationNumber}
+                                                    </span>
+                                                    <span className="font-semibold text-gray-800 text-sm truncate">{q.project}</span>
+                                                </div>
+                                                <span className="font-mono font-semibold text-gray-800 text-sm flex-shrink-0">
+                                                    Q {(q.total_price || 0).toFixed(2)}
                                                 </span>
-                                            </td>
-                                            <td className="py-3 px-5 font-semibold text-gray-800">{q.project}</td>
-                                            <td className="py-3 px-5 text-gray-600">{q.client?.name || <span className="text-gray-300 italic">Sin cliente</span>}</td>
-                                            <td className="py-3 px-5 text-gray-500 text-xs">{formatDate(q.createdAt)}</td>
-                                            <td className="py-3 px-5 text-center">
-                                                <span className={`inline-block px-2.5 py-0.5 text-xs font-semibold rounded-full capitalize ${q.status === 'confirmado' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                                                    }`}>
-                                                    {q.status?.replace('_', ' ')}
-                                                </span>
-                                            </td>
-                                            <td className="py-3 px-5 text-right font-mono font-semibold text-gray-800">
-                                                Q {(q.total_price || 0).toFixed(2)}
-                                            </td>
-                                        </tr>
+                                            </div>
+                                            <div className="flex items-center justify-between gap-2">
+                                                <span className="text-xs text-gray-500 truncate">{q.client?.name || '—'}</span>
+                                                <div className="flex items-center gap-2 flex-shrink-0">
+                                                    <span className="text-[10px] text-gray-400">{formatDate(q.createdAt)}</span>
+                                                    <span className={`inline-block px-2 py-0.5 text-[10px] font-semibold rounded-full capitalize ${q.status === 'confirmado' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                                                        {q.status?.replace('_', ' ')}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
                                     ))}
-                                </tbody>
-                            </table>
+                                </div>
+                            </>
                         )}
+
                         {!loadingQ && filteredQuotations.length > 10 && (
                             <div className="px-5 py-3 border-t border-gray-100 bg-gray-50/50 text-center">
                                 <button onClick={() => navigate('/quotations')} className="text-xs text-blue-600 hover:underline">
@@ -258,19 +293,19 @@ export default function MyDashboard() {
                 {/* ── Sección Pedidos Confirmados ── */}
                 <section className="pb-8">
                     <div className="flex items-center justify-between mb-3">
-                        <h2 className="text-lg font-semibold text-gray-800">Mis Pedidos Confirmados</h2>
+                        <h2 className="text-base sm:text-lg font-semibold text-gray-800">Mis Pedidos Confirmados</h2>
                     </div>
 
                     {/* Buscador pedidos */}
                     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-3 mb-3">
-                        <div className="relative max-w-sm">
+                        <div className="relative">
                             <FaSearch className="absolute top-1/2 left-3 -translate-y-1/2 text-gray-400" size={12} />
                             <input
                                 type="text"
                                 placeholder="Buscar por proyecto o cliente..."
                                 value={searchO}
                                 onChange={e => setSearchO(e.target.value)}
-                                className="w-full pl-8 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none bg-gray-50 focus:bg-white transition-colors"
+                                className="w-full sm:max-w-sm pl-8 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none bg-gray-50 focus:bg-white transition-colors"
                             />
                         </div>
                     </div>
@@ -291,44 +326,78 @@ export default function MyDashboard() {
                                 <p className="text-xs">Confirma una cotización para verla aquí</p>
                             </div>
                         ) : (
-                            <table className="min-w-full text-sm">
-                                <thead>
-                                    <tr className="border-b border-gray-100 bg-gray-50/70">
-                                        <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Proyecto</th>
-                                        <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Cliente</th>
-                                        <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Instalación</th>
-                                        <th className="py-3 px-5 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Estado</th>
-                                        <th className="py-3 px-5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Total</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-50">
+                            <>
+                                {/* ── TABLA — md+ ── */}
+                                <div className="hidden md:block overflow-x-auto">
+                                    <table className="min-w-full text-sm">
+                                        <thead>
+                                            <tr className="border-b border-gray-100 bg-gray-50/70">
+                                                <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Proyecto</th>
+                                                <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Cliente</th>
+                                                <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Instalación</th>
+                                                <th className="py-3 px-5 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Estado</th>
+                                                <th className="py-3 px-5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-50">
+                                            {filteredOrders.map(o => (
+                                                <tr key={o.id} className="hover:bg-blue-50/40 transition-colors">
+                                                    <td className="py-3 px-5 font-semibold text-gray-800">{o.project}</td>
+                                                    <td className="py-3 px-5 text-gray-600">{o.client?.name || '—'}</td>
+                                                    <td className="py-3 px-5 text-xs text-gray-500">
+                                                        {o.installationStartDate ? (
+                                                            <span className="flex items-center gap-1.5 text-indigo-600">
+                                                                <FaCalendarAlt size={10} />
+                                                                {formatDate(o.installationStartDate)}
+                                                                {o.installationEndDate && o.installationEndDate !== o.installationStartDate && (
+                                                                    <span className="text-gray-400">→ {formatDate(o.installationEndDate)}</span>
+                                                                )}
+                                                            </span>
+                                                        ) : '—'}
+                                                    </td>
+                                                    <td className="py-3 px-5 text-center">
+                                                        <span className={`inline-block px-2.5 py-0.5 text-xs font-semibold rounded-full ${ORDER_STATUS_STYLES[o.status] || 'bg-gray-100 text-gray-600'}`}>
+                                                            {ORDER_STATUS_LABELS[o.status] || o.status}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-3 px-5 text-right font-mono font-semibold text-gray-800">
+                                                        Q {Number(o.total || 0).toFixed(2)}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                {/* ── CARDS — móvil (< md) ── */}
+                                <div className="md:hidden divide-y divide-gray-100">
                                     {filteredOrders.map(o => (
-                                        <tr key={o.id} className="hover:bg-blue-50/40 transition-colors">
-                                            <td className="py-3 px-5 font-semibold text-gray-800">{o.project}</td>
-                                            <td className="py-3 px-5 text-gray-600">{o.client?.name || '—'}</td>
-                                            <td className="py-3 px-5 text-xs text-gray-500">
-                                                {o.installationStartDate ? (
-                                                    <span className="flex items-center gap-1.5 text-indigo-600">
-                                                        <FaCalendarAlt size={10} />
-                                                        {formatDate(o.installationStartDate)}
-                                                        {o.installationEndDate && o.installationEndDate !== o.installationStartDate && (
-                                                            <span className="text-gray-400">→ {formatDate(o.installationEndDate)}</span>
-                                                        )}
-                                                    </span>
-                                                ) : '—'}
-                                            </td>
-                                            <td className="py-3 px-5 text-center">
-                                                <span className={`inline-block px-2.5 py-0.5 text-xs font-semibold rounded-full ${ORDER_STATUS_STYLES[o.status] || 'bg-gray-100 text-gray-600'}`}>
+                                        <div key={o.id} className="p-4">
+                                            <div className="flex items-start justify-between gap-2 mb-1.5">
+                                                <span className="font-semibold text-gray-800 text-sm truncate">{o.project}</span>
+                                                <span className="font-mono font-semibold text-gray-800 text-sm flex-shrink-0">
+                                                    Q {Number(o.total || 0).toFixed(2)}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                                                <span className="text-xs text-gray-500">{o.client?.name || '—'}</span>
+                                                <span className={`inline-block px-2 py-0.5 text-[10px] font-semibold rounded-full ${ORDER_STATUS_STYLES[o.status] || 'bg-gray-100 text-gray-600'}`}>
                                                     {ORDER_STATUS_LABELS[o.status] || o.status}
                                                 </span>
-                                            </td>
-                                            <td className="py-3 px-5 text-right font-mono font-semibold text-gray-800">
-                                                Q {Number(o.total || 0).toFixed(2)}
-                                            </td>
-                                        </tr>
+                                            </div>
+                                            {o.installationStartDate && (
+                                                <div className="flex items-center gap-1.5 text-[11px] text-indigo-600 mt-1">
+                                                    <FaCalendarAlt size={9} />
+                                                    <span>{formatDate(o.installationStartDate)}</span>
+                                                    {o.installationEndDate && o.installationEndDate !== o.installationStartDate && (
+                                                        <span className="text-gray-400">→ {formatDate(o.installationEndDate)}</span>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
                                     ))}
-                                </tbody>
-                            </table>
+                                </div>
+                            </>
                         )}
                     </div>
                 </section>

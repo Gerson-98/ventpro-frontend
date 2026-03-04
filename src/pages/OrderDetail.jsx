@@ -6,7 +6,7 @@ import api from '@/services/api';
 import { Button } from '@/components/ui/button';
 import {
   FaMoneyBillWave, FaFilePdf, FaArrowLeft, FaFileAlt, FaChartBar,
-  FaPlus, FaTrashAlt, FaEdit, FaClone, FaMagic, FaCalendarAlt,
+  FaMagic, FaCalendarAlt,
   FaCamera, FaFileInvoice, FaPhoneAlt, FaUser, FaExternalLinkAlt,
 } from 'react-icons/fa';
 import AddWindowModal from '@/components/AddWindowModal';
@@ -104,7 +104,6 @@ export default function OrderDetail() {
 
   useEffect(() => { fetchOrder(); }, [id]);
 
-  // ── Glass colors (para resolver VIDRIO Y DUELA en la tabla) ─────────────────
   useEffect(() => {
     const fetchGlass = async () => {
       try {
@@ -222,25 +221,27 @@ export default function OrderDetail() {
   const clientData = order.client;
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-5 sm:py-6">
 
       {/* ── Breadcrumb ── */}
       <Link
         to="/orders"
-        className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-blue-600 mb-6 transition-colors group"
+        className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-blue-600 mb-5 transition-colors group"
       >
         <FaArrowLeft size={11} className="group-hover:-translate-x-0.5 transition-transform" />
         Volver a Pedidos
       </Link>
 
       {/* ── Header card ── */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 mb-5">
-        <div className="flex justify-between items-start gap-6 flex-wrap">
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6 mb-5">
 
-          {/* Columna izquierda — info principal */}
-          <div className="flex-1 min-w-0">
+        {/* Fila superior: info + acciones */}
+        <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
 
-            {/* Número + estado */}
+          {/* Columna izquierda */}
+          <div className="flex-1 min-w-0 w-full">
+
+            {/* Badges */}
             <div className="flex items-center gap-2 mb-2 flex-wrap">
               <span className="font-mono text-xs font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-100">
                 Pedido #{order.id}
@@ -256,14 +257,15 @@ export default function OrderDetail() {
                   title="Ver cotización original"
                 >
                   <FaFileInvoice size={10} />
-                  Cotización #{order.generatedFromQuotationId}
+                  <span className="hidden sm:inline">Cotización #{order.generatedFromQuotationId}</span>
+                  <span className="sm:hidden">Cot. #{order.generatedFromQuotationId}</span>
                   <FaExternalLinkAlt size={9} />
                 </Link>
               )}
             </div>
 
             {/* Proyecto */}
-            <h1 className="text-2xl font-black text-gray-900 mb-1 leading-tight">{order.project}</h1>
+            <h1 className="text-xl sm:text-2xl font-black text-gray-900 mb-1 leading-tight">{order.project}</h1>
 
             {/* Cliente */}
             {clientData && (
@@ -281,18 +283,16 @@ export default function OrderDetail() {
               </div>
             )}
 
-            {/* Total */}
-            <div className="flex items-center gap-4 flex-wrap">
+            {/* Total + IVA toggle */}
+            <div className="flex items-center gap-3 flex-wrap">
               <div>
                 <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Total</p>
-                <p className="text-3xl font-black text-gray-900">{formatCurrency(displayedTotal)}</p>
+                <p className="text-2xl sm:text-3xl font-black text-gray-900">{formatCurrency(displayedTotal)}</p>
                 {includeIva && (
                   <p className="text-xs text-green-600 font-medium mt-0.5">IVA incluido (12%)</p>
                 )}
               </div>
-
-              {/* Toggle IVA */}
-              <div className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-xl border border-gray-200 ml-2">
+              <div className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-xl border border-gray-200">
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"
@@ -307,10 +307,8 @@ export default function OrderDetail() {
             </div>
           </div>
 
-          {/* Columna derecha — estado + fecha + acciones */}
-          <div className="flex flex-col items-end gap-3 shrink-0">
-
-            {/* Selector de estado */}
+          {/* Columna derecha — estado + fecha */}
+          <div className="flex flex-row sm:flex-col items-start sm:items-end gap-3 w-full sm:w-auto flex-wrap">
             <select
               value={order.status || ''}
               onChange={handleStatusChange}
@@ -322,12 +320,11 @@ export default function OrderDetail() {
               ))}
             </select>
 
-            {/* Fecha instalación */}
             {order.installationStartDate ? (
-              <div className="text-right">
+              <div className="sm:text-right">
                 <div className="flex items-center gap-1.5 text-sm text-gray-600">
-                  <FaCalendarAlt size={12} className="text-indigo-500" />
-                  <span>{formatInstallationDate(order.installationStartDate, order.installationEndDate)}</span>
+                  <FaCalendarAlt size={12} className="text-indigo-500 flex-shrink-0" />
+                  <span className="text-xs sm:text-sm">{formatInstallationDate(order.installationStartDate, order.installationEndDate)}</span>
                 </div>
                 {isAdmin && (
                   <button
@@ -349,204 +346,209 @@ export default function OrderDetail() {
           <div className="flex flex-wrap gap-2 mt-5 pt-4 border-t border-gray-100">
             <Button
               size="sm"
-              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white"
-              onClick={() => setShowAddModal(true)}
-            >
-              <FaPlus size={11} /> Añadir Ventana
-            </Button>
-            <Button
-              size="sm"
               variant="outline"
-              className="flex items-center gap-1.5"
+              className="flex items-center gap-1.5 text-xs sm:text-sm"
               onClick={handleGenerateReport}
             >
-              <FaChartBar size={11} /> Reporte Perfiles
+              <FaChartBar size={11} />
+              <span className="hidden sm:inline">Reporte Perfiles</span>
+              <span className="sm:hidden">Perfiles</span>
             </Button>
             <Button
               size="sm"
               variant="outline"
-              className="flex items-center gap-1.5"
+              className="flex items-center gap-1.5 text-xs sm:text-sm"
               onClick={handleOptimizeCuts}
             >
-              <FaMagic size={11} /> Optimizar Cortes
+              <FaMagic size={11} />
+              <span className="hidden sm:inline">Optimizar Cortes</span>
+              <span className="sm:hidden">Cortes</span>
             </Button>
             <Button
               size="sm"
-              className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white ml-auto"
+              className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white ml-auto text-xs sm:text-sm"
               onClick={handleGeneratePDF}
             >
-              <FaFilePdf size={11} /> PDF Pedido
+              <FaFilePdf size={11} />
+              <span className="hidden sm:inline">PDF Pedido</span>
+              <span className="sm:hidden">PDF</span>
             </Button>
           </div>
         )}
       </div>
 
-      {/* ── Tabla de ventanas ── */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-x-auto mb-6">
-        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+      {/* ── Tabla de ventanas (md+) / Cards (móvil) ── */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm mb-6 overflow-hidden">
+        <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex justify-between items-center">
           <h2 className="text-base font-bold text-gray-800">Detalle de Ventanas</h2>
           <span className="text-xs font-semibold text-gray-400 bg-gray-100 px-2.5 py-1 rounded-lg">
             {windowCount} ítem{windowCount !== 1 ? 's' : ''}
           </span>
         </div>
 
-        <table className="min-w-full text-sm">
-          <colgroup>
-            <col className="w-auto" />
-            <col className="w-36" />
-            <col className="w-28" />
-            <col className="w-28" />
-            <col className="w-28" />
-            <col className="w-28" />
-            <col className="w-16" />
-            <col className="w-28" />
-            {isAdmin && <col className="w-32" />}
-          </colgroup>
-          <thead>
-            <tr className="bg-gray-50/70 border-b border-gray-100">
-              <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Tipo</th>
-              <th className="py-3 px-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Medidas (cm)</th>
-              <th className="py-3 px-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Hoja (cm)</th>
-              <th className="py-3 px-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Vidrio (cm)</th>
-              <th className="py-3 px-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">PVC</th>
-              <th className="py-3 px-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Vidrio</th>
-              <th className="py-3 px-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Cant.</th>
-              <th className="py-3 px-5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Precio</th>
-              {isAdmin && (
-                <th className="py-3 px-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Acciones</th>
-              )}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {(order.windows || []).map((win) => {
-              const isVidrioYDuela = win.glassColor?.name?.toUpperCase() === 'VIDRIO Y DUELA';
-              const additionalGlass = isVidrioYDuela && win.options?.vidrio_adicional_id
-                ? glassColors.find(g => g.id === Number(win.options.vidrio_adicional_id))
-                : null;
+        {windowCount === 0 ? (
+          <p className="py-12 text-center text-gray-400 text-sm">No hay ventanas en este pedido.</p>
+        ) : (
+          <>
+            {/* ── TABLA — md+ ── */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <colgroup>
+                  <col className="w-auto" />
+                  <col className="w-16" />
+                  <col className="w-28" />
+                  <col className="w-28" />
+                  <col className="w-28" />
+                  <col className="w-28" />
+                  <col className="w-16" />
+                  <col className="w-28" />
+                </colgroup>
+                <thead>
+                  <tr className="bg-gray-50/70 border-b border-gray-100">
+                    <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Tipo</th>
+                    <th className="py-3 px-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">#V</th>
+                    <th className="py-3 px-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Medidas (cm)</th>
+                    <th className="py-3 px-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Hoja (cm)</th>
+                    <th className="py-3 px-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Vidrio (cm)</th>
+                    <th className="py-3 px-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">PVC</th>
+                    <th className="py-3 px-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Vidrio</th>
+                    <th className="py-3 px-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Cant.</th>
+                    <th className="py-3 px-5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Precio</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {(order.windows || []).map((win, winIdx) => {
+                    const isVidrioYDuela = win.glassColor?.name?.toUpperCase() === 'VIDRIO Y DUELA';
+                    const additionalGlass = isVidrioYDuela && win.options?.vidrio_adicional_id
+                      ? glassColors.find(g => g.id === Number(win.options.vidrio_adicional_id))
+                      : null;
+                    return (
+                      <tr key={win.id} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="py-3.5 px-5">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-gray-800 block leading-tight">
+                              {win.displayName || win.window_type?.name || 'Desconocido'}
+                            </span>
+                            {win.design_image_url && (
+                              <a href={`${API_BASE}${win.design_image_url}`} target="_blank" rel="noopener noreferrer"
+                                title="Ver diseño adjunto" className="text-blue-400 hover:text-blue-600 transition-colors shrink-0">
+                                <FaCamera size={12} />
+                              </a>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4 text-center">
+                          <span className="font-mono text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
+                            V{winIdx + 1}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-center font-mono text-xs text-gray-700 font-semibold">
+                          {win.width_cm} × {win.height_cm}
+                        </td>
+                        <td className="py-3.5 px-4 text-center text-xs text-gray-500 font-mono">
+                          {win.hojaAncho ? `${win.hojaAncho.toFixed(1)}×${win.hojaAlto.toFixed(1)}` : '—'}
+                        </td>
+                        <td className="py-3.5 px-4 text-center text-xs text-gray-500 font-mono">
+                          {win.vidrioAncho ? `${win.vidrioAncho.toFixed(1)}×${win.vidrioAlto.toFixed(1)}` : '—'}
+                        </td>
+                        <td className="py-3.5 px-4 text-center text-xs text-gray-600">{win.pvcColor?.name || '—'}</td>
+                        <td className="py-3.5 px-4 text-center text-xs">
+                          {isVidrioYDuela && additionalGlass ? (
+                            <div className="leading-tight">
+                              <span className="text-gray-600 block">{win.glassColor.name}</span>
+                              <span className="text-blue-600 font-bold block">/ {additionalGlass.name}</span>
+                            </div>
+                          ) : (
+                            <span className="text-gray-600">{win.glassColor?.name || '—'}</span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4 text-center">
+                          <span className="w-7 h-7 inline-flex items-center justify-center bg-gray-100 text-gray-700 font-bold text-xs rounded-lg">
+                            {win.quantity || 1}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-5 text-right font-mono font-black text-gray-900">
+                          {formatCurrency(win.price)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot className="border-t-2 border-gray-200 bg-gray-50/70">
+                  <tr>
+                    <td colSpan={8} className="py-3 px-5 text-sm font-semibold text-gray-600 text-right">
+                      {includeIva ? 'Total con IVA (12%)' : 'Total del pedido'}
+                    </td>
+                    <td className="py-3 px-5 text-right font-mono font-black text-gray-900 text-base">
+                      {formatCurrency(displayedTotal)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
 
-              return (
-                <tr key={win.id} className="hover:bg-slate-50/60 transition-colors">
-
-                  {/* Tipo */}
-                  <td className="py-3.5 px-5">
-                    <div className="flex items-center gap-2">
-                      <div>
-                        <span className="font-semibold text-gray-800 block leading-tight">
+            {/* ── CARDS — móvil (< md) ── */}
+            <div className="md:hidden divide-y divide-gray-100">
+              {(order.windows || []).map((win, winIdx) => {
+                const isVidrioYDuela = win.glassColor?.name?.toUpperCase() === 'VIDRIO Y DUELA';
+                const additionalGlass = isVidrioYDuela && win.options?.vidrio_adicional_id
+                  ? glassColors.find(g => g.id === Number(win.options.vidrio_adicional_id))
+                  : null;
+                return (
+                  <div key={win.id} className="p-4">
+                    {/* Fila: número + nombre */}
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-mono text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md flex-shrink-0">
+                          V{winIdx + 1}
+                        </span>
+                        <span className="font-semibold text-gray-800 text-sm truncate">
                           {win.displayName || win.window_type?.name || 'Desconocido'}
                         </span>
+                        {win.design_image_url && (
+                          <a href={`${API_BASE}${win.design_image_url}`} target="_blank" rel="noopener noreferrer"
+                            className="text-blue-400 hover:text-blue-600 flex-shrink-0">
+                            <FaCamera size={11} />
+                          </a>
+                        )}
                       </div>
-                      {win.design_image_url && (
-                        <a
-                          href={`${API_BASE}${win.design_image_url}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title="Ver diseño adjunto"
-                          className="text-blue-400 hover:text-blue-600 transition-colors shrink-0"
-                        >
-                          <FaCamera size={12} />
-                        </a>
-                      )}
+                      <span className="font-mono font-black text-gray-900 text-sm flex-shrink-0">
+                        {formatCurrency(win.price)}
+                      </span>
                     </div>
-                  </td>
-
-                  {/* Medidas */}
-                  <td className="py-3.5 px-4 text-center font-mono text-xs text-gray-700 font-semibold">
-                    {win.width_cm} × {win.height_cm}
-                  </td>
-
-                  {/* Hoja */}
-                  <td className="py-3.5 px-4 text-center text-xs text-gray-500 font-mono">
-                    {win.hojaAncho ? `${win.hojaAncho.toFixed(1)}×${win.hojaAlto.toFixed(1)}` : '—'}
-                  </td>
-
-                  {/* Vidrio calc */}
-                  <td className="py-3.5 px-4 text-center text-xs text-gray-500 font-mono">
-                    {win.vidrioAncho ? `${win.vidrioAncho.toFixed(1)}×${win.vidrioAlto.toFixed(1)}` : '—'}
-                  </td>
-
-                  {/* Color PVC */}
-                  <td className="py-3.5 px-4 text-center text-xs text-gray-600">
-                    {win.pvcColor?.name || '—'}
-                  </td>
-
-                  {/* Color Vidrio */}
-                  <td className="py-3.5 px-4 text-center text-xs">
-                    {isVidrioYDuela && additionalGlass ? (
-                      <div className="leading-tight">
-                        <span className="text-gray-600 block">{win.glassColor.name}</span>
-                        <span className="text-blue-600 font-bold block">/ {additionalGlass.name}</span>
-                      </div>
-                    ) : (
-                      <span className="text-gray-600">{win.glassColor?.name || '—'}</span>
-                    )}
-                  </td>
-
-                  {/* Cantidad */}
-                  <td className="py-3.5 px-4 text-center">
-                    <span className="w-7 h-7 inline-flex items-center justify-center bg-gray-100 text-gray-700 font-bold text-xs rounded-lg">
-                      {win.quantity || 1}
-                    </span>
-                  </td>
-
-                  {/* Precio */}
-                  <td className="py-3.5 px-5 text-right font-mono font-black text-gray-900">
-                    {formatCurrency(win.price)}
-                  </td>
-
-                  {/* Acciones */}
-                  {isAdmin && (
-                    <td className="py-3.5 px-4 text-center">
-                      <div className="flex justify-center items-center gap-2">
-                        <button
-                          onClick={() => openEditModal(win)}
-                          title="Editar"
-                          className="p-1.5 rounded-lg text-blue-500 hover:bg-blue-50 hover:text-blue-700 transition-colors"
-                        >
-                          <FaEdit size={13} />
-                        </button>
-                        <button
-                          onClick={() => handleDuplicate(win.id)}
-                          title="Duplicar"
-                          className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
-                        >
-                          <FaClone size={13} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(win.id)}
-                          title="Eliminar"
-                          className="p-1.5 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"
-                        >
-                          <FaTrashAlt size={13} />
-                        </button>
-                      </div>
-                    </td>
-                  )}
-                </tr>
-              );
-            })}
-
-            {windowCount === 0 && (
-              <tr>
-                <td colSpan={isAdmin ? 9 : 8} className="py-12 text-center text-gray-400 text-sm">
-                  No hay ventanas en este pedido.
-                </td>
-              </tr>
-            )}
-          </tbody>
-
-          {/* Footer total */}
-          <tfoot className="border-t-2 border-gray-200 bg-gray-50/70">
-            <tr>
-              <td colSpan={isAdmin ? 7 : 6} className="py-3 px-5 text-sm font-semibold text-gray-600 text-right">
-                {includeIva ? 'Total con IVA (12%)' : 'Total del pedido'}
-              </td>
-              <td className="py-3 px-5 text-right font-mono font-black text-gray-900 text-base">
-                {formatCurrency(displayedTotal)}
-              </td>
-              {isAdmin && <td />}
-            </tr>
-          </tfoot>
-        </table>
+                    {/* Detalles en grid compacto */}
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-500">
+                      <span>Medidas: <span className="font-mono font-semibold text-gray-700">{win.width_cm}×{win.height_cm} cm</span></span>
+                      <span>Cant: <span className="font-semibold text-gray-700">{win.quantity || 1}</span></span>
+                      {win.hojaAncho && (
+                        <span>Hoja: <span className="font-mono text-gray-600">{win.hojaAncho.toFixed(1)}×{win.hojaAlto.toFixed(1)}</span></span>
+                      )}
+                      {win.vidrioAncho && (
+                        <span>Vidrio calc: <span className="font-mono text-gray-600">{win.vidrioAncho.toFixed(1)}×{win.vidrioAlto.toFixed(1)}</span></span>
+                      )}
+                      <span>PVC: <span className="text-gray-700">{win.pvcColor?.name || '—'}</span></span>
+                      <span>
+                        Vidrio:{' '}
+                        <span className="text-gray-700">
+                          {isVidrioYDuela && additionalGlass
+                            ? `${win.glassColor.name} / ${additionalGlass.name}`
+                            : win.glassColor?.name || '—'}
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+              {/* Footer total en móvil */}
+              <div className="px-4 py-3 bg-gray-50/70 border-t-2 border-gray-200 flex justify-between items-center">
+                <span className="text-sm font-semibold text-gray-600">
+                  {includeIva ? 'Total con IVA (12%)' : 'Total del pedido'}
+                </span>
+                <span className="font-mono font-black text-gray-900">{formatCurrency(displayedTotal)}</span>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* ── Checklists ── */}

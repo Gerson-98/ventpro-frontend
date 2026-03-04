@@ -37,7 +37,6 @@ function ChecklistCard({ typeInfo, data, orderId, onUpdate, isAdmin }) {
     const [saving, setSaving] = useState(false);
     const [resetting, setResetting] = useState(false);
 
-    // Inicializar todos los ítems como checked al abrir
     useEffect(() => {
         if (open && !completed) {
             const initial = {};
@@ -46,9 +45,7 @@ function ChecklistCard({ typeInfo, data, orderId, onUpdate, isAdmin }) {
         }
     }, [open, completed, templates]);
 
-    const checkedCount = completed
-        ? completed.items.filter((i) => i.checked).length
-        : 0;
+    const checkedCount = completed ? completed.items.filter((i) => i.checked).length : 0;
     const totalCount = completed ? completed.items.length : templates.length;
 
     const handleSubmit = async () => {
@@ -86,57 +83,57 @@ function ChecklistCard({ typeInfo, data, orderId, onUpdate, isAdmin }) {
 
     return (
         <div className={`rounded-xl border ${color.border} overflow-hidden`}>
-            {/* Header */}
-            <div className={`${color.bg} px-4 py-3 flex items-center justify-between`}>
-                <div className="flex items-center gap-3">
-                    <span className="text-xl">{icon}</span>
-                    <div>
-                        <p className="text-sm font-semibold text-gray-800">{label}</p>
+
+            {/* ── Header ── */}
+            <div className={`${color.bg} px-3 sm:px-4 py-3`}>
+                {/* Fila 1: icono + título */}
+                <div className="flex items-center gap-3 mb-2 sm:mb-0">
+                    <span className="text-xl flex-shrink-0">{icon}</span>
+                    <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-800 leading-tight">{label}</p>
                         <p className="text-xs text-gray-500">{description}</p>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                    {completed ? (
-                        <>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${color.badge}`}>
-                                ✓ Completado
-                            </span>
-                            <span className="text-xs text-gray-500">
-                                {checkedCount}/{totalCount} ítems
-                            </span>
-                            <button
-                                onClick={() => setOpen((o) => !o)}
-                                className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded hover:bg-white/60 transition-colors"
-                            >
-                                {open ? 'Ocultar' : 'Ver detalle'}
-                            </button>
-                            {isAdmin && (
-                                <button
-                                    onClick={handleReset}
-                                    disabled={resetting}
-                                    className="text-xs text-red-400 hover:text-red-600 px-2 py-1 rounded hover:bg-red-50 transition-colors"
-                                >
-                                    {resetting ? '...' : 'Rehacer'}
-                                </button>
-                            )}
-                        </>
-                    ) : templates.length === 0 ? (
-                        <span className="text-xs text-gray-400 italic">Sin ítems configurados</span>
-                    ) : (
-                        <button
-                            onClick={() => setOpen((o) => !o)}
-                            className={`text-xs text-white px-3 py-1.5 rounded-lg font-medium ${color.btn} transition-colors`}
-                        >
-                            {open ? 'Cancelar' : 'Completar'}
-                        </button>
-                    )}
+                {/* Fila 2 (móvil) / inline (sm+): acciones */}
+                <div className="flex items-center gap-2 flex-wrap mt-2 sm:mt-0 sm:hidden">
+                    <ActionButtons
+                        completed={completed}
+                        templates={templates}
+                        open={open}
+                        setOpen={setOpen}
+                        checkedCount={checkedCount}
+                        totalCount={totalCount}
+                        color={color}
+                        isAdmin={isAdmin}
+                        resetting={resetting}
+                        handleReset={handleReset}
+                    />
+                </div>
+
+                {/* sm+: todo en una sola fila */}
+                <div className="hidden sm:flex items-center justify-between">
+                    <div /> {/* spacer — el título ya está arriba pero en sm va inline */}
+                    <div className="flex items-center gap-2">
+                        <ActionButtons
+                            completed={completed}
+                            templates={templates}
+                            open={open}
+                            setOpen={setOpen}
+                            checkedCount={checkedCount}
+                            totalCount={totalCount}
+                            color={color}
+                            isAdmin={isAdmin}
+                            resetting={resetting}
+                            handleReset={handleReset}
+                        />
+                    </div>
                 </div>
             </div>
 
-            {/* Body expandible */}
+            {/* ── Body expandible ── */}
             {open && (
-                <div className="px-4 py-4 bg-white border-t border-gray-100">
+                <div className="px-3 sm:px-4 py-4 bg-white border-t border-gray-100">
                     {completed ? (
                         // MODO VISTA
                         <div className="space-y-1">
@@ -160,17 +157,14 @@ function ChecklistCard({ typeInfo, data, orderId, onUpdate, isAdmin }) {
                                     <p className="text-sm text-gray-600">{completed.notes}</p>
                                 </div>
                             )}
-                            <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-2 text-xs text-gray-400">
+                            <div className="mt-3 pt-3 border-t border-gray-100 flex flex-wrap items-center gap-1.5 text-xs text-gray-400">
                                 <span>Completado por</span>
                                 <span className="font-medium text-gray-600">{completed.completedBy?.name}</span>
                                 <span>—</span>
                                 <span>
                                     {new Date(completed.completedAt).toLocaleDateString('es-GT', {
-                                        day: '2-digit',
-                                        month: 'short',
-                                        year: 'numeric',
-                                        hour: '2-digit',
-                                        minute: '2-digit',
+                                        day: '2-digit', month: 'short', year: 'numeric',
+                                        hour: '2-digit', minute: '2-digit',
                                     })}
                                 </span>
                             </div>
@@ -181,18 +175,15 @@ function ChecklistCard({ typeInfo, data, orderId, onUpdate, isAdmin }) {
                             {templates.map((template) => (
                                 <label
                                     key={template.id}
-                                    className="flex items-center gap-3 py-1.5 px-2 rounded-lg hover:bg-gray-50 cursor-pointer"
+                                    className="flex items-center gap-3 py-1.5 px-2 rounded-lg hover:bg-gray-50 active:bg-gray-100 cursor-pointer"
                                 >
                                     <input
                                         type="checkbox"
                                         checked={checkedItems[template.id] ?? false}
                                         onChange={(e) =>
-                                            setCheckedItems((prev) => ({
-                                                ...prev,
-                                                [template.id]: e.target.checked,
-                                            }))
+                                            setCheckedItems((prev) => ({ ...prev, [template.id]: e.target.checked }))
                                         }
-                                        className="w-4 h-4 rounded accent-blue-600"
+                                        className="w-4 h-4 rounded accent-blue-600 flex-shrink-0"
                                     />
                                     <span className="text-sm text-gray-700">{template.label}</span>
                                 </label>
@@ -214,7 +205,7 @@ function ChecklistCard({ typeInfo, data, orderId, onUpdate, isAdmin }) {
                             <div className="flex justify-end gap-2 mt-2">
                                 <button
                                     onClick={() => setOpen(false)}
-                                    className="text-sm px-3 py-1.5 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100"
+                                    className="text-sm px-3 py-1.5 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100 active:bg-gray-200"
                                 >
                                     Cancelar
                                 </button>
@@ -231,6 +222,48 @@ function ChecklistCard({ typeInfo, data, orderId, onUpdate, isAdmin }) {
                 </div>
             )}
         </div>
+    );
+}
+
+// Botones de acción extraídos para no duplicar JSX entre móvil y desktop
+function ActionButtons({ completed, templates, open, setOpen, checkedCount, totalCount, color, isAdmin, resetting, handleReset }) {
+    if (completed) {
+        return (
+            <>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${color.badge}`}>
+                    ✓ Completado
+                </span>
+                <span className="text-xs text-gray-500">{checkedCount}/{totalCount}</span>
+                <button
+                    onClick={() => setOpen((o) => !o)}
+                    className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded hover:bg-white/60 active:bg-white/80 transition-colors"
+                >
+                    {open ? 'Ocultar' : 'Ver detalle'}
+                </button>
+                {isAdmin && (
+                    <button
+                        onClick={handleReset}
+                        disabled={resetting}
+                        className="text-xs text-red-400 hover:text-red-600 px-2 py-1 rounded hover:bg-red-50 active:bg-red-100 transition-colors"
+                    >
+                        {resetting ? '...' : 'Rehacer'}
+                    </button>
+                )}
+            </>
+        );
+    }
+
+    if (templates.length === 0) {
+        return <span className="text-xs text-gray-400 italic">Sin ítems configurados</span>;
+    }
+
+    return (
+        <button
+            onClick={() => setOpen((o) => !o)}
+            className={`text-xs text-white px-3 py-1.5 rounded-lg font-medium ${color.btn} transition-colors active:opacity-80`}
+        >
+            {open ? 'Cancelar' : 'Completar'}
+        </button>
     );
 }
 
@@ -254,11 +287,11 @@ export default function ChecklistPanel({ orderId, isAdmin }) {
         if (orderId) fetchChecklists();
     }, [orderId]);
 
-    // Contar cuántos están completados
     const completedCount = checklists.filter((c) => c.completed).length;
 
     return (
         <div className="mt-6">
+            {/* Header con barra de progreso */}
             <div className="flex items-center justify-between mb-3">
                 <div>
                     <h3 className="text-sm font-semibold text-gray-700">Checklists de Instalación</h3>
@@ -266,10 +299,9 @@ export default function ChecklistPanel({ orderId, isAdmin }) {
                         {loading ? '...' : `${completedCount} de ${checklists.length} completados`}
                     </p>
                 </div>
-                {/* Barra de progreso */}
                 {!loading && checklists.length > 0 && (
                     <div className="flex items-center gap-2">
-                        <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <div className="w-20 sm:w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
                             <div
                                 className="h-full bg-green-500 rounded-full transition-all duration-500"
                                 style={{ width: `${(completedCount / checklists.length) * 100}%` }}

@@ -5,8 +5,6 @@ import api from '@/services/api';
 import { FaEdit, FaSave, FaTimes, FaPlus, FaTrashAlt, FaExclamationTriangle, FaInfoCircle } from 'react-icons/fa';
 
 // ─── Constantes ────────────────────────────────────────────────────────────────
-
-// CORRECCIÓN: valores exactos que usa el cost-calculator.service.ts
 const HOJA_DIVISION_OPTIONS = [
     { value: 'Completo', label: 'Completo — ancho + margen' },
     { value: 'Mitad', label: 'Mitad — (ancho + margen) / 2' },
@@ -21,15 +19,14 @@ const EMPTY_BASE = {
     vidrioDescuento: 0,
 };
 
-// Un override vacío listo para agregar
 const EMPTY_OVERRIDE = {
-    key: '',   // la option_key que lo activa, ej: "chapa_ambas_hojas"
-    hojaDivision: '',   // vacío = no sobreescribe
+    key: '',
+    hojaDivision: '',
     hojaMargen: '',
     hojaDescuento: '',
+    vidrioDescuento: '',
 };
 
-// Convierte el JSON de calculationOverrides a array editable
 const overridesToArray = (json) => {
     if (!json || typeof json !== 'object') return [];
     return Object.entries(json).map(([key, val]) => ({
@@ -37,109 +34,113 @@ const overridesToArray = (json) => {
         hojaDivision: val.hojaDivision ?? '',
         hojaMargen: val.hojaMargen ?? '',
         hojaDescuento: val.hojaDescuento ?? '',
+        vidrioDescuento: val.vidrioDescuento ?? '',
     }));
 };
 
-// Convierte el array editable de vuelta a JSON
 const arrayToOverrides = (arr) => {
     const result = {};
-    arr.forEach(({ key, hojaDivision, hojaMargen, hojaDescuento }) => {
+    arr.forEach(({ key, hojaDivision, hojaMargen, hojaDescuento, vidrioDescuento }) => {
         if (!key.trim()) return;
         const entry = {};
         if (hojaDivision) entry.hojaDivision = hojaDivision;
         if (hojaMargen !== '') entry.hojaMargen = Number(hojaMargen);
         if (hojaDescuento !== '') entry.hojaDescuento = Number(hojaDescuento);
+        if (vidrioDescuento !== '') entry.vidrioDescuento = Number(vidrioDescuento);
         if (Object.keys(entry).length) result[key.trim()] = entry;
     });
     return Object.keys(result).length ? result : null;
 };
 
-// ─── Subcomponente: editor de un override ─────────────────────────────────────
+// ─── OverrideRow — stack vertical en móvil, fila en sm+ ──────────────────────
 function OverrideRow({ override, index, onChange, onRemove, existingKeys }) {
     return (
-        <div className="flex gap-2 items-start p-3 bg-blue-50 rounded-lg border border-blue-100">
-            {/* Key */}
-            <div className="flex-1 min-w-0">
-                <label className="block text-xs text-blue-600 font-medium mb-1">option_key</label>
-                {existingKeys.length > 0 ? (
+        <div className="p-3 bg-blue-50 rounded-lg border border-blue-100 space-y-3">
+            {/* Fila superior: key + botón eliminar */}
+            <div className="flex items-start gap-2">
+                <div className="flex-1 min-w-0">
+                    <label className="block text-xs text-blue-600 font-medium mb-1">option_key</label>
+                    {existingKeys.length > 0 ? (
+                        <select
+                            value={override.key}
+                            onChange={(e) => onChange(index, 'key', e.target.value)}
+                            className="w-full border border-blue-200 rounded p-1.5 text-xs focus:ring-1 focus:ring-blue-400 focus:outline-none"
+                        >
+                            <option value="">— Seleccionar —</option>
+                            {existingKeys.map((k) => <option key={k} value={k}>{k}</option>)}
+                            <option value="__custom__">✏ Escribir nuevo...</option>
+                        </select>
+                    ) : (
+                        <input
+                            type="text"
+                            placeholder="ej: chapa_ambas_hojas"
+                            value={override.key}
+                            onChange={(e) => onChange(index, 'key', e.target.value)}
+                            className="w-full border border-blue-200 rounded p-1.5 text-xs focus:ring-1 focus:ring-blue-400 focus:outline-none"
+                        />
+                    )}
+                    {override.key === '__custom__' && (
+                        <input
+                            type="text"
+                            placeholder="Escribe el valor exacto..."
+                            className="w-full mt-1 border border-blue-300 rounded p-1.5 text-xs focus:ring-1 focus:ring-blue-400 focus:outline-none"
+                            onChange={(e) => onChange(index, 'key', e.target.value)}
+                        />
+                    )}
+                </div>
+                <button
+                    type="button"
+                    onClick={() => onRemove(index)}
+                    className="mt-5 text-red-400 hover:text-red-600 transition flex-shrink-0 p-1"
+                    title="Eliminar override"
+                >
+                    <FaTrashAlt size={13} />
+                </button>
+            </div>
+
+            {/* Campos numéricos — grid 2×2 en móvil, fila en sm+ */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div>
+                    <label className="block text-xs text-blue-600 font-medium mb-1">División</label>
                     <select
-                        value={override.key}
-                        onChange={(e) => onChange(index, 'key', e.target.value)}
+                        value={override.hojaDivision}
+                        onChange={(e) => onChange(index, 'hojaDivision', e.target.value)}
                         className="w-full border border-blue-200 rounded p-1.5 text-xs focus:ring-1 focus:ring-blue-400 focus:outline-none"
                     >
-                        <option value="">— Seleccionar —</option>
-                        {existingKeys.map((k) => <option key={k} value={k}>{k}</option>)}
-                        <option value="__custom__">✏ Escribir nuevo...</option>
+                        <option value="">Sin cambio</option>
+                        {HOJA_DIVISION_OPTIONS.map((o) => (
+                            <option key={o.value} value={o.value}>{o.value}</option>
+                        ))}
                     </select>
-                ) : (
+                </div>
+                <div>
+                    <label className="block text-xs text-blue-600 font-medium mb-1">Margen</label>
                     <input
-                        type="text"
-                        placeholder="ej: chapa_ambas_hojas"
-                        value={override.key}
-                        onChange={(e) => onChange(index, 'key', e.target.value)}
-                        className="w-full border border-blue-200 rounded p-1.5 text-xs focus:ring-1 focus:ring-blue-400 focus:outline-none"
+                        type="number" step="0.1" placeholder="—"
+                        value={override.hojaMargen}
+                        onChange={(e) => onChange(index, 'hojaMargen', e.target.value)}
+                        className="w-full border border-blue-200 rounded p-1.5 text-xs font-mono focus:ring-1 focus:ring-blue-400 focus:outline-none"
                     />
-                )}
-                {override.key === '__custom__' && (
+                </div>
+                <div>
+                    <label className="block text-xs text-blue-600 font-medium mb-1">Desc. Alto</label>
                     <input
-                        type="text"
-                        placeholder="Escribe el valor exacto..."
-                        className="w-full mt-1 border border-blue-300 rounded p-1.5 text-xs focus:ring-1 focus:ring-blue-400 focus:outline-none"
-                        onChange={(e) => onChange(index, 'key', e.target.value)}
+                        type="number" step="0.1" placeholder="—"
+                        value={override.hojaDescuento}
+                        onChange={(e) => onChange(index, 'hojaDescuento', e.target.value)}
+                        className="w-full border border-blue-200 rounded p-1.5 text-xs font-mono focus:ring-1 focus:ring-blue-400 focus:outline-none"
                     />
-                )}
+                </div>
+                <div>
+                    <label className="block text-xs text-blue-600 font-medium mb-1">Desc. Vidrio</label>
+                    <input
+                        type="number" step="0.1" placeholder="—"
+                        value={override.vidrioDescuento}
+                        onChange={(e) => onChange(index, 'vidrioDescuento', e.target.value)}
+                        className="w-full border border-blue-200 rounded p-1.5 text-xs font-mono focus:ring-1 focus:ring-blue-400 focus:outline-none"
+                    />
+                </div>
             </div>
-
-            {/* hojaDivision override */}
-            <div className="w-28">
-                <label className="block text-xs text-blue-600 font-medium mb-1">División</label>
-                <select
-                    value={override.hojaDivision}
-                    onChange={(e) => onChange(index, 'hojaDivision', e.target.value)}
-                    className="w-full border border-blue-200 rounded p-1.5 text-xs focus:ring-1 focus:ring-blue-400 focus:outline-none"
-                >
-                    <option value="">Sin cambio</option>
-                    {HOJA_DIVISION_OPTIONS.map((o) => (
-                        <option key={o.value} value={o.value}>{o.value}</option>
-                    ))}
-                </select>
-            </div>
-
-            {/* hojaMargen override */}
-            <div className="w-20">
-                <label className="block text-xs text-blue-600 font-medium mb-1">Margen</label>
-                <input
-                    type="number"
-                    step="0.1"
-                    placeholder="—"
-                    value={override.hojaMargen}
-                    onChange={(e) => onChange(index, 'hojaMargen', e.target.value)}
-                    className="w-full border border-blue-200 rounded p-1.5 text-xs font-mono focus:ring-1 focus:ring-blue-400 focus:outline-none"
-                />
-            </div>
-
-            {/* hojaDescuento override */}
-            <div className="w-20">
-                <label className="block text-xs text-blue-600 font-medium mb-1">Desc. Alto</label>
-                <input
-                    type="number"
-                    step="0.1"
-                    placeholder="—"
-                    value={override.hojaDescuento}
-                    onChange={(e) => onChange(index, 'hojaDescuento', e.target.value)}
-                    className="w-full border border-blue-200 rounded p-1.5 text-xs font-mono focus:ring-1 focus:ring-blue-400 focus:outline-none"
-                />
-            </div>
-
-            {/* Eliminar */}
-            <button
-                type="button"
-                onClick={() => onRemove(index)}
-                className="mt-5 text-red-400 hover:text-red-600 transition flex-shrink-0"
-                title="Eliminar override"
-            >
-                <FaTrashAlt size={13} />
-            </button>
         </div>
     );
 }
@@ -147,8 +148,8 @@ function OverrideRow({ override, index, onChange, onRemove, existingKeys }) {
 // ─── Componente principal ──────────────────────────────────────────────────────
 export default function CalculationsTab() {
     const [windowTypes, setWindowTypes] = useState([]);
-    const [calculations, setCalculations] = useState({});  // { [window_type_id]: calculation }
-    const [optionKeys, setOptionKeys] = useState([]);  // keys únicas de AccessoryRules para los overrides
+    const [calculations, setCalculations] = useState({});
+    const [optionKeys, setOptionKeys] = useState([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
@@ -180,11 +181,8 @@ export default function CalculationsTab() {
             });
             setCalculations(map);
 
-            // Extraer keys desde option_values — fuente única de verdad
             const groups = Array.isArray(groupsRes.data) ? groupsRes.data : [];
-            const keys = groups
-                .flatMap(g => g.values.map(v => v.key))
-                .sort();
+            const keys = groups.flatMap(g => g.values.map(v => v.key)).sort();
             setOptionKeys([...new Set(keys)]);
 
         } catch (err) {
@@ -235,7 +233,6 @@ export default function CalculationsTab() {
     const handleSave = async () => {
         setFormError('');
 
-        // Validar overrides: no puede haber dos con la misma key
         const keys = overrides.map((o) => o.key.trim()).filter(Boolean);
         if (new Set(keys).size !== keys.length) {
             setFormError('Hay dos overrides con la misma clave. Cada clave debe ser única.');
@@ -253,7 +250,6 @@ export default function CalculationsTab() {
 
         setSaving(true);
         try {
-            // Siempre POST — el backend hace upsert (crea o actualiza según window_type_id)
             await api.post('/window-calculations', payload);
             closeModal();
             fetchData();
@@ -266,17 +262,16 @@ export default function CalculationsTab() {
         }
     };
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
     const tieneCalc = (id) => !!calculations[id];
 
     // ── Render ────────────────────────────────────────────────────────────────
     return (
-        <div className="bg-white p-6 rounded-lg shadow-md">
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-md">
 
-            {/* Encabezado */}
-            <div className="mb-6">
-                <h2 className="text-2xl font-semibold text-gray-800">Ajustes de Cálculo</h2>
-                <p className="text-gray-500 text-sm mt-0.5">
+            {/* Header */}
+            <div className="mb-4 sm:mb-6">
+                <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">Ajustes de Cálculo</h2>
+                <p className="text-gray-500 text-xs sm:text-sm mt-0.5">
                     Define cómo se calculan las medidas de hoja y vidrio para cada tipo de ventana, incluyendo overrides por opción.
                 </p>
             </div>
@@ -297,7 +292,8 @@ export default function CalculationsTab() {
                 </div>
             ) : (
                 <>
-                    <div className="overflow-x-auto rounded-lg border border-gray-200">
+                    {/* ── Tabla desktop (md+) ── */}
+                    <div className="hidden md:block overflow-x-auto rounded-lg border border-gray-200">
                         <table className="min-w-full text-sm">
                             <thead className="bg-gray-50 text-gray-600 text-xs uppercase tracking-wide">
                                 <tr>
@@ -369,21 +365,89 @@ export default function CalculationsTab() {
                             </tbody>
                         </table>
                     </div>
+
+                    {/* ── Cards móvil (< md) ── */}
+                    <div className="md:hidden border border-gray-200 rounded-lg overflow-hidden divide-y divide-gray-100">
+                        {windowTypes.map((wt) => {
+                            const calc = calculations[wt.id];
+                            const overrideCount = calc?.calculationOverrides
+                                ? Object.keys(calc.calculationOverrides).length
+                                : 0;
+                            return (
+                                <div key={wt.id} className="p-3">
+                                    {/* Fila 1: nombre + botón */}
+                                    <div className="flex items-start justify-between gap-2 mb-2">
+                                        <div className="min-w-0">
+                                            <p className="font-medium text-sm text-gray-900 truncate">{wt.name}</p>
+                                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                                {tieneCalc(wt.id) ? (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-green-100 text-green-700">
+                                                        ✓ Configurado
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-100 text-amber-700">
+                                                        ⚠ Sin configurar
+                                                    </span>
+                                                )}
+                                                {overrideCount > 0 && (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-purple-100 text-purple-700">
+                                                        {overrideCount} override{overrideCount > 1 ? 's' : ''}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => openModal(wt)}
+                                            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-50 text-blue-700 rounded-md active:bg-blue-100"
+                                        >
+                                            <FaEdit size={11} />
+                                            {tieneCalc(wt.id) ? 'Editar' : 'Configurar'}
+                                        </button>
+                                    </div>
+                                    {/* Fila 2: valores en grid 2×2 */}
+                                    {calc && (
+                                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs mt-2">
+                                            <div>
+                                                <span className="text-gray-400">División: </span>
+                                                <span className="font-medium text-blue-700">{calc.hojaDivision}</span>
+                                            </div>
+                                            <div>
+                                                <span className="text-gray-400">Margen: </span>
+                                                <span className="font-mono text-gray-700">{calc.hojaMargen} cm</span>
+                                            </div>
+                                            <div>
+                                                <span className="text-gray-400">Desc. Alto: </span>
+                                                <span className="font-mono text-gray-700">{calc.hojaDescuento} cm</span>
+                                            </div>
+                                            <div>
+                                                <span className="text-gray-400">Desc. Vidrio: </span>
+                                                <span className="font-mono text-gray-700">{calc.vidrioDescuento} cm</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+
                     <p className="mt-3 text-xs text-gray-400 text-right">
                         {Object.keys(calculations).length} de {windowTypes.length} tipos configurados
                     </p>
                 </>
             )}
 
-            {/* ── MODAL ── */}
+            {/* ── MODAL — bottom sheet móvil / centrado sm+ ── */}
             {showModal && editingType && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-                    <div className="bg-white rounded-xl w-full max-w-2xl shadow-2xl border border-gray-100 flex flex-col max-h-[90vh]">
+                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white w-full flex flex-col rounded-t-2xl sm:rounded-xl h-[95dvh] sm:h-auto sm:max-h-[90vh] sm:max-w-2xl overflow-hidden shadow-2xl">
+
+                        {/* Drag handle móvil */}
+                        <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mt-3 sm:hidden" />
 
                         {/* Header */}
-                        <div className="flex justify-between items-start p-6 pb-4 border-b border-gray-100">
+                        <div className="flex justify-between items-start px-5 pt-4 pb-3 sm:p-6 sm:pb-4 border-b border-gray-100 flex-shrink-0">
                             <div>
-                                <h3 className="text-lg font-semibold text-gray-800">
+                                <h3 className="text-base sm:text-lg font-semibold text-gray-800">
                                     {calculations[editingType.id] ? 'Editar' : 'Configurar'} Cálculo
                                 </h3>
                                 <p className="text-sm text-blue-600 font-medium mt-0.5">{editingType.name}</p>
@@ -396,19 +460,15 @@ export default function CalculationsTab() {
                             </button>
                         </div>
 
-                        {/* Body */}
-                        <div className="overflow-y-auto flex-1 p-6 space-y-6">
+                        {/* Body scrollable */}
+                        <div className="overflow-y-auto flex-1 px-5 py-4 sm:p-6 space-y-6">
 
-                            {/* ── Valores base ── */}
+                            {/* Valores base */}
                             <div>
                                 <h4 className="text-sm font-semibold text-gray-700 mb-3">Valores base</h4>
-                                <div className="grid grid-cols-2 gap-4">
-
-                                    {/* hojaDivision */}
-                                    <div className="col-span-2">
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            División de Hoja
-                                        </label>
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">División de Hoja</label>
                                         <select
                                             value={baseValues.hojaDivision}
                                             onChange={(e) => setBaseValues((p) => ({ ...p, hojaDivision: e.target.value }))}
@@ -420,68 +480,56 @@ export default function CalculationsTab() {
                                         </select>
                                     </div>
 
-                                    {/* hojaMargen */}
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            Margen de Ancho (cm)
-                                        </label>
-                                        <input
-                                            type="number"
-                                            step="0.1"
-                                            value={baseValues.hojaMargen}
-                                            onChange={(e) => setBaseValues((p) => ({ ...p, hojaMargen: e.target.value }))}
-                                            className="w-full border border-gray-300 rounded-lg p-2.5 text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                        />
-                                    </div>
-
-                                    {/* hojaDescuento */}
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            Descuento de Alto (cm)
-                                        </label>
-                                        <input
-                                            type="number"
-                                            step="0.1"
-                                            value={baseValues.hojaDescuento}
-                                            onChange={(e) => setBaseValues((p) => ({ ...p, hojaDescuento: e.target.value }))}
-                                            className="w-full border border-gray-300 rounded-lg p-2.5 text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                        />
-                                    </div>
-
-                                    {/* vidrioDescuento */}
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            Descuento de Vidrio (cm)
-                                        </label>
-                                        <input
-                                            type="number"
-                                            step="0.1"
-                                            value={baseValues.vidrioDescuento}
-                                            onChange={(e) => setBaseValues((p) => ({ ...p, vidrioDescuento: e.target.value }))}
-                                            className="w-full border border-gray-300 rounded-lg p-2.5 text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                        />
+                                    <div className="grid grid-cols-3 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-700 mb-1">Margen Ancho (cm)</label>
+                                            <input
+                                                type="number" step="0.1"
+                                                value={baseValues.hojaMargen}
+                                                onChange={(e) => setBaseValues((p) => ({ ...p, hojaMargen: e.target.value }))}
+                                                className="w-full border border-gray-300 rounded-lg p-2.5 text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-700 mb-1">Desc. Alto (cm)</label>
+                                            <input
+                                                type="number" step="0.1"
+                                                value={baseValues.hojaDescuento}
+                                                onChange={(e) => setBaseValues((p) => ({ ...p, hojaDescuento: e.target.value }))}
+                                                className="w-full border border-gray-300 rounded-lg p-2.5 text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-700 mb-1">Desc. Vidrio (cm)</label>
+                                            <input
+                                                type="number" step="0.1"
+                                                value={baseValues.vidrioDescuento}
+                                                onChange={(e) => setBaseValues((p) => ({ ...p, vidrioDescuento: e.target.value }))}
+                                                className="w-full border border-gray-300 rounded-lg p-2.5 text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* ── Overrides ── */}
+                            {/* Overrides */}
                             <div>
-                                <div className="flex justify-between items-center mb-2">
-                                    <div className="flex items-center gap-2">
-                                        <h4 className="text-sm font-semibold text-gray-700">
+                                <div className="flex items-start justify-between gap-2 mb-2">
+                                    <div className="flex-1 min-w-0">
+                                        <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-1.5 flex-wrap">
                                             Overrides por opción
+                                            <span className="text-xs text-gray-400 flex items-center gap-1 font-normal">
+                                                <FaInfoCircle size={11} />
+                                                Sobreescriben los valores base
+                                            </span>
                                         </h4>
-                                        <span className="text-xs text-gray-400 flex items-center gap-1">
-                                            <FaInfoCircle size={11} />
-                                            Sobreescriben los valores base según la opción elegida en el cotizador
-                                        </span>
                                     </div>
                                     <button
                                         type="button"
                                         onClick={addOverride}
-                                        className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 font-medium transition"
+                                        className="flex-shrink-0 flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 font-medium transition"
                                     >
-                                        <FaPlus size={10} /> Agregar override
+                                        <FaPlus size={10} /> Agregar
                                     </button>
                                 </div>
 
@@ -505,7 +553,6 @@ export default function CalculationsTab() {
                                 )}
                             </div>
 
-                            {/* Error */}
                             {formError && (
                                 <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm flex items-center gap-2">
                                     <FaExclamationTriangle size={13} /> {formError}
@@ -514,7 +561,7 @@ export default function CalculationsTab() {
                         </div>
 
                         {/* Footer */}
-                        <div className="flex justify-end gap-3 p-6 pt-4 border-t border-gray-100">
+                        <div className="flex justify-end gap-3 px-5 py-4 sm:p-6 sm:pt-4 border-t border-gray-100 flex-shrink-0">
                             <button
                                 type="button"
                                 onClick={closeModal}
