@@ -441,7 +441,9 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
         setQuotation(prev => ({ ...prev, windows: updatedWindows }));
         // Las opciones son selects — cambio inmediato, sin debounce
         calculateWindowCost(updatedWindows[index]);
-    }; = (index, file) => {
+    };
+
+    const handleFileChange = (index, file) => {
         const updatedWindows = quotation.windows.map((win, i) =>
             i === index ? { ...win, fileToUpload: file, design_image_url: null } : win
         );
