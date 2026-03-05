@@ -743,20 +743,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                     <div className="flex items-center justify-between">
                                         <h3 className="text-base sm:text-lg font-semibold text-gray-700">Ventanas</h3>
                                         <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-                                            <button
-                                                type="button"
-                                                onClick={() => setUseCm(false)}
-                                                className={`px-2 sm:px-3 py-1 rounded-md text-xs font-semibold transition-colors ${!useCm ? 'bg-white shadow text-blue-700' : 'text-gray-500 hover:text-gray-700'}`}
-                                            >
-                                                m
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setUseCm(true)}
-                                                className={`px-2 sm:px-3 py-1 rounded-md text-xs font-semibold transition-colors ${useCm ? 'bg-white shadow text-blue-700' : 'text-gray-500 hover:text-gray-700'}`}
-                                            >
-                                                cm
-                                            </button>
+                                            <h3 className="text-base sm:text-lg font-semibold text-gray-700">Ventanas</h3>
                                         </div>
                                     </div>
 
@@ -766,7 +753,27 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                             <thead className="bg-gray-100 border-b sticky top-0 z-10">
                                                 <tr>
                                                     <th className="p-2 text-left w-52">Tipo</th>
-                                                    <th className="p-2 text-center w-28">Medidas ({useCm ? 'cm' : 'm'})</th>
+                                                    <th className="p-2 text-center w-28">
+                                                        <div className="flex flex-col items-center gap-1">
+                                                            <span>Medidas</span>
+                                                            <div className="flex items-center gap-0.5 bg-gray-200 rounded-md p-0.5">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setUseCm(false)}
+                                                                    className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors ${!useCm ? 'bg-white shadow text-blue-700' : 'text-gray-500 hover:text-gray-700'}`}
+                                                                >
+                                                                    m
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setUseCm(true)}
+                                                                    className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors ${useCm ? 'bg-white shadow text-blue-700' : 'text-gray-500 hover:text-gray-700'}`}
+                                                                >
+                                                                    cm
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </th>
                                                     <th className="p-2 text-center w-16">Cant.</th>
                                                     <th className="p-2 text-center w-28">m² Ind.</th>
                                                     <th className="p-2 text-left w-40">Opciones</th>
