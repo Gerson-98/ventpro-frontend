@@ -129,6 +129,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
     const [calculatingCost, setCalculatingCost] = useState({});
     const [validationErrors, setValidationErrors] = useState([]);
     const [useCm, setUseCm] = useState(false);
+    const [totalOverride, setTotalOverride] = useState(''); // total editable por el usuario
 
     const toDisplay = (valueInMeters) => {
         if (valueInMeters === '' || valueInMeters === null || valueInMeters === undefined) return '';
@@ -187,6 +188,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             setCatalogsLoaded(false);
             setValidationErrors([]);
             setUseCm(false);
+            setTotalOverride('');
             return;
         }
         const fetchCatalogs = async () => {
@@ -476,6 +478,39 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
     const totalPrecioSugerido = Object.values(windowCosts).reduce((s, c) => s + (c?.precio_sugerido_minimo || 0), 0);
     const isCalculatingAny = Object.values(calculatingCost).some(Boolean);
 
+    // Total efectivo: el que el usuario haya escrito, o el calculado automáticamente
+    const effectiveTotal = totalOverride !== '' ? parseFloat(totalOverride) || 0 : totalsInRealTime.total;
+
+    // m² totales de todas las ventanas (para calcular precio/m² inverso)
+    const totalM2 = quotation.windows.reduce((acc, win) => {
+        const w = parseFloat(win.width_m) || 0;
+        const h = parseFloat(win.height_m) || 0;
+        const q = parseInt(win.quantity) || 0;
+        return acc + (w * h * q);
+    }, 0);
+
+    // Cuando el usuario edita el total, recalculamos el precio global por m²
+    const handleTotalChange = (e) => {
+        const val = e.target.value;
+        setTotalOverride(val);
+        if (val !== '' && totalM2 > 0) {
+            const newPrice = (parseFloat(val) || 0) / totalM2;
+            setQuotation(prev => ({ ...prev, price_per_m2: parseFloat(newPrice.toFixed(4)) }));
+        }
+    };
+
+    // Igualar al precio mínimo sugerido
+    const handleIgualMinimo = () => {
+        if (totalPrecioSugerido <= 0 || totalM2 <= 0) return;
+        const newPricePerM2 = totalPrecioSugerido / totalM2;
+        setQuotation(prev => ({
+            ...prev,
+            price_per_m2: parseFloat(newPricePerM2.toFixed(4)),
+            windows: prev.windows.map(win => ({ ...win, price_per_m2: '' })), // limpiar overrides individuales
+        }));
+        setTotalOverride('');
+    };
+
     const validateQuotation = () => {
         const errors = [];
         if (!quotation.project?.trim()) errors.push('El nombre del proyecto es obligatorio.');
@@ -517,6 +552,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
         setValidationErrors([]);
         setLoading(true);
         const freshTotals = calculateGrandTotal();
+        const finalTotal = totalOverride !== '' ? (parseFloat(totalOverride) || 0) : freshTotals.total;
         const windowsSnapshot = quotation.windows.map(win => ({
             existingId: win.id ?? null,
             fileToUpload: win.fileToUpload ?? null,
@@ -526,7 +562,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             clientId: Number(quotation.clientId) || null,
             price_per_m2: quotation.price_per_m2 ? Number(quotation.price_per_m2) : null,
             include_iva: Boolean(quotation.include_iva),
-            total_price: freshTotals.total,
+            total_price: finalTotal,
             notes: quotation.notes || null,
             reference_image_url: quotation.reference_image_url || null,
             windows: quotation.windows.map(win => ({
@@ -599,10 +635,92 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                             <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-2 border-b border-gray-100 flex-shrink-0">
                                 {/* Drag handle visual en móvil */}
                                 <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-3 sm:hidden" />
-                                <DialogTitle className="text-base sm:text-lg">Cotización de Proyecto</DialogTitle>
-                                <DialogDescription className="text-xs sm:text-sm text-gray-500">
-                                    Detalles y cálculo de precios para el cliente.
-                                </DialogDescription>
+                                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                                    <div>
+                                        <DialogTitle className="text-base sm:text-lg">Cotización de Proyecto</DialogTitle>
+                                        <DialogDescription className="text-xs sm:text-sm text-gray-500">
+                                            Detalles y cálculo de precios para el cliente.
+                                        </DialogDescription>
+                                    </div>
+
+                                    {/* ── Totales sticky en el header ── */}
+                                    <div className="flex flex-wrap items-center gap-2 sm:gap-3 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 flex-shrink-0">
+                                        {/* Precio sugerido mínimo */}
+                                        {totalPrecioSugerido > 0 && (
+                                            <div className="flex flex-col items-center">
+                                                <span className="text-[10px] text-amber-600 font-semibold uppercase tracking-wide">Mín. sugerido</span>
+                                                <span className="text-sm font-bold text-amber-700">
+                                                    Q {totalPrecioSugerido.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        {/* Separador */}
+                                        {totalPrecioSugerido > 0 && <div className="w-px h-8 bg-gray-200" />}
+
+                                        {/* Sub-total e IVA */}
+                                        <div className="flex flex-col items-end gap-0.5">
+                                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                                                <span>Sub-total:</span>
+                                                <span className="font-medium text-gray-700">
+                                                    Q {totalsInRealTime.subTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                                </span>
+                                            </div>
+                                            {quotation.include_iva && (
+                                                <div className="flex items-center gap-2 text-xs text-green-600">
+                                                    <span>IVA (12%):</span>
+                                                    <span className="font-medium">
+                                                        Q {totalsInRealTime.ivaTax.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Separador */}
+                                        <div className="w-px h-8 bg-gray-200" />
+
+                                        {/* TOTAL editable */}
+                                        <div className="flex flex-col items-center">
+                                            <span className="text-[10px] text-blue-600 font-semibold uppercase tracking-wide">Total</span>
+                                            <div className="flex items-center gap-1">
+                                                <span className="text-sm font-bold text-blue-700">Q</span>
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    value={totalOverride !== '' ? totalOverride : totalsInRealTime.total}
+                                                    onChange={handleTotalChange}
+                                                    onFocus={(e) => { if (totalOverride === '') setTotalOverride(String(totalsInRealTime.total)); e.target.select(); }}
+                                                    onBlur={(e) => { if (e.target.value === '' || parseFloat(e.target.value) === 0) setTotalOverride(''); }}
+                                                    className="w-24 text-lg font-black text-blue-700 bg-transparent border-b-2 border-blue-300 focus:border-blue-600 focus:outline-none text-center"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Botón igualar */}
+                                        {totalPrecioSugerido > 0 && totalM2 > 0 && (
+                                            <button
+                                                type="button"
+                                                onClick={handleIgualMinimo}
+                                                className="text-[10px] sm:text-xs font-semibold px-2 py-1.5 rounded-lg bg-amber-100 text-amber-700 hover:bg-amber-200 active:bg-amber-300 border border-amber-300 transition-colors whitespace-nowrap"
+                                                title="Ajusta el precio/m² para que el total iguale el precio mínimo sugerido"
+                                            >
+                                                ↓ Igualar mínimo
+                                            </button>
+                                        )}
+
+                                        {/* Indicador de override activo */}
+                                        {totalOverride !== '' && (
+                                            <button
+                                                type="button"
+                                                onClick={() => { setTotalOverride(''); setQuotation(prev => ({ ...prev })); }}
+                                                className="text-[10px] text-gray-400 hover:text-red-500 transition-colors"
+                                                title="Restaurar cálculo automático"
+                                            >
+                                                ↺ auto
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
                             </DialogHeader>
 
                             <form onSubmit={handleSubmit} className="flex-grow flex flex-col overflow-hidden">
@@ -741,9 +859,22 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
 
                                     {/* ── Título ventanas + toggle CM/M ── */}
                                     <div className="flex items-center justify-between">
-
+                                        <h3 className="text-base sm:text-lg font-semibold text-gray-700">Ventanas</h3>
                                         <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-                                            <h3 className="text-base sm:text-lg font-semibold text-gray-700">Ventanas</h3>
+                                            <button
+                                                type="button"
+                                                onClick={() => setUseCm(false)}
+                                                className={`px-2 sm:px-3 py-1 rounded-md text-xs font-semibold transition-colors ${!useCm ? 'bg-white shadow text-blue-700' : 'text-gray-500 hover:text-gray-700'}`}
+                                            >
+                                                m
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setUseCm(true)}
+                                                className={`px-2 sm:px-3 py-1 rounded-md text-xs font-semibold transition-colors ${useCm ? 'bg-white shadow text-blue-700' : 'text-gray-500 hover:text-gray-700'}`}
+                                            >
+                                                cm
+                                            </button>
                                         </div>
                                     </div>
 
@@ -753,27 +884,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                             <thead className="bg-gray-100 border-b sticky top-0 z-10">
                                                 <tr>
                                                     <th className="p-2 text-left w-52">Tipo</th>
-                                                    <th className="p-2 text-center w-28">
-                                                        <div className="flex flex-col items-center gap-1">
-                                                            <span>Medidas</span>
-                                                            <div className="flex items-center gap-0.5 bg-gray-200 rounded-md p-0.5">
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => setUseCm(false)}
-                                                                    className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors ${!useCm ? 'bg-white shadow text-blue-700' : 'text-gray-500 hover:text-gray-700'}`}
-                                                                >
-                                                                    m
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => setUseCm(true)}
-                                                                    className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors ${useCm ? 'bg-white shadow text-blue-700' : 'text-gray-500 hover:text-gray-700'}`}
-                                                                >
-                                                                    cm
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    </th>
+                                                    <th className="p-2 text-center w-28">Medidas ({useCm ? 'cm' : 'm'})</th>
                                                     <th className="p-2 text-center w-16">Cant.</th>
                                                     <th className="p-2 text-center w-28">m² Ind.</th>
                                                     <th className="p-2 text-left w-40">Opciones</th>
@@ -972,75 +1083,29 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                         <FaPlus className="mr-2" size={11} /> Añadir Ventana
                                     </Button>
 
-                                    {/* ── Resumen de totales ── */}
-                                    <div className="bg-gray-50 p-3 sm:p-4 border rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
-                                        {/* Análisis de costos */}
-                                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm w-full sm:flex-1">
-                                            {isAdmin ? (
-                                                <>
-                                                    <p className="text-xs text-amber-700 font-semibold uppercase mb-2 tracking-wide">
-                                                        Análisis de Costos
-                                                    </p>
-                                                    {isCalculatingAny ? (
-                                                        <span className="text-xs text-gray-400 italic animate-pulse">⏳ Calculando...</span>
-                                                    ) : totalMaterialCost > 0 ? (
-                                                        <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs">
-                                                            <span className="text-gray-600">
-                                                                Costo materiales:{' '}
-                                                                <span className="font-bold text-gray-800">Q {totalMaterialCost.toFixed(2)}</span>
-                                                            </span>
-                                                            <span className="text-green-700 font-bold">
-                                                                Precio mínimo sugerido:{' '}
-                                                                <span className="text-green-800">Q {(totalMaterialCost / 0.40).toFixed(2)}</span>
-                                                            </span>
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-xs text-gray-400 italic">
-                                                            Completa tipo, medidas y color PVC para ver el análisis.
-                                                        </span>
-                                                    )}
-                                                </>
+                                    {/* ── Análisis de costos (solo visible cuando hay datos) ── */}
+                                    {(totalMaterialCost > 0 || isCalculatingAny) && (
+                                        <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-sm">
+                                            {isCalculatingAny ? (
+                                                <span className="text-xs text-gray-400 italic animate-pulse">⏳ Calculando costos...</span>
+                                            ) : isAdmin ? (
+                                                <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs items-center">
+                                                    <span className="text-amber-700 font-semibold uppercase tracking-wide">Análisis de Costos</span>
+                                                    <span className="text-gray-600">
+                                                        Materiales: <span className="font-bold text-gray-800">Q {totalMaterialCost.toFixed(2)}</span>
+                                                    </span>
+                                                    <span className="text-green-700 font-bold">
+                                                        Mín. sugerido: <span className="text-green-800">Q {totalPrecioSugerido.toFixed(2)}</span>
+                                                    </span>
+                                                </div>
                                             ) : (
-                                                <>
-                                                    <p className="text-xs text-amber-700 font-semibold uppercase mb-2 tracking-wide">
-                                                        Precio Sugerido
-                                                    </p>
-                                                    {isCalculatingAny ? (
-                                                        <span className="text-xs text-gray-400 italic animate-pulse">⏳ Calculando...</span>
-                                                    ) : totalPrecioSugerido > 0 ? (
-                                                        <span className="text-green-700 font-bold text-xs">
-                                                            Precio mínimo sugerido:{' '}
-                                                            <span className="text-green-800">Q {totalPrecioSugerido.toFixed(2)}</span>
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-xs text-gray-400 italic">
-                                                            Completa tipo, medidas y color PVC para ver el precio sugerido.
-                                                        </span>
-                                                    )}
-                                                </>
-                                            )}
-                                        </div>
-
-                                        {/* Totales */}
-                                        <div className="space-y-1 w-full sm:w-56 flex-shrink-0">
-                                            <div className="flex justify-between text-sm text-gray-600">
-                                                <span>Sub-total:</span>
-                                                <span>Q {totalsInRealTime.subTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
-                                            </div>
-                                            {quotation.include_iva && (
-                                                <div className="flex justify-between text-sm text-green-600 font-medium">
-                                                    <span>IVA (12%):</span>
-                                                    <span>Q {totalsInRealTime.ivaTax.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                                                <div className="flex items-center gap-2 text-xs">
+                                                    <span className="text-amber-700 font-semibold">Precio mínimo sugerido:</span>
+                                                    <span className="text-green-700 font-bold">Q {totalPrecioSugerido.toFixed(2)}</span>
                                                 </div>
                                             )}
-                                            <div className="flex justify-between items-center pt-2 border-t border-gray-300">
-                                                <span className="text-base font-bold text-gray-800">TOTAL:</span>
-                                                <span className="text-xl sm:text-2xl font-black text-blue-700">
-                                                    Q {totalsInRealTime.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                                                </span>
-                                            </div>
                                         </div>
-                                    </div>
+                                    )}
                                 </div>
 
                                 {/* ── Errores de validación ── */}
