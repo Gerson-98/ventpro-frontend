@@ -741,7 +741,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
 
                                     {/* ── Título ventanas + toggle CM/M ── */}
                                     <div className="flex items-center justify-between">
-                                        <h3 className="text-base sm:text-lg font-semibold text-gray-700">Ventanas</h3>
+
                                         <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
                                             <h3 className="text-base sm:text-lg font-semibold text-gray-700">Ventanas</h3>
                                         </div>
