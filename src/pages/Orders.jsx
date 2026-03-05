@@ -1,6 +1,6 @@
 // RUTA: src/pages/Orders.jsx
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "@/services/api";
 import { useAuth } from "@/context/AuthContext";
@@ -22,6 +22,8 @@ import {
   FaBoxOpen,
   FaSearch,
   FaPlus,
+  FaChevronLeft,
+  FaChevronRight,
 } from "react-icons/fa";
 
 const ORDER_STATUSES = [
@@ -73,6 +75,7 @@ export default function Orders() {
   const navigate = useNavigate();
 
   const [orders, setOrders] = useState([]);
+  const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddClient, setShowAddClient] = useState(false);
@@ -82,18 +85,21 @@ export default function Orders() {
   });
   const [filters, setFilters] = useState({ status: 'all', month: 'all', search: '' });
 
-  const fetchOrders = async () => {
+  // ── Fetch paginado ────────────────────────────────────────────────────────
+  const fetchOrders = useCallback(async (page = 1) => {
     try {
       setLoading(true);
-      const res = await api.get('/orders');
-      setOrders(Array.isArray(res.data) ? res.data : []);
+      const res = await api.get('/orders', { params: { page, limit: 50 } });
+      const { data, total, totalPages } = res.data;
+      setOrders(Array.isArray(data) ? data : []);
+      setPagination({ page, total, totalPages });
     } catch (err) {
       console.error('❌ Error al obtener pedidos:', err);
       setOrders([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const fetchClients = async () => {
     try {
@@ -106,9 +112,9 @@ export default function Orders() {
   };
 
   useEffect(() => {
-    fetchOrders();
+    fetchOrders(1);
     fetchClients();
-  }, []);
+  }, [fetchOrders]);
 
   const createOrder = async () => {
     if (!formData.project || !formData.clientId) {
@@ -116,10 +122,12 @@ export default function Orders() {
       return;
     }
     try {
-      await api.post('/orders', formData);
+      const res = await api.post('/orders', formData);
       setFormData({ project: '', clientId: '', total: '', status: 'en_proceso' });
       setOpen(false);
-      fetchOrders();
+      // ── Actualización optimista: insertar al inicio sin refetch ───────────
+      setOrders(prev => [res.data, ...prev]);
+      setPagination(prev => ({ ...prev, total: prev.total + 1 }));
     } catch (err) {
       console.error('❌ Error al crear pedido:', err);
       alert('No se pudo crear el pedido.');
@@ -128,10 +136,16 @@ export default function Orders() {
 
   const deleteOrder = async (id) => {
     if (!confirm('¿Eliminar este pedido permanentemente?')) return;
+    // ── Actualización optimista ───────────────────────────────────────────
+    const previous = orders;
+    setOrders(prev => prev.filter(o => o.id !== id));
+    setPagination(prev => ({ ...prev, total: Math.max(0, prev.total - 1) }));
     try {
       await api.delete(`/orders/${id}`);
-      fetchOrders();
     } catch (err) {
+      // Revertir en caso de error
+      setOrders(previous);
+      setPagination(prev => ({ ...prev, total: prev.total + 1 }));
       console.error('❌ Error al eliminar pedido:', err);
       alert('No se pudo eliminar el pedido.');
     }
@@ -380,11 +394,33 @@ export default function Orders() {
               })}
             </div>
 
-            {/* Footer */}
-            <div className="px-4 sm:px-5 py-3 border-t border-gray-100 bg-gray-50/50 flex justify-between items-center">
+            {/* Footer con paginación */}
+            <div className="px-4 sm:px-5 py-3 border-t border-gray-100 bg-gray-50/50 flex flex-wrap justify-between items-center gap-2">
               <span className="text-xs text-gray-400">
-                {filteredOrders.length} de {orders.length} pedidos
+                {filteredOrders.length} en página · {pagination.total} totales
               </span>
+              {/* Controles de paginación */}
+              {pagination.totalPages > 1 && (
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => fetchOrders(pagination.page - 1)}
+                    disabled={pagination.page <= 1}
+                    className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <FaChevronLeft size={10} />
+                  </button>
+                  <span className="text-xs text-gray-600 px-2 font-medium">
+                    {pagination.page} / {pagination.totalPages}
+                  </span>
+                  <button
+                    onClick={() => fetchOrders(pagination.page + 1)}
+                    disabled={pagination.page >= pagination.totalPages}
+                    className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <FaChevronRight size={10} />
+                  </button>
+                </div>
+              )}
               <span className="text-xs font-semibold text-gray-600">
                 Q {filteredOrders.reduce((s, o) => s + Number(o.total || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
               </span>

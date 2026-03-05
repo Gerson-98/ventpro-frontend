@@ -1,6 +1,6 @@
 // RUTA: src/components/AddQuotationModal.jsx
 
-import { useState, useEffect, useCallback, Fragment } from 'react';
+import { useState, useEffect, useCallback, useRef, Fragment } from 'react';
 import api from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
 import { FaPlus, FaTrashAlt, FaClone, FaUpload, FaCamera } from 'react-icons/fa';
@@ -172,6 +172,22 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             setCalculatingCost(prev => ({ ...prev, [key]: false }));
         }
     }, []);
+
+    // ── Debounce del cálculo de costos ────────────────────────────────────────
+    // Sin debounce, cada pulsación en ancho/alto/cantidad dispara una llamada
+    // al backend. Con 80 ventanas y 3 vendedores = ~1,400 llamadas simultáneas.
+    // 700ms cubre la velocidad normal de escritura de números (ej: "1.20").
+    const debounceTimers = useRef({});
+    const debouncedCalculateCost = useCallback((win) => {
+        const key = win.tempId || win.id;
+        if (debounceTimers.current[key]) {
+            clearTimeout(debounceTimers.current[key]);
+        }
+        debounceTimers.current[key] = setTimeout(() => {
+            delete debounceTimers.current[key];
+            calculateWindowCost(win);
+        }, 700);
+    }, [calculateWindowCost]);
 
     const loadOptionGroups = useCallback(async (windowTypeId) => {
         if (!windowTypeId) return [];
@@ -383,7 +399,14 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
         });
         setQuotation(prev => ({ ...prev, windows: updatedWindows }));
         if (['width_m', 'height_m', 'color_id', 'glass_color_id', 'quantity'].includes(name)) {
-            calculateWindowCost(updatedWindows[index]);
+            // Campos numéricos se debouncean — el usuario puede estar escribiendo "1.20"
+            // color_id y glass_color_id son selects (cambio instantáneo), se calculan sin delay
+            const isSelectField = ['color_id', 'glass_color_id'].includes(name);
+            if (isSelectField) {
+                calculateWindowCost(updatedWindows[index]);
+            } else {
+                debouncedCalculateCost(updatedWindows[index]);
+            }
         }
     };
 
@@ -416,10 +439,9 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             return newWindow;
         });
         setQuotation(prev => ({ ...prev, windows: updatedWindows }));
+        // Las opciones son selects — cambio inmediato, sin debounce
         calculateWindowCost(updatedWindows[index]);
-    };
-
-    const handleFileChange = (index, file) => {
+    }; = (index, file) => {
         const updatedWindows = quotation.windows.map((win, i) =>
             i === index ? { ...win, fileToUpload: file, design_image_url: null } : win
         );

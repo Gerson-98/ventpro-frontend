@@ -1,9 +1,9 @@
 // src/pages/Quotations.jsx
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "@/services/api";
-import { FaPlus, FaSearch } from "react-icons/fa";
+import { FaPlus, FaSearch, FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import AddQuotationModal from "@/components/AddQuotationModal";
 
 const clientStatusStyles = {
@@ -28,25 +28,31 @@ const clientStatusLabels = {
 
 export default function Quotations() {
     const [quotations, setQuotations] = useState([]);
+    const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const [filters, setFilters] = useState({ quotationStatus: 'all', clientStatus: 'all' });
     const navigate = useNavigate();
 
-    const fetchQuotations = async () => {
+    // ── Fetch paginado ────────────────────────────────────────────────────────
+    // El backend devuelve { data, total, page, totalPages }.
+    // Los filtros de status/cliente se aplican sobre la página actual (50 registros).
+    const fetchQuotations = useCallback(async (page = 1) => {
         setLoading(true);
         try {
-            const response = await api.get("/quotations");
-            setQuotations(response.data);
+            const response = await api.get("/quotations", { params: { page, limit: 50 } });
+            const { data, total, totalPages } = response.data;
+            setQuotations(data);
+            setPagination({ page, total, totalPages });
         } catch (error) {
             console.error("Error al obtener cotizaciones:", error);
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
-    useEffect(() => { fetchQuotations(); }, []);
+    useEffect(() => { fetchQuotations(1); }, [fetchQuotations]);
 
     const formatDate = (dateString) => new Date(dateString).toLocaleDateString('es-GT', {
         year: 'numeric', month: 'short', day: 'numeric'
@@ -54,10 +60,14 @@ export default function Quotations() {
 
     const handleDelete = async (id) => {
         if (!confirm("¿Seguro que deseas eliminar esta cotización?")) return;
+        // ── Actualización optimista — no re-descarga toda la página ──────────
+        const previous = quotations;
+        setQuotations(prev => prev.filter(q => q.id !== id));
         try {
             await api.delete(`/quotations/${id}`);
-            setQuotations(prev => prev.filter(q => q.id !== id));
         } catch (error) {
+            // Revertir si falla
+            setQuotations(previous);
             if (error.response?.status === 400) {
                 alert(`Error: ${error.response.data.message}`);
             } else {
@@ -82,10 +92,11 @@ export default function Quotations() {
     }, [quotations, searchTerm, filters]);
 
     const totals = useMemo(() => ({
-        total: quotations.length,
+        // total usa el count real del backend, no solo la página actual
+        total: pagination.total,
         confirmadas: quotations.filter(q => q.status === 'confirmado').length,
         enProceso: quotations.filter(q => q.status !== 'confirmado').length,
-    }), [quotations]);
+    }), [quotations, pagination.total]);
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -264,11 +275,33 @@ export default function Quotations() {
                                 ))}
                             </div>
 
-                            {/* Footer */}
-                            <div className="px-4 sm:px-5 py-3 border-t border-gray-100 bg-gray-50/50 flex justify-between items-center">
+                            {/* Footer con paginación */}
+                            <div className="px-4 sm:px-5 py-3 border-t border-gray-100 bg-gray-50/50 flex flex-wrap justify-between items-center gap-2">
                                 <span className="text-xs text-gray-400">
-                                    {filteredQuotations.length} de {quotations.length} cotizaciones
+                                    {filteredQuotations.length} en página · {pagination.total} totales
                                 </span>
+                                {/* Controles de paginación */}
+                                {pagination.totalPages > 1 && (
+                                    <div className="flex items-center gap-1">
+                                        <button
+                                            onClick={() => fetchQuotations(pagination.page - 1)}
+                                            disabled={pagination.page <= 1}
+                                            className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                        >
+                                            <FaChevronLeft size={10} />
+                                        </button>
+                                        <span className="text-xs text-gray-600 px-2 font-medium">
+                                            {pagination.page} / {pagination.totalPages}
+                                        </span>
+                                        <button
+                                            onClick={() => fetchQuotations(pagination.page + 1)}
+                                            disabled={pagination.page >= pagination.totalPages}
+                                            className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                        >
+                                            <FaChevronRight size={10} />
+                                        </button>
+                                    </div>
+                                )}
                                 <span className="text-xs font-semibold text-gray-600">
                                     Q {filteredQuotations.reduce((s, q) => s + (q.total_price || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                                 </span>
@@ -282,7 +315,19 @@ export default function Quotations() {
                 <AddQuotationModal
                     open={showModal}
                     onClose={() => setShowModal(false)}
-                    onSave={() => { setShowModal(false); fetchQuotations(); }}
+                    onSave={(newQuotation) => {
+                        setShowModal(false);
+                        // ── Actualización optimista ───────────────────────────
+                        // Inserta la nueva cotización al inicio sin re-descargar
+                        // toda la página. El total del backend se incrementa en 1.
+                        if (newQuotation) {
+                            setQuotations(prev => [newQuotation, ...prev]);
+                            setPagination(prev => ({ ...prev, total: prev.total + 1 }));
+                        } else {
+                            // Fallback: si el modal no devuelve el objeto, refetch
+                            fetchQuotations(1);
+                        }
+                    }}
                 />
             )}
         </div>
