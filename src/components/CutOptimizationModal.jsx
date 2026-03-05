@@ -62,10 +62,7 @@ function fmtWaste(cm) {
 
 // PRIMER / SEGUNDA / TERCER …
 function ordinal(n) {
-    const w = ['PRIMER', 'SEGUNDA', 'TERCER', 'CUARTO', 'QUINTO',
-        'SEXTO', 'SÉPTIMO', 'OCTAVO', 'NOVENO', 'DÉCIMO',
-        'UNDÉCIMO', 'DUODÉCIMO'];
-    return (w[n - 1] ?? `${n}°`) + ' SERIE DE CORTE';
+    return `${n}° SERIE DE CORTE`;
 }
 
 // Nombre corto para etiqueta de fila: "MARCO CORREDIZO S80 4,5 CM" → "MARCO 4,5 CM"
