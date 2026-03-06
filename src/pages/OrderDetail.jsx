@@ -446,10 +446,10 @@ export default function OrderDetail() {
                           {win.width_cm} × {win.height_cm}
                         </td>
                         <td className="py-3.5 px-4 text-center text-xs text-gray-500 font-mono">
-                          {win.hojaAncho ? `${win.hojaAncho.toFixed(1)}×${win.hojaAlto.toFixed(1)}` : '—'}
+                          {win.hojaAncho ? `${win.hojaAncho}×${win.hojaAlto}` : '—'}
                         </td>
                         <td className="py-3.5 px-4 text-center text-xs text-gray-500 font-mono">
-                          {win.vidrioAncho ? `${win.vidrioAncho.toFixed(1)}×${win.vidrioAlto.toFixed(1)}` : '—'}
+                          {win.vidrioAncho ? `${win.vidrioAncho}×${win.vidrioAlto}` : '—'}
                         </td>
                         <td className="py-3.5 px-4 text-center text-xs text-gray-600">{win.pvcColor?.name || '—'}</td>
                         <td className="py-3.5 px-4 text-center text-xs">
@@ -521,10 +521,10 @@ export default function OrderDetail() {
                       <span>Medidas: <span className="font-mono font-semibold text-gray-700">{win.width_cm}×{win.height_cm} cm</span></span>
                       <span>Cant: <span className="font-semibold text-gray-700">{win.quantity || 1}</span></span>
                       {win.hojaAncho && (
-                        <span>Hoja: <span className="font-mono text-gray-600">{win.hojaAncho.toFixed(1)}×{win.hojaAlto.toFixed(1)}</span></span>
+                        <span>Hoja: <span className="font-mono text-gray-600">{win.hojaAncho}×{win.hojaAlto}</span></span>
                       )}
                       {win.vidrioAncho && (
-                        <span>Vidrio calc: <span className="font-mono text-gray-600">{win.vidrioAncho.toFixed(1)}×{win.vidrioAlto.toFixed(1)}</span></span>
+                        <span>Vidrio calc: <span className="font-mono text-gray-600">{win.vidrioAncho}×{win.vidrioAlto}</span></span>
                       )}
                       <span>PVC: <span className="text-gray-700">{win.pvcColor?.name || '—'}</span></span>
                       <span>

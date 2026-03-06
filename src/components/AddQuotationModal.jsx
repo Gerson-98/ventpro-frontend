@@ -945,7 +945,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                                                     <div className="flex items-center justify-center gap-1">
                                                                         <input
                                                                             type="number"
-                                                                            step={useCm ? "1" : "0.01"}
+                                                                            step={useCm ? "0.1" : "any"}
                                                                             name="width_m"
                                                                             value={toDisplay(win.width_m)}
                                                                             onChange={(e) => {
@@ -959,7 +959,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                                                         <span className="text-gray-400">×</span>
                                                                         <input
                                                                             type="number"
-                                                                            step={useCm ? "1" : "0.01"}
+                                                                            step={useCm ? "0.1" : "any"}
                                                                             name="height_m"
                                                                             value={toDisplay(win.height_m)}
                                                                             onChange={(e) => {
