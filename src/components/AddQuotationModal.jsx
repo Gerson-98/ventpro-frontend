@@ -130,6 +130,103 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
     const [validationErrors, setValidationErrors] = useState([]);
     const [useCm, setUseCm] = useState(false);
     const [totalOverride, setTotalOverride] = useState(''); // total editable por el usuario
+    const [hasDraft, setHasDraft] = useState(false);
+    const [draftRestored, setDraftRestored] = useState(false);
+
+    // ── Auto-guardado en localStorage ──────────────────────────────────────────
+    const DRAFT_KEY = 'quotation_draft';
+    const autoSaveTimer = useRef(null);
+
+    // Guardar borrador cada 3 segundos cuando hay cambios
+    useEffect(() => {
+        if (!open || isEditing || !catalogsLoaded) return;
+        // Solo guardar si hay al menos 1 ventana con datos
+        const hasData = quotation.windows.length > 0 &&
+            (quotation.project || quotation.windows.some(w => w.window_type_id));
+        if (!hasData) return;
+
+        if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+        autoSaveTimer.current = setTimeout(() => {
+            try {
+                // Excluir datos no serializables (fileToUpload, _optionGroups)
+                const draftWindows = quotation.windows.map(w => ({
+                    ...w,
+                    fileToUpload: null,
+                    _optionGroups: [],
+                }));
+                const draft = {
+                    ...quotation,
+                    windows: draftWindows,
+                    _savedAt: Date.now(),
+                    _useCm: useCm,
+                    _totalOverride: totalOverride,
+                };
+                localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+            } catch { /* localStorage lleno o no disponible — ignorar */ }
+        }, 3000);
+
+        return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
+    }, [quotation, useCm, totalOverride, open, isEditing, catalogsLoaded]);
+
+    // Verificar si existe un borrador al abrir (solo para cotización nueva)
+    useEffect(() => {
+        if (!open || quotationToEdit || !catalogsLoaded || draftRestored) return;
+        try {
+            const raw = localStorage.getItem(DRAFT_KEY);
+            if (raw) {
+                const draft = JSON.parse(raw);
+                // Solo ofrecer restaurar si el draft tiene menos de 24h
+                if (draft._savedAt && Date.now() - draft._savedAt < 24 * 60 * 60 * 1000) {
+                    setHasDraft(true);
+                }
+            }
+        } catch { /* corrupto — ignorar */ }
+    }, [open, quotationToEdit, catalogsLoaded, draftRestored]);
+
+    const restoreDraft = useCallback(async () => {
+        try {
+            const raw = localStorage.getItem(DRAFT_KEY);
+            if (!raw) return;
+            const draft = JSON.parse(raw);
+            // Restaurar optionGroups para cada ventana
+            const restoredWindows = await Promise.all(
+                (draft.windows || []).map(async (win) => {
+                    const optGroups = win.window_type_id
+                        ? await loadOptionGroups(win.window_type_id)
+                        : [];
+                    return { ...win, _optionGroups: optGroups };
+                })
+            );
+            setQuotation({
+                project: draft.project || '',
+                clientId: draft.clientId || '',
+                price_per_m2: draft.price_per_m2 || '',
+                include_iva: Boolean(draft.include_iva),
+                notes: draft.notes || '',
+                reference_image_url: draft.reference_image_url || '',
+                windows: restoredWindows,
+            });
+            if (draft._useCm) setUseCm(draft._useCm);
+            if (draft._totalOverride) setTotalOverride(draft._totalOverride);
+            // Calcular costos de cada ventana restaurada
+            for (const win of restoredWindows) {
+                calculateWindowCost(win);
+            }
+        } catch { /* corrupto — ignorar */ }
+        setHasDraft(false);
+        setDraftRestored(true);
+    }, [loadOptionGroups, calculateWindowCost]);
+
+    const discardDraft = useCallback(() => {
+        try { localStorage.removeItem(DRAFT_KEY); } catch { }
+        setHasDraft(false);
+        setDraftRestored(true);
+    }, []);
+
+    // Limpiar borrador al guardar exitosamente
+    const clearDraft = () => {
+        try { localStorage.removeItem(DRAFT_KEY); } catch { }
+    };
 
     const toDisplay = (valueInMeters) => {
         if (valueInMeters === '' || valueInMeters === null || valueInMeters === undefined) return '';
@@ -465,6 +562,8 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
         const src = quotation.windows[index];
         const newWin = {
             ...src,
+            width_m: '',       // No duplicar medidas
+            height_m: '',      // No duplicar medidas
             options: { ...src.options },
             _variantValues: { ...src._variantValues },
             _optionGroups: [...(src._optionGroups || [])],
@@ -477,7 +576,6 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             ...quotation.windows.slice(index + 1),
         ];
         setQuotation(prev => ({ ...prev, windows: updatedWindows }));
-        calculateWindowCost(newWin);
     };
 
     const calculateGrandTotal = () => {
@@ -622,6 +720,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                     headers: { 'Content-Type': 'multipart/form-data' },
                 });
             }
+            clearDraft();
             onSave();
         } catch (error) {
             console.error("Error guardando cotización:", error);
@@ -669,6 +768,19 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
 
                                     {/* ── Totales sticky en el header ── */}
                                     <div className="flex flex-wrap items-center gap-2 sm:gap-3 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 flex-shrink-0">
+                                        {/* Total m² del proyecto */}
+                                        {totalM2 > 0 && (
+                                            <div className="flex flex-col items-center">
+                                                <span className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide">Total m²</span>
+                                                <span className="text-sm font-bold text-gray-700">
+                                                    {totalM2.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        {/* Separador */}
+                                        {totalM2 > 0 && totalPrecioSugerido > 0 && <div className="w-px h-8 bg-gray-200" />}
+
                                         {/* Precio sugerido mínimo */}
                                         {totalPrecioSugerido > 0 && (
                                             <div className="flex flex-col items-center">
@@ -749,6 +861,31 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
 
                             <form onSubmit={handleSubmit} className="flex-grow flex flex-col overflow-hidden">
                                 <div className="flex-grow overflow-y-auto px-4 sm:px-6 py-4 space-y-5">
+
+                                    {/* ── Banner de borrador recuperable ── */}
+                                    {hasDraft && !isEditing && (
+                                        <div className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                            <span className="text-sm text-blue-700">
+                                                Se encontró una cotización sin guardar. ¿Deseas recuperarla?
+                                            </span>
+                                            <div className="flex gap-2 ml-auto flex-shrink-0">
+                                                <button
+                                                    type="button"
+                                                    onClick={restoreDraft}
+                                                    className="px-3 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                                                >
+                                                    Recuperar
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={discardDraft}
+                                                    className="px-3 py-1.5 text-xs font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                                                >
+                                                    Descartar
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {/* ── Cabecera ── */}
                                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
@@ -952,7 +1089,8 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                                                                 const inMeters = fromDisplay(e.target.value);
                                                                                 handleWindowChange(index, { target: { name: 'width_m', value: inMeters } });
                                                                             }}
-                                                                            className="w-14 p-2 border rounded text-center text-xs"
+                                                                            onWheel={(e) => e.target.blur()}
+                                                                            className="w-20 p-2 border rounded text-center text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                                             placeholder={useCm ? "cm" : "m"}
                                                                             required
                                                                         />
@@ -966,7 +1104,8 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                                                                 const inMeters = fromDisplay(e.target.value);
                                                                                 handleWindowChange(index, { target: { name: 'height_m', value: inMeters } });
                                                                             }}
-                                                                            className="w-14 p-2 border rounded text-center text-xs"
+                                                                            onWheel={(e) => e.target.blur()}
+                                                                            className="w-20 p-2 border rounded text-center text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                                             placeholder={useCm ? "cm" : "m"}
                                                                             required
                                                                         />

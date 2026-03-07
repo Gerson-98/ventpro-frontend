@@ -102,11 +102,11 @@ function buildSeries(optimizationData) {
     const combos = []; // totales HOJA/MOSQUITERO para mostrar aparte
     let idx = 0;
 
-    // Primero combos, luego solos (para que las series de hoja+mosquitero vayan primero)
+    // Orden: primero perfiles individuales (MARCO, etc.), luego combos (HOJA+MOSQUITERO)
     const names = Object.keys(optimizationData);
     const ordered = [
-        ...names.filter(n => n.includes(' + ')),
         ...names.filter(n => !n.includes(' + ')),
+        ...names.filter(n => n.includes(' + ')),
     ];
 
     for (const pName of ordered) {
@@ -123,6 +123,9 @@ function buildSeries(optimizationData) {
                 : shortName(cedazoFullName))
             : '';
 
+        // Reiniciar contador de serie para cada grupo de perfil
+        let groupIdx = 0;
+
         for (const group of groups) {
 
             if (isCombo) {
@@ -137,8 +140,6 @@ function buildSeries(optimizationData) {
                     }));
                 } else if (group.bars?.length > 0) {
                     // 🔄 Viejo service: re-calcular series en el frontend con FFD
-                    // Tomamos SOLO piezas que NO son cedazo (o sin tag) para hacer el mismo
-                    // FFD que el backend nuevo, produciendo los bins correctos.
                     const hojaCuts = [];
                     for (const bar of group.bars) {
                         for (const cut of bar.cuts) {
@@ -158,22 +159,24 @@ function buildSeries(optimizationData) {
                 }
 
                 const nSeries = series.length;
-                // Registrar totales de este combo para mostrar en columna derecha
                 combos.push({
                     hojaLabel: hojaLbl,
                     cedazoLabel: cedazoLbl,
-                    totalHoja: nSeries * 2,   // 2 barras HOJA por serie de máquina
-                    totalCedazo: nSeries * 1,   // 1 barra MOSQUITERO por serie
+                    totalHoja: nSeries * 2,
+                    totalCedazo: nSeries * 1,
                 });
 
                 for (const s of series) {
                     idx++;
+                    groupIdx++;
                     items.push({
                         type: 'machine',
                         idx,
+                        groupIdx,
+                        groupName: `${hojaLbl} + ${cedazoLbl}`,
                         cuts: s.cuts,
                         waste: s.waste,
-                        palette: PALETTES[(idx - 1) % PALETTES.length],
+                        palette: PALETTES[(groupIdx - 1) % PALETTES.length],
                         hojaLbl,
                         cedazoLbl,
                     });
@@ -184,13 +187,16 @@ function buildSeries(optimizationData) {
                 const rowLbl = shortName(pName);
                 for (const bar of (group.bars ?? [])) {
                     idx++;
+                    groupIdx++;
                     items.push({
                         type: 'single',
                         idx,
+                        groupIdx,
+                        groupName: rowLbl,
                         rowLbl,
                         cuts: [...bar.cuts].sort((a, z) => z.length - a.length),
                         waste: bar.waste,
-                        palette: PALETTES[(idx - 1) % PALETTES.length],
+                        palette: PALETTES[(groupIdx - 1) % PALETTES.length],
                     });
                 }
             }
@@ -257,9 +263,8 @@ function BarRow({ rowLabel, cuts, waste, palette, singleMode = false }) {
 }
 
 // ─── Un bloque de serie (título + filas) ──────────────────────────────────────
-function SerieBlock({ item }) {
+function SerieBlock({ item, showGroupHeader }) {
     // Para combos (machine): 3 filas con el nombre real del perfil en cada una
-    // hojaLbl viene del buildSeries (ej: "HOJA 6,6 CM", "MARCO 4,5 CM", etc.)
     const rows = item.type === 'machine'
         ? [
             { lbl: item.hojaLbl || 'HOJA 6,6 CM', cuts: item.cuts, waste: item.waste },
@@ -269,21 +274,30 @@ function SerieBlock({ item }) {
         : [{ lbl: item.rowLbl, cuts: item.cuts, waste: item.waste }];
 
     return (
-        <div className="mb-5">
-            <h4 className="text-[15px] font-black text-gray-900 uppercase tracking-wide mb-2 leading-none">
-                {ordinal(item.idx)}
-            </h4>
-            {rows.map((row, ri) => (
-                <BarRow
-                    key={ri}
-                    rowLabel={row.lbl}
-                    cuts={row.cuts}
-                    waste={row.waste}
-                    palette={item.palette}
-                    singleMode={item.type === 'single'}
-                />
-            ))}
-        </div>
+        <>
+            {showGroupHeader && (
+                <div className="mt-6 mb-3 pb-2 border-b-2 border-gray-800 first:mt-0">
+                    <span className="text-[11px] font-black text-gray-800 uppercase tracking-widest">
+                        {item.groupName}
+                    </span>
+                </div>
+            )}
+            <div className="mb-5">
+                <h4 className="text-[15px] font-black text-gray-900 uppercase tracking-wide mb-2 leading-none">
+                    {ordinal(item.groupIdx)}
+                </h4>
+                {rows.map((row, ri) => (
+                    <BarRow
+                        key={ri}
+                        rowLabel={row.lbl}
+                        cuts={row.cuts}
+                        waste={row.waste}
+                        palette={item.palette}
+                        singleMode={item.type === 'single'}
+                    />
+                ))}
+            </div>
+        </>
     );
 }
 
@@ -319,9 +333,17 @@ export default function CutOptimizationModal({
         const date = new Date().toLocaleDateString('es-GT',
             { day: 'numeric', month: 'long', year: 'numeric' });
 
-        // Construir HTML de series
+        // Construir HTML de series con separadores de grupo
         let seriesHtml = '';
+        let prevGroup = null;
         for (const it of items) {
+            // Separador de grupo
+            if (it.groupName !== prevGroup) {
+                if (prevGroup !== null) seriesHtml += `<div style="height:6px"></div>`;
+                seriesHtml += `<div style="margin-top:12px;margin-bottom:8px;padding-bottom:4px;border-bottom:2px solid #222;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:1.5px;color:#222">${it.groupName}</div>`;
+                prevGroup = it.groupName;
+            }
+
             const rows = it.type === 'machine'
                 ? [
                     { lbl: it.hojaLbl || 'HOJA 6,6 CM', cuts: it.cuts, waste: it.waste },
@@ -331,7 +353,7 @@ export default function CutOptimizationModal({
                 : [{ lbl: it.rowLbl, cuts: it.cuts, waste: it.waste }];
 
             seriesHtml += `<div class="sblk">
-                <div class="stit">${ordinal(it.idx)}</div>`;
+                <div class="stit">${ordinal(it.groupIdx)}</div>`;
 
             for (const row of rows) {
                 seriesHtml += `<div class="brow">
@@ -354,18 +376,6 @@ export default function CutOptimizationModal({
             seriesHtml += `</div><div style="height:10px"></div>`;
         }
 
-        // Totales combo
-        let totHtml = '';
-        if (combos.length > 0) {
-            totHtml = `<div class="totbox">`;
-            for (const c of combos) {
-                totHtml += `
-                <div class="tr"><span>TOTAL DE BARRAS ${c.hojaLabel}</span><b>${c.totalHoja} UNIDADES</b></div>
-                <div class="tr"><span>TOTAL DE BARRAS ${c.cedazoLabel}</span><b>${c.totalCedazo} UNIDADES</b></div>`;
-            }
-            totHtml += `</div>`;
-        }
-
         const html = `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
 <title>Plan de Corte — ${projectName || 'Pedido'}</title>
 <style>
@@ -376,9 +386,6 @@ body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;padd
 .hsub{font-size:10px;color:#666;margin-top:2px}
 .smry{display:flex;gap:22px;margin-bottom:14px;padding:6px 10px;background:#f5f5f5;border-radius:3px;width:fit-content}
 .smry span{font-size:10px;color:#555} .smry b{font-size:12px;font-weight:900;color:#111;display:block}
-.layout{display:flex;gap:36px;align-items:flex-start}
-.scol{flex:1}
-.tcol{flex-shrink:0}
 .sblk{page-break-inside:avoid}
 .stit{font-size:13px;font-weight:900;text-transform:uppercase;color:#111;margin-bottom:5px}
 .brow{display:flex;align-items:center;margin-bottom:3px;min-height:26px}
@@ -387,10 +394,7 @@ body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;padd
 .pc{display:flex;align-items:center;justify-content:center;height:100%;border-right:1px solid rgba(255,255,255,.4);min-width:26px;overflow:hidden;flex-shrink:0}
 .pc span{font-size:7.5px;font-weight:700;color:#fff;text-shadow:0 1px 1px rgba(0,0,0,.3);padding:0 2px;white-space:nowrap}
 .wlbl{width:84px;flex-shrink:0;padding-left:7px;font-size:9.5px;color:#333;white-space:nowrap}
-.totbox{border:1px solid #ddd;border-radius:4px;padding:10px 14px;background:#fafafa;min-width:210px}
-.tr{display:flex;justify-content:space-between;gap:12px;font-size:10px;color:#555;margin-bottom:3px;white-space:nowrap}
-.tr b{font-weight:900;color:#111}
-@media print{.sblk{page-break-inside:avoid}.layout{display:flex}}
+@media print{.sblk{page-break-inside:avoid}}
 </style></head><body>
 <div class="hdr">
   <div class="htit">✂ PLAN DE CORTE</div>
@@ -401,10 +405,7 @@ body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;padd
   <span>Eficiencia<b>${eff}%</b></span>
   <span>Desperdicio<b>${totalWaste.toFixed(0)} cm</b></span>
 </div>
-<div class="layout">
-  <div class="scol">${seriesHtml}</div>
-  <div class="tcol">${totHtml}</div>
-</div>
+<div>${seriesHtml}</div>
 <script>window.onload=()=>{window.print();setTimeout(()=>window.close(),900)}<\/script>
 </body></html>`;
 
@@ -471,7 +472,6 @@ body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;padd
 
                             {/* Resumen global */}
                             <div className="flex flex-wrap gap-8 mb-6 pb-5 border-b border-gray-100">
-                                {/* Métricas fijas */}
                                 {[
                                     ['Barras totales', totalBars],
                                     ['Eficiencia', `${eff}%`],
@@ -482,61 +482,21 @@ body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;padd
                                         <p className="text-2xl font-black text-gray-900 leading-none">{v}</p>
                                     </div>
                                 ))}
-                                {/* Desglose por combo: "8 HOJA · 4 MOSQUITERO" */}
-                                {combos.map((c, ci) => (
-                                    <div key={ci} className="flex gap-5 border-l border-gray-200 pl-8">
-                                        <div>
-                                            <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold mb-0.5">{c.hojaLabel}</p>
-                                            <p className="text-2xl font-black text-gray-900 leading-none">{c.totalHoja} <span className="text-xs font-semibold text-gray-400">uds</span></p>
-                                        </div>
-                                        <div>
-                                            <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold mb-0.5">{c.cedazoLabel}</p>
-                                            <p className="text-2xl font-black text-gray-900 leading-none">{c.totalCedazo} <span className="text-xs font-semibold text-gray-400">uds</span></p>
-                                        </div>
-                                    </div>
-                                ))}
                             </div>
 
-                            {/* Layout: series izquierda | totales derecha */}
-                            <div className="flex gap-8 items-start">
-
-                                {/* Series */}
-                                <div className="flex-1 min-w-0">
-                                    {items.map(item => (
-                                        <SerieBlock key={item.idx} item={item} />
-                                    ))}
-                                </div>
-
-                                {/* Totales combo */}
-                                {combos.length > 0 && (
-                                    <div className="flex-shrink-0 pt-1" style={{ minWidth: 220 }}>
-                                        <div className="border border-gray-200 rounded-xl p-4 bg-gray-50 space-y-3">
-                                            {combos.map((c, ci) => (
-                                                <div key={ci}>
-                                                    {ci > 0 && <div className="border-t border-gray-200 pt-3" />}
-                                                    <div className="flex justify-between items-baseline gap-4 text-[11px] mb-1.5">
-                                                        <span className="text-gray-500 uppercase leading-tight">
-                                                            Total barras<br />{c.hojaLabel}
-                                                        </span>
-                                                        <span className="font-black text-gray-900 text-right text-base leading-none">
-                                                            {c.totalHoja}
-                                                            <span className="text-[10px] font-semibold text-gray-500 ml-1">UNIDADES</span>
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex justify-between items-baseline gap-4 text-[11px]">
-                                                        <span className="text-gray-500 uppercase leading-tight">
-                                                            Total barras<br />{c.cedazoLabel}
-                                                        </span>
-                                                        <span className="font-black text-gray-900 text-right text-base leading-none">
-                                                            {c.totalCedazo}
-                                                            <span className="text-[10px] font-semibold text-gray-500 ml-1">UNIDADES</span>
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
+                            {/* Series con separadores por grupo */}
+                            <div>
+                                {items.map((item, i) => {
+                                    const prevGroup = i > 0 ? items[i - 1].groupName : null;
+                                    const showGroupHeader = item.groupName !== prevGroup;
+                                    return (
+                                        <SerieBlock
+                                            key={item.idx}
+                                            item={item}
+                                            showGroupHeader={showGroupHeader}
+                                        />
+                                    );
+                                })}
                             </div>
                         </div>
                     )}

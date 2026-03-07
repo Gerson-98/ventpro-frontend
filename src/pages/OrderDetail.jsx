@@ -12,6 +12,7 @@ import {
 import AddWindowModal from '@/components/AddWindowModal';
 import ProfilesReportModal from '@/components/ProfilesReportModal';
 import CutOptimizationModal from '@/components/CutOptimizationModal';
+import GlassCutModal from '@/components/GlassCutModal';
 import RescheduleOrderModal from '@/components/RescheduleOrderModal';
 import EditOrderWindowModal from '@/components/EditOrderWindowModal';
 import { useAuth } from '@/context/AuthContext';
@@ -86,6 +87,9 @@ export default function OrderDetail() {
   const [showOptModal, setShowOptModal] = useState(false);
   const [optimizationData, setOptimizationData] = useState({});
   const [isOptLoading, setIsOptLoading] = useState(false);
+  const [showGlassModal, setShowGlassModal] = useState(false);
+  const [glassCutData, setGlassCutData] = useState({});
+  const [isGlassLoading, setIsGlassLoading] = useState(false);
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
 
   // ── Fetch order ─────────────────────────────────────────────────────────────
@@ -188,6 +192,20 @@ export default function OrderDetail() {
       setShowOptModal(false);
     } finally {
       setIsOptLoading(false);
+    }
+  };
+
+  const handleGlassCuts = async () => {
+    setIsGlassLoading(true);
+    setShowGlassModal(true);
+    try {
+      const res = await api.get(`/reports/order/${id}/glass-cuts`);
+      setGlassCutData(res.data);
+    } catch {
+      alert('No se pudo generar el corte de vidrio.');
+      setShowGlassModal(false);
+    } finally {
+      setIsGlassLoading(false);
     }
   };
 
@@ -363,6 +381,16 @@ export default function OrderDetail() {
               <FaMagic size={11} />
               <span className="hidden sm:inline">Optimizar Cortes</span>
               <span className="sm:hidden">Cortes</span>
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex items-center gap-1.5 text-xs sm:text-sm"
+              onClick={handleGlassCuts}
+            >
+              <FaFileAlt size={11} />
+              <span className="hidden sm:inline">Corte Vidrio</span>
+              <span className="sm:hidden">Vidrio</span>
             </Button>
             <Button
               size="sm"
@@ -590,6 +618,15 @@ export default function OrderDetail() {
           isLoading={isOptLoading}
           optimizationData={optimizationData}
           onClose={() => setShowOptModal(false)}
+          projectName={order?.project}
+        />
+      )}
+
+      {showGlassModal && (
+        <GlassCutModal
+          isLoading={isGlassLoading}
+          glassCutData={glassCutData}
+          onClose={() => setShowGlassModal(false)}
           projectName={order?.project}
         />
       )}
