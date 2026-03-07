@@ -183,46 +183,6 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
         } catch { /* corrupto — ignorar */ }
     }, [open, quotationToEdit, catalogsLoaded, draftRestored]);
 
-    const restoreDraft = useCallback(async () => {
-        try {
-            const raw = localStorage.getItem(DRAFT_KEY);
-            if (!raw) return;
-            const draft = JSON.parse(raw);
-            // Restaurar optionGroups para cada ventana
-            const restoredWindows = await Promise.all(
-                (draft.windows || []).map(async (win) => {
-                    const optGroups = win.window_type_id
-                        ? await loadOptionGroups(win.window_type_id)
-                        : [];
-                    return { ...win, _optionGroups: optGroups };
-                })
-            );
-            setQuotation({
-                project: draft.project || '',
-                clientId: draft.clientId || '',
-                price_per_m2: draft.price_per_m2 || '',
-                include_iva: Boolean(draft.include_iva),
-                notes: draft.notes || '',
-                reference_image_url: draft.reference_image_url || '',
-                windows: restoredWindows,
-            });
-            if (draft._useCm) setUseCm(draft._useCm);
-            if (draft._totalOverride) setTotalOverride(draft._totalOverride);
-            // Calcular costos de cada ventana restaurada
-            for (const win of restoredWindows) {
-                calculateWindowCost(win);
-            }
-        } catch { /* corrupto — ignorar */ }
-        setHasDraft(false);
-        setDraftRestored(true);
-    }, [loadOptionGroups, calculateWindowCost]);
-
-    const discardDraft = useCallback(() => {
-        try { localStorage.removeItem(DRAFT_KEY); } catch { }
-        setHasDraft(false);
-        setDraftRestored(true);
-    }, []);
-
     // Limpiar borrador al guardar exitosamente
     const clearDraft = () => {
         try { localStorage.removeItem(DRAFT_KEY); } catch { }
@@ -294,6 +254,46 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
         } catch {
             return [];
         }
+    }, []);
+
+    const restoreDraft = useCallback(async () => {
+        try {
+            const raw = localStorage.getItem(DRAFT_KEY);
+            if (!raw) return;
+            const draft = JSON.parse(raw);
+            // Restaurar optionGroups para cada ventana
+            const restoredWindows = await Promise.all(
+                (draft.windows || []).map(async (win) => {
+                    const optGroups = win.window_type_id
+                        ? await loadOptionGroups(win.window_type_id)
+                        : [];
+                    return { ...win, _optionGroups: optGroups };
+                })
+            );
+            setQuotation({
+                project: draft.project || '',
+                clientId: draft.clientId || '',
+                price_per_m2: draft.price_per_m2 || '',
+                include_iva: Boolean(draft.include_iva),
+                notes: draft.notes || '',
+                reference_image_url: draft.reference_image_url || '',
+                windows: restoredWindows,
+            });
+            if (draft._useCm) setUseCm(draft._useCm);
+            if (draft._totalOverride) setTotalOverride(draft._totalOverride);
+            // Calcular costos de cada ventana restaurada
+            for (const win of restoredWindows) {
+                calculateWindowCost(win);
+            }
+        } catch { /* corrupto — ignorar */ }
+        setHasDraft(false);
+        setDraftRestored(true);
+    }, [loadOptionGroups, calculateWindowCost]);
+
+    const discardDraft = useCallback(() => {
+        try { localStorage.removeItem(DRAFT_KEY); } catch { }
+        setHasDraft(false);
+        setDraftRestored(true);
     }, []);
 
     useEffect(() => {
