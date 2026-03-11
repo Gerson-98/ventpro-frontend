@@ -107,7 +107,9 @@ export default function Quotations() {
                     <div>
                         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">Cotizaciones</h1>
                         <p className="text-gray-500 text-xs sm:text-sm mt-1">
-                            {totals.total} cotizaciones · {totals.confirmadas} confirmadas · {totals.enProceso} en proceso
+                            {totals.total} cotizaciones en total ·{' '}
+                            {totals.confirmadas} confirmadas en esta página ·{' '}
+                            {totals.enProceso} en proceso en esta página
                         </p>
                     </div>
                     <button

@@ -17,7 +17,12 @@ export function AuthProvider({ children }) {
                 if (token) {
                     // Si encontramos un token, lo decodificamos para obtener los datos del usuario.
                     const decodedUser = jwtDecode(token);
-                    setUser(decodedUser);
+                    const isExpired = decodedUser.exp * 1000 < Date.now();
+                    if (isExpired) {
+                        localStorage.removeItem('authToken');
+                    } else {
+                        setUser(decodedUser);
+                    }
                 }
             } catch (error) {
                 console.error("Token inválido o expirado:", error);
@@ -39,9 +44,13 @@ export function AuthProvider({ children }) {
 
     const value = { user, logout, loading };
 
-    // Si aún estamos cargando, no mostramos nada para evitar parpadeos.
     if (loading) {
-        return null;
+        return (
+            <div style={{ minHeight: '100vh', background: '#09090b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: 24, height: 24, border: '2px solid rgba(255,255,255,0.15)', borderTopColor: '#3b82f6', borderRadius: '50%', animation: 'spin 0.65s linear infinite' }} />
+                <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+            </div>
+        );
     }
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

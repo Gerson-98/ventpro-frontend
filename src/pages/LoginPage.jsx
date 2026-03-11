@@ -9,8 +9,20 @@ export default function LoginPage() {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [ready, setReady] = useState(false);
+    const [online, setOnline] = useState(navigator.onLine);
 
     useEffect(() => { setReady(true); }, []);
+
+    useEffect(() => {
+        const handleOnline = () => setOnline(true);
+        const handleOffline = () => setOnline(false);
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+        return () => {
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
+        };
+    }, []);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -20,8 +32,16 @@ export default function LoginPage() {
             const { data } = await api.post('/auth/login', { email, password });
             localStorage.setItem('authToken', data.access_token);
             window.location.href = '/';
-        } catch {
-            setError('Credenciales incorrectas.');
+        } catch (err) {
+            if (err.code === 'ECONNABORTED' || err.code === 'ERR_NETWORK') {
+                setError('No se pudo conectar al servidor. Verifica tu conexión e intenta de nuevo.');
+            } else if (err.response?.status === 401 || err.response?.status === 400) {
+                setError('Correo o contraseña incorrectos.');
+            } else if (err.response?.status >= 500) {
+                setError('El servidor tuvo un problema. Espera unos segundos e intenta de nuevo.');
+            } else {
+                setError('Ocurrió un error inesperado. Intenta de nuevo.');
+            }
         } finally {
             setLoading(false);
         }
@@ -311,8 +331,13 @@ export default function LoginPage() {
                     <div className="lp-footer">
                         <span className="lp-footer-text">v1.0.0</span>
                         <div className="lp-online">
-                            <span className="lp-dot" />
-                            En línea
+                            <span className="lp-dot" style={{
+                                background: online ? '#22c55e' : '#ef4444',
+                                boxShadow: online
+                                    ? '0 0 5px rgba(34,197,94,0.7)'
+                                    : '0 0 5px rgba(239,68,68,0.7)',
+                            }} />
+                            {online ? 'En línea' : 'Sin conexión'}
                         </div>
                     </div>
                 </div>

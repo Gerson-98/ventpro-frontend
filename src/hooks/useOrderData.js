@@ -1,9 +1,10 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import api from "@/services/api";
 
 export default function useOrderData(id) {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
+  const controllerRef = useRef(null);
 
   const fetchOrder = useCallback(async (signal) => {
     try {
@@ -23,10 +24,18 @@ export default function useOrderData(id) {
 
   useEffect(() => {
     const controller = new AbortController();
+    controllerRef.current = controller;
     fetchOrder(controller.signal);
     // Cleanup: cancela la petición si el componente se desmonta o cambia el id
     return () => controller.abort();
   }, [fetchOrder]);
 
-  return { order, setOrder, loading, refetch: () => fetchOrder() };
+  const refetch = useCallback(() => {
+    if (controllerRef.current) controllerRef.current.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
+    fetchOrder(controller.signal);
+  }, [fetchOrder]);
+
+  return { order, setOrder, loading, refetch };
 }

@@ -195,14 +195,17 @@ export default function Orders() {
         <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 shadow-sm p-3 sm:p-4">
           <p className="text-[10px] sm:text-xs font-semibold text-gray-400 uppercase tracking-wide">Activos</p>
           <p className="text-2xl sm:text-3xl font-black text-gray-900 mt-1">{metrics.active}</p>
+          <p className="text-[9px] text-gray-300 mt-0.5">esta página</p>
         </div>
         <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 shadow-sm p-3 sm:p-4">
           <p className="text-[10px] sm:text-xs font-semibold text-gray-400 uppercase tracking-wide">Completados</p>
           <p className="text-2xl sm:text-3xl font-black text-green-600 mt-1">{metrics.completed}</p>
+          <p className="text-[9px] text-gray-300 mt-0.5">esta página</p>
         </div>
         <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 shadow-sm p-3 sm:p-4">
           <p className="text-[10px] sm:text-xs font-semibold text-gray-400 uppercase tracking-wide">Facturado</p>
           <p className="text-base sm:text-2xl font-black text-blue-700 mt-1 truncate">{formatCurrency(metrics.total)}</p>
+          <p className="text-[9px] text-gray-300 mt-0.5">esta página</p>
         </div>
       </div>
 
