@@ -18,34 +18,11 @@ import EditOrderWindowModal from '@/components/EditOrderWindowModal';
 import { useAuth } from '@/context/AuthContext';
 import { generateDocumentPDF } from '@/lib/generateDocumentPDF';
 import ChecklistPanel from '@/components/ChecklistPanel';
-
-// ─── Constantes de estado ──────────────────────────────────────────────────────
-const ORDER_STATUSES = [
-  { value: 'en_proceso', label: 'En Proceso' },
-  { value: 'en_fabricacion', label: 'En Fabricación' },
-  { value: 'listo_para_instalar', label: 'Listo para Instalar' },
-  { value: 'en_ruta', label: 'En Ruta' },
-  { value: 'completado', label: 'Completado' },
-  { value: 'cancelado', label: 'Cancelado' },
-];
-
-const STATUS_STYLES = {
-  en_proceso: 'bg-blue-100 text-blue-800 border-blue-300',
-  en_fabricacion: 'bg-orange-100 text-orange-800 border-orange-300',
-  listo_para_instalar: 'bg-purple-100 text-purple-800 border-purple-300',
-  en_ruta: 'bg-cyan-100 text-cyan-800 border-cyan-300',
-  completado: 'bg-green-100 text-green-800 border-green-300',
-  cancelado: 'bg-red-100 text-red-800 border-red-300',
-};
-
-const STATUS_DOT = {
-  en_proceso: 'bg-blue-500',
-  en_fabricacion: 'bg-orange-500',
-  listo_para_instalar: 'bg-purple-500',
-  en_ruta: 'bg-cyan-500',
-  completado: 'bg-green-500',
-  cancelado: 'bg-red-500',
-};
+import {
+  ORDER_STATUS_LIST,
+  getStatusStyle,
+  getStatusLabel,
+} from '@/config/orderStatuses';
 
 const API_BASE = import.meta.env.VITE_API_URL?.replace(/\/+$/, '') || 'http://localhost:3000';
 
@@ -264,9 +241,9 @@ export default function OrderDetail() {
               <span className="font-mono text-xs font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-100">
                 Pedido #{order.id}
               </span>
-              <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${STATUS_STYLES[order.status] || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[order.status] || 'bg-gray-400'}`} />
-                {ORDER_STATUSES.find(s => s.value === order.status)?.label || order.status}
+              <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${getStatusStyle(order.status).badgeFull}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${getStatusStyle(order.status).dot}`} />
+                {getStatusLabel(order.status)}
               </span>
               {order.generatedFromQuotationId && (
                 <Link
@@ -331,9 +308,9 @@ export default function OrderDetail() {
               value={order.status || ''}
               onChange={handleStatusChange}
               disabled={isUpdatingStatus || !isAdmin}
-              className={`px-3 py-1.5 text-xs border rounded-full font-semibold appearance-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed transition-colors outline-none focus:ring-2 focus:ring-blue-400 ${STATUS_STYLES[order.status] || 'bg-gray-100 text-gray-700 border-gray-300'}`}
+              className={`px-3 py-1.5 text-xs border rounded-full font-semibold appearance-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed transition-colors outline-none focus:ring-2 focus:ring-blue-400 ${getStatusStyle(order.status).badgeFull}`}
             >
-              {ORDER_STATUSES.map(s => (
+              {ORDER_STATUS_LIST.map(s => (
                 <option key={s.value} value={s.value}>{s.label}</option>
               ))}
             </select>

@@ -26,31 +26,12 @@ import {
   FaChevronRight,
 } from "react-icons/fa";
 
-const ORDER_STATUSES = [
-  { value: 'en_proceso', label: 'En Proceso' },
-  { value: 'en_fabricacion', label: 'En Fabricación' },
-  { value: 'listo_para_instalar', label: 'Listo para Instalar' },
-  { value: 'en_ruta', label: 'En Ruta' },
-  { value: 'completado', label: 'Completado' },
-  { value: 'cancelado', label: 'Cancelado' },
-];
-
-const STATUS_STYLES = {
-  en_proceso: { badge: 'bg-blue-100 text-blue-800 border-blue-200', dot: 'bg-blue-500' },
-  en_fabricacion: { badge: 'bg-orange-100 text-orange-800 border-orange-200', dot: 'bg-orange-500' },
-  listo_para_instalar: { badge: 'bg-purple-100 text-purple-800 border-purple-200', dot: 'bg-purple-500' },
-  en_ruta: { badge: 'bg-cyan-100 text-cyan-800 border-cyan-200', dot: 'bg-cyan-500' },
-  completado: { badge: 'bg-green-100 text-green-800 border-green-200', dot: 'bg-green-500' },
-  cancelado: { badge: 'bg-red-100 text-red-800 border-red-200', dot: 'bg-red-500' },
-};
-
-const getStatusStyle = (status) =>
-  STATUS_STYLES[status] || { badge: 'bg-gray-100 text-gray-700 border-gray-200', dot: 'bg-gray-400' };
-
-const statusLabel = (status) => {
-  const found = ORDER_STATUSES.find(s => s.value === status);
-  return found ? found.label : status || 'Sin estado';
-};
+import {
+  ORDER_STATUS,
+  ORDER_STATUS_LIST,
+  getStatusStyle,
+  getStatusLabel,
+} from '@/config/orderStatuses';
 
 const formatDate = (d) => {
   if (!d) return null;
@@ -81,7 +62,7 @@ export default function Orders() {
   const [showAddClient, setShowAddClient] = useState(false);
   const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState({
-    project: '', clientId: '', total: '', status: 'en_proceso',
+    project: '', clientId: '', total: '', status: ORDER_STATUS.EN_PROCESO,
   });
   const [filters, setFilters] = useState({ status: 'all', month: 'all', search: '' });
 
@@ -123,7 +104,7 @@ export default function Orders() {
     }
     try {
       const res = await api.post('/orders', formData);
-      setFormData({ project: '', clientId: '', total: '', status: 'en_proceso' });
+      setFormData({ project: '', clientId: '', total: '', status: ORDER_STATUS.EN_PROCESO });
       setOpen(false);
       // ── Actualización optimista: insertar al inicio sin refetch ───────────
       setOrders(prev => [res.data, ...prev]);
@@ -167,8 +148,8 @@ export default function Orders() {
   }, [orders, filters]);
 
   const metrics = useMemo(() => {
-    const active = orders.filter(o => !['completado', 'cancelado'].includes(o.status)).length;
-    const completed = orders.filter(o => o.status === 'completado').length;
+    const active = orders.filter(o => ![ORDER_STATUS.COMPLETADO, ORDER_STATUS.CANCELADO].includes(o.status)).length;
+    const completed = orders.filter(o => o.status === ORDER_STATUS.COMPLETADO).length;
     const total = orders.reduce((sum, o) => sum + Number(o.total || 0), 0);
     return { active, completed, total };
   }, [orders]);
@@ -252,7 +233,7 @@ export default function Orders() {
             className="flex-1 sm:flex-none border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
           >
             <option value="all">Todos los estados</option>
-            {ORDER_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+            {ORDER_STATUS_LIST.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
         </div>
         <span className="text-xs text-gray-400 font-medium sm:ml-auto">
@@ -313,7 +294,7 @@ export default function Orders() {
                         <td className="py-3.5 px-5 text-center">
                           <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${style.badge}`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
-                            {statusLabel(order.status)}
+                            {getStatusLabel(order.status)}
                           </span>
                         </td>
                         <td className="py-3.5 px-5 text-xs text-indigo-600">
@@ -357,7 +338,7 @@ export default function Orders() {
                       </span>
                       <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border ${style.badge}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
-                        {statusLabel(order.status)}
+                        {getStatusLabel(order.status)}
                       </span>
                     </div>
                     {/* Proyecto */}

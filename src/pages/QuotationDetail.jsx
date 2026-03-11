@@ -270,7 +270,7 @@ export default function QuotationDetail() {
                         </button>
 
                         <button
-                            onClick={() => generateDocumentPDF(quotation)}
+                            onClick={async () => { try { await generateDocumentPDF(quotation); } catch { alert('Error al generar PDF. Intenta de nuevo.'); } }}
                             className="inline-flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium rounded-xl border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition-all"
                         >
                             <FaFilePdf size={12} />
