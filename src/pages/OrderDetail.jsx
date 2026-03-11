@@ -23,6 +23,8 @@ import {
   getStatusStyle,
   getStatusLabel,
 } from '@/config/orderStatuses';
+import useOrderData from '@/hooks/useOrderData';
+import useOrderReports from '@/hooks/useOrderReports';
 
 const API_BASE = import.meta.env.VITE_API_URL?.replace(/\/+$/, '') || 'http://localhost:3000';
 
@@ -48,42 +50,40 @@ export default function OrderDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  const [order, setOrder] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // ── Hooks de datos y reportes ────────────────────────────────────────────────
+  const { order, setOrder, loading, refetch } = useOrderData(id);
+  const {
+    handleGenerateReport,
+    handleOptimizeCuts,
+    showReportModal,
+    setShowReportModal,
+    reportData,
+    isReportLoading,
+    showOptimizationModal,
+    setShowOptimizationModal,
+    optimizationData,
+    isOptimizationLoading,
+  } = useOrderReports(id);
+
   const [glassColors, setGlassColors] = useState([]);
   const [includeIva, setIncludeIva] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
-  // Modales
+  // Modales de ventanas y agenda
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [windowToEdit, setWindowToEdit] = useState(null);
-  const [showReportModal, setShowReportModal] = useState(false);
-  const [reportData, setReportData] = useState({});
-  const [isReportLoading, setIsReportLoading] = useState(false);
-  const [showOptModal, setShowOptModal] = useState(false);
-  const [optimizationData, setOptimizationData] = useState({});
-  const [isOptLoading, setIsOptLoading] = useState(false);
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+
+  // Modal de corte de vidrio (no cubierto por useOrderReports)
   const [showGlassModal, setShowGlassModal] = useState(false);
   const [glassCutData, setGlassCutData] = useState({});
   const [isGlassLoading, setIsGlassLoading] = useState(false);
-  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
 
-  // ── Fetch order ─────────────────────────────────────────────────────────────
-  const fetchOrder = async () => {
-    try {
-      setLoading(true);
-      const res = await api.get(`/orders/${id}`);
-      setOrder(res.data);
-      if (res.data.include_iva !== undefined) setIncludeIva(!!res.data.include_iva);
-    } catch (err) {
-      console.error('❌ Error al obtener pedido:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { fetchOrder(); }, [id]);
+  // Sincronizar includeIva desde los datos del pedido cuando carguen
+  useEffect(() => {
+    if (order?.include_iva !== undefined) setIncludeIva(!!order.include_iva);
+  }, [order]);
 
   useEffect(() => {
     const fetchGlass = async () => {
@@ -114,7 +114,7 @@ export default function OrderDetail() {
       const nuevoEstado = !includeIva;
       await api.patch(`/orders/${order.id}`, { include_iva: nuevoEstado });
       setIncludeIva(nuevoEstado);
-      await fetchOrder();
+      await refetch();
     } catch {
       console.error('Error al cambiar IVA');
     }
@@ -124,7 +124,7 @@ export default function OrderDetail() {
     if (!confirm('¿Eliminar esta ventana del pedido?')) return;
     try {
       await api.delete(`/windows/${winId}`);
-      await fetchOrder();
+      await refetch();
     } catch {
       alert('Error al eliminar la ventana.');
     }
@@ -133,7 +133,7 @@ export default function OrderDetail() {
   const handleDuplicate = async (winId) => {
     try {
       await api.post(`/windows/${winId}/duplicate`);
-      await fetchOrder();
+      await refetch();
     } catch {
       alert('No se pudo duplicar la ventana.');
     }
@@ -142,34 +142,6 @@ export default function OrderDetail() {
   const openEditModal = (win) => {
     setWindowToEdit(win);
     setShowEditModal(true);
-  };
-
-  const handleGenerateReport = async () => {
-    setIsReportLoading(true);
-    setShowReportModal(true);
-    try {
-      const res = await api.get(`/reports/order/${id}/profiles`);
-      setReportData(res.data);
-    } catch {
-      alert('No se pudo generar el reporte.');
-      setShowReportModal(false);
-    } finally {
-      setIsReportLoading(false);
-    }
-  };
-
-  const handleOptimizeCuts = async () => {
-    setIsOptLoading(true);
-    setShowOptModal(true);
-    try {
-      const res = await api.get(`/reports/order/${id}/optimize-cuts`);
-      setOptimizationData(res.data);
-    } catch {
-      alert('No se pudo generar el plan de corte.');
-      setShowOptModal(false);
-    } finally {
-      setIsOptLoading(false);
-    }
   };
 
   const handleGlassCuts = async () => {
@@ -568,7 +540,7 @@ export default function OrderDetail() {
         <AddWindowModal
           orderId={Number(order.id)}
           onClose={() => setShowAddModal(false)}
-          onSave={async () => { setShowAddModal(false); await fetchOrder(); }}
+          onSave={async () => { setShowAddModal(false); await refetch(); }}
         />
       )}
 
@@ -576,7 +548,7 @@ export default function OrderDetail() {
         open={showEditModal}
         windowData={windowToEdit}
         onClose={() => { setShowEditModal(false); setWindowToEdit(null); }}
-        onSave={async () => { setShowEditModal(false); setWindowToEdit(null); await fetchOrder(); }}
+        onSave={async () => { setShowEditModal(false); setWindowToEdit(null); await refetch(); }}
       />
 
       {showReportModal && (
@@ -590,11 +562,11 @@ export default function OrderDetail() {
         />
       )}
 
-      {showOptModal && (
+      {showOptimizationModal && (
         <CutOptimizationModal
-          isLoading={isOptLoading}
+          isLoading={isOptimizationLoading}
           optimizationData={optimizationData}
-          onClose={() => setShowOptModal(false)}
+          onClose={() => setShowOptimizationModal(false)}
           projectName={order?.project}
         />
       )}
@@ -613,7 +585,7 @@ export default function OrderDetail() {
           open={showRescheduleModal}
           onClose={() => setShowRescheduleModal(false)}
           order={order}
-          onRescheduleSuccess={() => { setShowRescheduleModal(false); fetchOrder(); }}
+          onRescheduleSuccess={() => { setShowRescheduleModal(false); refetch(); }}
         />
       )}
     </div>

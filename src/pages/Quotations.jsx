@@ -139,7 +139,7 @@ export default function Quotations() {
                             className="flex-1 sm:flex-none border border-gray-200 rounded-xl py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-gray-50"
                         >
                             <option value="all">Todas</option>
-                            <option value="en proceso">En Proceso</option>
+                            <option value="en_proceso">En Proceso</option>
                             <option value="confirmado">Confirmado</option>
                         </select>
                         <select
