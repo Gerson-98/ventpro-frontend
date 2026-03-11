@@ -28,6 +28,12 @@ import useOrderReports from '@/hooks/useOrderReports';
 
 const API_BASE = import.meta.env.VITE_API_URL?.replace(/\/+$/, '') || 'http://localhost:3000';
 
+const resolveImageUrl = (url) => {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  return `${API_BASE}${url}`;
+};
+
 const formatCurrency = (n) =>
   `Q ${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
 
@@ -74,6 +80,7 @@ export default function OrderDetail() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [windowToEdit, setWindowToEdit] = useState(null);
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState(null);
 
   // Modal de corte de vidrio (no cubierto por useOrderReports)
   const [showGlassModal, setShowGlassModal] = useState(false);
@@ -407,10 +414,23 @@ export default function OrderDetail() {
                               {win.displayName || win.window_type?.name || 'Desconocido'}
                             </span>
                             {win.design_image_url && (
-                              <a href={`${API_BASE}${win.design_image_url}`} target="_blank" rel="noopener noreferrer"
-                                title="Ver diseño adjunto" className="text-blue-400 hover:text-blue-600 transition-colors shrink-0">
-                                <FaCamera size={12} />
-                              </a>
+                              <button
+                                onClick={() => setLightboxUrl(resolveImageUrl(win.design_image_url))}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  cursor: 'zoom-in',
+                                  padding: 0,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 4,
+                                  color: '#3b82f6',
+                                  fontSize: 12,
+                                  fontWeight: 500,
+                                }}
+                              >
+                                📷 Diseño
+                              </button>
                             )}
                           </div>
                         </td>
@@ -483,10 +503,23 @@ export default function OrderDetail() {
                           {win.displayName || win.window_type?.name || 'Desconocido'}
                         </span>
                         {win.design_image_url && (
-                          <a href={`${API_BASE}${win.design_image_url}`} target="_blank" rel="noopener noreferrer"
-                            className="text-blue-400 hover:text-blue-600 flex-shrink-0">
-                            <FaCamera size={11} />
-                          </a>
+                          <button
+                            onClick={() => setLightboxUrl(resolveImageUrl(win.design_image_url))}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'zoom-in',
+                              padding: 0,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              color: '#3b82f6',
+                              fontSize: 12,
+                              fontWeight: 500,
+                            }}
+                          >
+                            📷 Diseño
+                          </button>
                         )}
                       </div>
                       <span className="font-mono font-black text-gray-900 text-sm flex-shrink-0">
@@ -587,6 +620,53 @@ export default function OrderDetail() {
           order={order}
           onRescheduleSuccess={() => { setShowRescheduleModal(false); refetch(); }}
         />
+      )}
+
+      {lightboxUrl && (
+        <div
+          onClick={() => setLightboxUrl(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.85)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'zoom-out',
+          }}
+        >
+          <img
+            src={lightboxUrl}
+            alt="Diseño"
+            style={{
+              maxWidth: '90vw',
+              maxHeight: '90vh',
+              borderRadius: 8,
+              boxShadow: '0 8px 40px rgba(0,0,0,0.6)',
+            }}
+            onClick={e => e.stopPropagation()}
+          />
+          <button
+            onClick={() => setLightboxUrl(null)}
+            style={{
+              position: 'absolute',
+              top: 20,
+              right: 24,
+              background: 'rgba(255,255,255,0.15)',
+              border: 'none',
+              borderRadius: '50%',
+              width: 36,
+              height: 36,
+              color: '#fff',
+              fontSize: 20,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >×</button>
+        </div>
       )}
     </div>
   );

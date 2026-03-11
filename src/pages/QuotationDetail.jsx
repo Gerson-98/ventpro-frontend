@@ -50,6 +50,7 @@ export default function QuotationDetail() {
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
     const [reportData, setReportData] = useState([]);
     const [isReportLoading, setIsReportLoading] = useState(false);
+    const [lightboxUrl, setLightboxUrl] = useState(null);
 
     const fetchQuotation = async () => {
         setLoading(true);
@@ -160,6 +161,12 @@ export default function QuotationDetail() {
     const isReopenada = !isConfirmado && !!quotation.generatedOrder;
     const windowCount = quotation.quotation_windows?.length || 0;
     const API_BASE = import.meta.env.VITE_API_URL?.replace(/\/+$/, '') || 'http://localhost:3000';
+
+    const resolveImageUrl = (url) => {
+        if (!url) return '';
+        if (url.startsWith('http://') || url.startsWith('https://')) return url;
+        return `${API_BASE}${url}`;
+    };
 
     return (
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5 sm:py-6">
@@ -376,18 +383,23 @@ export default function QuotationDetail() {
                                     <FaCamera size={12} className="text-gray-400" />
                                     <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Foto de referencia</span>
                                 </div>
-                                <a
-                                    href={`${API_BASE}${quotation.reference_image_url}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="block"
+                                <button
+                                    onClick={() => setLightboxUrl(resolveImageUrl(quotation.reference_image_url))}
+                                    style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        cursor: 'zoom-in',
+                                        padding: 0,
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 4,
+                                        color: '#3b82f6',
+                                        fontSize: 12,
+                                        fontWeight: 500,
+                                    }}
                                 >
-                                    <img
-                                        src={`${API_BASE}${quotation.reference_image_url}`}
-                                        alt="Foto de referencia"
-                                        className="h-24 w-auto rounded-xl border border-gray-200 object-cover shadow-sm hover:opacity-90 transition-opacity cursor-pointer"
-                                    />
-                                </a>
+                                    📷 Ver foto de referencia
+                                </button>
                             </div>
                         )}
                     </div>
@@ -446,26 +458,25 @@ export default function QuotationDetail() {
                                                         <div className="flex items-center gap-2">
                                                             <span className="font-semibold text-gray-800">{win.displayName}</span>
                                                             {win.design_image_url && (
-                                                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-md border border-blue-100">
-                                                                    <FaCamera size={9} /> Diseño
-                                                                </span>
+                                                                <button
+                                                                    onClick={() => setLightboxUrl(resolveImageUrl(win.design_image_url))}
+                                                                    style={{
+                                                                        background: 'none',
+                                                                        border: 'none',
+                                                                        cursor: 'zoom-in',
+                                                                        padding: 0,
+                                                                        display: 'inline-flex',
+                                                                        alignItems: 'center',
+                                                                        gap: 4,
+                                                                        color: '#3b82f6',
+                                                                        fontSize: 12,
+                                                                        fontWeight: 500,
+                                                                    }}
+                                                                >
+                                                                    📷 Diseño
+                                                                </button>
                                                             )}
                                                         </div>
-                                                        {win.design_image_url && (
-                                                            <a
-                                                                href={`${API_BASE}${win.design_image_url}`}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                className="block w-fit group/img"
-                                                            >
-                                                                <img
-                                                                    src={`${API_BASE}${win.design_image_url}`}
-                                                                    alt={`Diseño ${win.displayName}`}
-                                                                    className="h-14 w-auto rounded-lg border border-blue-100 object-cover shadow-sm group-hover/img:opacity-80 group-hover/img:shadow-md transition-all"
-                                                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                                                />
-                                                            </a>
-                                                        )}
                                                     </div>
                                                 </td>
                                                 <td className="py-3.5 px-5 font-mono text-xs text-gray-600">
@@ -529,19 +540,24 @@ export default function QuotationDetail() {
 
                                         {/* Imagen de diseño si existe */}
                                         {win.design_image_url && (
-                                            <a
-                                                href={`${API_BASE}${win.design_image_url}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="block w-fit mb-2"
+                                            <button
+                                                onClick={() => setLightboxUrl(resolveImageUrl(win.design_image_url))}
+                                                style={{
+                                                    background: 'none',
+                                                    border: 'none',
+                                                    cursor: 'zoom-in',
+                                                    padding: 0,
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: 4,
+                                                    color: '#3b82f6',
+                                                    fontSize: 12,
+                                                    fontWeight: 500,
+                                                    marginBottom: 8,
+                                                }}
                                             >
-                                                <img
-                                                    src={`${API_BASE}${win.design_image_url}`}
-                                                    alt={`Diseño ${win.displayName}`}
-                                                    className="h-12 w-auto rounded-lg border border-blue-100 object-cover shadow-sm"
-                                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                                />
-                                            </a>
+                                                📷 Diseño
+                                            </button>
                                         )}
 
                                         {/* Detalles en grid compacto */}
@@ -617,6 +633,54 @@ export default function QuotationDetail() {
                     showPrices={true}
                     projectName={quotation?.project}
                 />
+            )}
+
+            {/* ── Lightbox ── */}
+            {lightboxUrl && (
+                <div
+                    onClick={() => setLightboxUrl(null)}
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        background: 'rgba(0,0,0,0.85)',
+                        zIndex: 9999,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'zoom-out',
+                    }}
+                >
+                    <img
+                        src={lightboxUrl}
+                        alt="Diseño"
+                        style={{
+                            maxWidth: '90vw',
+                            maxHeight: '90vh',
+                            borderRadius: 8,
+                            boxShadow: '0 8px 40px rgba(0,0,0,0.6)',
+                        }}
+                        onClick={e => e.stopPropagation()}
+                    />
+                    <button
+                        onClick={() => setLightboxUrl(null)}
+                        style={{
+                            position: 'absolute',
+                            top: 20,
+                            right: 24,
+                            background: 'rgba(255,255,255,0.15)',
+                            border: 'none',
+                            borderRadius: '50%',
+                            width: 36,
+                            height: 36,
+                            color: '#fff',
+                            fontSize: 20,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                        }}
+                    >×</button>
+                </div>
             )}
         </div>
     );
