@@ -112,8 +112,7 @@ export const generateDocumentPDF = async (data, mode = 'quotation') => {
     doc.setFont("helvetica", "normal");
     doc.setTextColor(40);
 
-    // En pedidos es data.clients, en cotización es data.client
-    const clientName = isOrder ? data.clients?.name : data.client?.name;
+    const clientName = data.client?.name ?? 'N/A';
     doc.text(clientName || "N/A", margin.left, startY + 5);
     doc.text(String(data.quotationNumber || data.id), pageWidth / 2 + 15, startY + 5);
 

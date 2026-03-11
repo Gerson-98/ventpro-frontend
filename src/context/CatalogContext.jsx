@@ -8,6 +8,14 @@ export function CatalogProvider({ children }) {
   const [pvcColors, setPvcColors] = useState([]);
   const [glassColors, setGlassColors] = useState([]);
   const [loadingCatalogs, setLoadingCatalogs] = useState(true);
+  const [catalogError, setCatalogError] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
+
+  const retryCatalogs = () => {
+    setCatalogError(null);
+    setLoadingCatalogs(true);
+    setRetryCount(c => c + 1);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -24,7 +32,9 @@ export function CatalogProvider({ children }) {
         setPvcColors(Array.isArray(pvc.data) ? pvc.data : []);
         setGlassColors(Array.isArray(glass.data) ? glass.data : []);
       } catch (err) {
-        console.error("Error cargando catálogos:", err);
+        if (!cancelled) {
+          setCatalogError('No se pudieron cargar los catálogos. Verifica tu conexión.');
+        }
       } finally {
         if (!cancelled) setLoadingCatalogs(false);
       }
@@ -32,10 +42,10 @@ export function CatalogProvider({ children }) {
 
     fetchCatalogs();
     return () => { cancelled = true; };
-  }, []);
+  }, [retryCount]);
 
   return (
-    <CatalogContext.Provider value={{ windowTypes, pvcColors, glassColors, loadingCatalogs }}>
+    <CatalogContext.Provider value={{ windowTypes, pvcColors, glassColors, loadingCatalogs, catalogError, retryCatalogs }}>
       {children}
     </CatalogContext.Provider>
   );

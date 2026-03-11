@@ -8,6 +8,7 @@ export const api = axios.create({
   baseURL: BASE_URL,
   headers: { "Content-Type": "application/json" },
   withCredentials: false,
+  timeout: 15000,
 });
 
 // ✨ INTERCEPTOR: Adjunta el token JWT a cada request automáticamente
@@ -23,12 +24,16 @@ api.interceptors.request.use(
 );
 
 // ✨ INTERCEPTOR: Si el token expiró, redirige al login automáticamente
+// También transforma errores de timeout en mensajes legibles para el usuario
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('authToken');
       window.location.href = '/login';
+    }
+    if (error.code === 'ECONNABORTED' || error.code === 'ERR_NETWORK') {
+      error.userMessage = 'El servidor tardó demasiado en responder. Intenta de nuevo.';
     }
     return Promise.reject(error);
   }
