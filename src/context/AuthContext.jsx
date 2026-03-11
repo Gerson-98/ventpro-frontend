@@ -1,7 +1,8 @@
 // RUTA: src/context/AuthContext.jsx
 
 import { createContext, useContext, useState, useEffect } from 'react';
-import { jwtDecode } from 'jwt-decode'; // Necesitaremos una nueva librería para decodificar el token
+import { jwtDecode } from 'jwt-decode';
+import api from '@/services/api';
 
 const AuthContext = createContext(null);
 
@@ -36,10 +37,16 @@ export function AuthProvider({ children }) {
         initializeAuth();
     }, []);
 
-    const logout = () => {
-        setUser(null);
-        localStorage.removeItem('authToken');
-        window.location.href = '/login';
+    const logout = async () => {
+        try {
+            await api.post('/auth/logout', {}, { withCredentials: true });
+        } catch {
+            // Si falla el logout del servidor, igual limpiamos local
+        } finally {
+            setUser(null);
+            localStorage.removeItem('authToken');
+            window.location.href = '/login';
+        }
     };
 
     const value = { user, logout, loading };

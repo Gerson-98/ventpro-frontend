@@ -23,18 +23,75 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// ✨ INTERCEPTOR: Si el token expiró, redirige al login automáticamente
-// También transforma errores de timeout en mensajes legibles para el usuario
+// ✨ INTERCEPTOR: Refresh silencioso de access_token con cola de requests
+// Si el access_token expiró (401), intenta renovarlo con el refresh_token (httpOnly cookie).
+// Si el refresh también falla → logout y redirect a /login.
+
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  failedQueue = [];
+};
+
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('authToken');
-      window.location.href = '/login';
+  async (error) => {
+    const originalRequest = error.config;
+
+    // Si es 401, no es el endpoint de refresh ni de login, y no hemos reintentado ya
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !originalRequest.url.includes('/auth/refresh') &&
+      !originalRequest.url.includes('/auth/login')
+    ) {
+      if (isRefreshing) {
+        // Ya hay un refresh en curso: encola este request y espera el nuevo token
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then((token) => {
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+            return api(originalRequest);
+          })
+          .catch((err) => Promise.reject(err));
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        const { data } = await api.post('/auth/refresh', {}, { withCredentials: true });
+        const newToken = data.access_token;
+
+        localStorage.setItem('authToken', newToken);
+        api.defaults.headers.common.Authorization = `Bearer ${newToken}`;
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+
+        processQueue(null, newToken);
+        return api(originalRequest);
+      } catch (refreshError) {
+        processQueue(refreshError, null);
+        localStorage.removeItem('authToken');
+        window.location.href = '/login';
+        return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
+      }
     }
+
     if (error.code === 'ECONNABORTED' || error.code === 'ERR_NETWORK') {
       error.userMessage = 'El servidor tardó demasiado en responder. Intenta de nuevo.';
     }
+
     return Promise.reject(error);
   }
 );
