@@ -733,6 +733,12 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
 
     const API_BASE = import.meta.env.VITE_API_URL?.replace(/\/+$/, '') || 'http://localhost:3000';
 
+    const resolveImageUrl = (url) => {
+        if (!url) return '';
+        if (url.startsWith('http://') || url.startsWith('https://')) return url;
+        return `${API_BASE}${url}`;
+    };
+
     return (
         <>
             <DialogPrimitive.Root open={open} onOpenChange={onClose}>
@@ -982,13 +988,13 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                                     {quotation.reference_image_url ? (
                                                         <div className="flex flex-col gap-2">
                                                             <a
-                                                                href={`${API_BASE}${quotation.reference_image_url}`}
+                                                                href={resolveImageUrl(quotation.reference_image_url)}
                                                                 target="_blank"
                                                                 rel="noopener noreferrer"
                                                                 className="block w-fit"
                                                             >
                                                                 <img
-                                                                    src={`${API_BASE}${quotation.reference_image_url}`}
+                                                                    src={resolveImageUrl(quotation.reference_image_url)}
                                                                     alt="Foto de referencia"
                                                                     className="h-20 w-auto rounded-lg border border-gray-200 object-cover shadow-sm hover:opacity-90 transition-opacity"
                                                                 />
@@ -1166,13 +1172,13 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                                                             )}
                                                                             {win.design_image_url && !win.fileToUpload && (
                                                                                 <a
-                                                                                    href={`${API_BASE}${win.design_image_url}`}
+                                                                                    href={resolveImageUrl(win.design_image_url)}
                                                                                     target="_blank"
                                                                                     rel="noopener noreferrer"
                                                                                     className="block w-fit mt-1"
                                                                                 >
                                                                                     <img
-                                                                                        src={`${API_BASE}${win.design_image_url}`}
+                                                                                        src={resolveImageUrl(win.design_image_url)}
                                                                                         alt="Diseño adjunto"
                                                                                         className="h-10 w-auto rounded-lg border border-blue-200 object-cover shadow-sm hover:opacity-80 transition-opacity"
                                                                                         onError={(e) => { e.currentTarget.style.display = 'none'; }}
