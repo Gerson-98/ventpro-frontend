@@ -1,6 +1,18 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import api from "@/services/api";
 
+// ── Caché en memoria con TTL de 5 minutos ──────────────
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
+const catalogCache = {
+  data: null,
+  timestamp: null,
+};
+const isCacheValid = () =>
+  catalogCache.data !== null &&
+  catalogCache.timestamp !== null &&
+  Date.now() - catalogCache.timestamp < CACHE_TTL_MS;
+// ────────────────────────────────────────────────────────
+
 const CatalogContext = createContext(null);
 
 export function CatalogProvider({ children }) {
@@ -21,6 +33,14 @@ export function CatalogProvider({ children }) {
     let cancelled = false;
 
     const fetchCatalogs = async () => {
+      // Si el caché es válido, úsalo sin llamar a la API
+      if (isCacheValid() && retryCount === 0) {
+        setWindowTypes(catalogCache.data.windowTypes);
+        setPvcColors(catalogCache.data.pvcColors);
+        setGlassColors(catalogCache.data.glassColors);
+        setLoadingCatalogs(false);
+        return;
+      }
       try {
         const [types, pvc, glass] = await Promise.all([
           api.get("/window-types"),
@@ -28,9 +48,15 @@ export function CatalogProvider({ children }) {
           api.get("/glass-colors"),
         ]);
         if (cancelled) return;
-        setWindowTypes(Array.isArray(types.data) ? types.data : []);
-        setPvcColors(Array.isArray(pvc.data) ? pvc.data : []);
-        setGlassColors(Array.isArray(glass.data) ? glass.data : []);
+        const windowTypes = Array.isArray(types.data) ? types.data : [];
+        const pvcColors = Array.isArray(pvc.data) ? pvc.data : [];
+        const glassColors = Array.isArray(glass.data) ? glass.data : [];
+        // Guardar en caché
+        catalogCache.data = { windowTypes, pvcColors, glassColors };
+        catalogCache.timestamp = Date.now();
+        setWindowTypes(windowTypes);
+        setPvcColors(pvcColors);
+        setGlassColors(glassColors);
       } catch (err) {
         if (!cancelled) {
           setCatalogError('No se pudieron cargar los catálogos. Verifica tu conexión.');

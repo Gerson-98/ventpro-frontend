@@ -53,7 +53,9 @@ export default function MyDashboard() {
     const { user } = useAuth();
     const navigate = useNavigate();
 
-    const [quotations, setQuotations] = useState([]);
+    const [summary, setSummary] = useState(null);
+    const [loadingSummary, setLoadingSummary] = useState(true);
+    const [recentQuotations, setRecentQuotations] = useState([]);
     const [orders, setOrders] = useState([]);
     const [loadingQ, setLoadingQ] = useState(true);
     const [loadingO, setLoadingO] = useState(true);
@@ -62,9 +64,16 @@ export default function MyDashboard() {
     const [qStatusFilter, setQStatusFilter] = useState('all');
 
     useEffect(() => {
-        api.get('/quotations')
-            .then(r => setQuotations(r.data))
-            .catch(err => console.error('Error cotizaciones:', err))
+        api.get('/dashboard/summary')
+            .then(r => setSummary(r.data))
+            .catch(err => console.error('Error cargando summary:', err))
+            .finally(() => setLoadingSummary(false));
+    }, []);
+
+    useEffect(() => {
+        api.get('/quotations', { params: { page: 1, limit: 10 } })
+            .then(r => setRecentQuotations(Array.isArray(r.data) ? r.data : []))
+            .catch(() => {})
             .finally(() => setLoadingQ(false));
 
         api.get('/orders')
@@ -74,7 +83,7 @@ export default function MyDashboard() {
     }, []);
 
     const filteredQuotations = useMemo(() => {
-        return quotations
+        return recentQuotations
             .filter(q => qStatusFilter === 'all' || q.status === qStatusFilter)
             .filter(q => {
                 if (!searchQ) return true;
@@ -85,7 +94,7 @@ export default function MyDashboard() {
                     q.quotationNumber?.toLowerCase().includes(s)
                 );
             });
-    }, [quotations, searchQ, qStatusFilter]);
+    }, [recentQuotations, searchQ, qStatusFilter]);
 
     const filteredOrders = useMemo(() => {
         return orders.filter(o => {
@@ -97,18 +106,6 @@ export default function MyDashboard() {
             );
         });
     }, [orders, searchO]);
-
-    const stats = useMemo(() => {
-        const totalVentasCotizaciones = quotations
-            .filter(q => q.status === 'confirmado')
-            .reduce((sum, q) => sum + (q.total_price || 0), 0);
-        return {
-            totalCotizaciones: quotations.length,
-            confirmadas: quotations.filter(q => q.status === 'confirmado').length,
-            pendientes: quotations.filter(q => q.status !== 'confirmado').length,
-            totalVentas: totalVentasCotizaciones,
-        };
-    }, [quotations]);
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -129,25 +126,25 @@ export default function MyDashboard() {
                     <StatCard
                         icon={<FaClipboardList size={17} />}
                         label="Total Cotizaciones"
-                        value={stats.totalCotizaciones}
+                        value={loadingSummary ? '...' : (summary?.quotations.total ?? 0)}
                         color="blue"
                     />
                     <StatCard
                         icon={<FaCheckCircle size={17} />}
                         label="Confirmadas"
-                        value={stats.confirmadas}
+                        value={loadingSummary ? '...' : (summary?.quotations.confirmed ?? 0)}
                         color="emerald"
                     />
                     <StatCard
                         icon={<FaClock size={17} />}
                         label="En Proceso"
-                        value={stats.pendientes}
+                        value={loadingSummary ? '...' : (summary?.quotations.pending ?? 0)}
                         color="amber"
                     />
                     <StatCard
                         icon={<FaCalendarAlt size={17} />}
                         label="Ventas Confirm."
-                        value={`Q ${stats.totalVentas.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+                        value={loadingSummary ? '...' : `Q ${(summary?.totals.sales ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
                         sub="suma de cotizaciones confirmadas"
                         color="indigo"
                     />
@@ -280,10 +277,10 @@ export default function MyDashboard() {
                             </>
                         )}
 
-                        {!loadingQ && filteredQuotations.length > 10 && (
+                        {!loadingQ && (summary?.quotations.total ?? 0) > 10 && (
                             <div className="px-5 py-3 border-t border-gray-100 bg-gray-50/50 text-center">
                                 <button onClick={() => navigate('/quotations')} className="text-xs text-blue-600 hover:underline">
-                                    Ver las {filteredQuotations.length - 10} cotizaciones restantes →
+                                    Ver todas las cotizaciones →
                                 </button>
                             </div>
                         )}

@@ -132,6 +132,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
     const [totalOverride, setTotalOverride] = useState(''); // total editable por el usuario
     const [hasDraft, setHasDraft] = useState(false);
     const [draftRestored, setDraftRestored] = useState(false);
+    const [ivaToggleLocked, setIvaToggleLocked] = useState(false);
 
     // ── Auto-guardado en localStorage ──────────────────────────────────────────
     const DRAFT_KEY = 'quotation_draft';
@@ -662,6 +663,13 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
         return errors;
     };
 
+    const handleIvaToggle = (e) => {
+        if (ivaToggleLocked) return; // Ignora clicks dobles
+        setIvaToggleLocked(true);
+        setQuotation(p => ({ ...p, include_iva: e.target.checked }));
+        setTimeout(() => setIvaToggleLocked(false), 500); // 500ms de bloqueo
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (loading) return;
@@ -943,7 +951,8 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                             type="checkbox"
                                             id="include_iva"
                                             checked={quotation.include_iva}
-                                            onChange={(e) => setQuotation(p => ({ ...p, include_iva: e.target.checked }))}
+                                            onChange={handleIvaToggle}
+                                            disabled={ivaToggleLocked}
                                             className="w-4 h-4 text-blue-600 rounded cursor-pointer"
                                         />
                                         <label htmlFor="include_iva" className="text-sm font-bold text-blue-800 cursor-pointer select-none">

@@ -1,6 +1,6 @@
 // RUTA: src/pages/Orders.jsx
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "@/services/api";
 import { useAuth } from "@/context/AuthContext";
@@ -64,13 +64,32 @@ export default function Orders() {
   const [formData, setFormData] = useState({
     project: '', clientId: '', total: '', status: ORDER_STATUS.EN_PROCESO,
   });
+  const [searchInput, setSearchInput] = useState('');
   const [filters, setFilters] = useState({ status: 'all', month: 'all', search: '' });
 
-  // ── Fetch paginado ────────────────────────────────────────────────────────
+  // ── Debounce: actualiza filters.search 400ms después de que el usuario deja de escribir ──
+  const debounceRef = useRef(null);
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchInput(value);
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setFilters(prev => ({ ...prev, search: value }));
+    }, 400);
+  };
+
+  // ── Fetch paginado — envía filtros al backend ─────────────────────────────
   const fetchOrders = useCallback(async (page = 1) => {
     try {
       setLoading(true);
-      const res = await api.get('/orders', { params: { page, limit: 50 } });
+      const params = { page, limit: 50 };
+      if (filters.search) params.search = filters.search;
+      if (filters.status !== 'all') params.status = filters.status;
+      if (filters.month !== 'all') {
+        const year = new Date().getFullYear();
+        params.month = `${year}-${String(filters.month).padStart(2, '0')}`;
+      }
+      const res = await api.get('/orders', { params });
       const { data, total, totalPages } = res.data;
       setOrders(Array.isArray(data) ? data : []);
       setPagination({ page, total, totalPages });
@@ -80,7 +99,7 @@ export default function Orders() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [filters]);
 
   const fetchClients = async () => {
     try {
@@ -94,8 +113,11 @@ export default function Orders() {
 
   useEffect(() => {
     fetchOrders(1);
-    fetchClients();
   }, [fetchOrders]);
+
+  useEffect(() => {
+    fetchClients();
+  }, []);
 
   const createOrder = async () => {
     if (!formData.project || !formData.clientId) {
@@ -131,21 +153,6 @@ export default function Orders() {
       alert('No se pudo eliminar el pedido.');
     }
   };
-
-  const filteredOrders = useMemo(() => {
-    return orders.filter((order) => {
-      const clientData = order.client || order.clients;
-      const orderDate = new Date(order.createdAt);
-      const matchesStatus = filters.status === 'all' || order.status === filters.status;
-      const matchesMonth = filters.month === 'all' || (orderDate.getMonth() + 1) === parseInt(filters.month);
-      const searchTerm = filters.search.toLowerCase().trim();
-      const matchesSearch = !searchTerm
-        || order.project?.toLowerCase().includes(searchTerm)
-        || clientData?.name?.toLowerCase().includes(searchTerm)
-        || clientData?.phone?.includes(searchTerm);
-      return matchesStatus && matchesMonth && matchesSearch;
-    });
-  }, [orders, filters]);
 
   const metrics = useMemo(() => {
     const active = orders.filter(o => ![ORDER_STATUS.COMPLETADO, ORDER_STATUS.CANCELADO].includes(o.status)).length;
@@ -216,8 +223,8 @@ export default function Orders() {
           <input
             type="text"
             placeholder="Buscar por proyecto o cliente..."
-            value={filters.search}
-            onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+            value={searchInput}
+            onChange={handleSearchChange}
             className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
           />
         </div>
@@ -228,7 +235,7 @@ export default function Orders() {
             className="flex-1 sm:flex-none border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
           >
             <option value="all">Todos los meses</option>
-            {months.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+            {months.map(m => <option key={m.value} value={String(m.value)}>{m.label}</option>)}
           </select>
           <select
             value={filters.status}
@@ -240,13 +247,13 @@ export default function Orders() {
           </select>
         </div>
         <span className="text-xs text-gray-400 font-medium sm:ml-auto">
-          {filteredOrders.length} pedido{filteredOrders.length !== 1 ? 's' : ''}
+          {orders.length} pedido{orders.length !== 1 ? 's' : ''}
         </span>
       </div>
 
       {/* ── Tabla (md+) / Cards (móvil) ── */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        {filteredOrders.length === 0 ? (
+        {orders.length === 0 ? (
           <div className="text-center py-20 text-gray-400">
             <FaBoxOpen size={36} className="mx-auto mb-3 opacity-30" />
             <p className="font-medium">No hay pedidos que coincidan con los filtros.</p>
@@ -268,7 +275,7 @@ export default function Orders() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {filteredOrders.map((order) => {
+                  {orders.map((order) => {
                     const clientData = order.client || order.clients;
                     const style = getStatusStyle(order.status);
                     return (
@@ -325,7 +332,7 @@ export default function Orders() {
 
             {/* ── CARDS — móvil (< md) ── */}
             <div className="md:hidden divide-y divide-gray-100">
-              {filteredOrders.map((order) => {
+              {orders.map((order) => {
                 const clientData = order.client || order.clients;
                 const style = getStatusStyle(order.status);
                 return (
@@ -381,7 +388,7 @@ export default function Orders() {
             {/* Footer con paginación */}
             <div className="px-4 sm:px-5 py-3 border-t border-gray-100 bg-gray-50/50 flex flex-wrap justify-between items-center gap-2">
               <span className="text-xs text-gray-400">
-                {filteredOrders.length} en página · {pagination.total} totales
+                {orders.length} en página · {pagination.total} totales
               </span>
               {/* Controles de paginación */}
               {pagination.totalPages > 1 && (
@@ -406,7 +413,7 @@ export default function Orders() {
                 </div>
               )}
               <span className="text-xs font-semibold text-gray-600">
-                Q {filteredOrders.reduce((s, o) => s + Number(o.total || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                Q {orders.reduce((s, o) => s + Number(o.total || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
               </span>
             </div>
           </>

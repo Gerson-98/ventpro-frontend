@@ -1,4 +1,5 @@
 import axios from "axios";
+import { toast } from 'sonner';
 
 const BASE_URL =
   import.meta.env.VITE_API_URL?.replace(/\/+$/, "") ||
@@ -90,6 +91,20 @@ api.interceptors.response.use(
 
     if (error.code === 'ECONNABORTED' || error.code === 'ERR_NETWORK') {
       error.userMessage = 'El servidor tardó demasiado en responder. Intenta de nuevo.';
+    }
+
+    // Mostrar toast solo para errores que no son 401
+    // (los 401 ya los maneja el refresh silencioso)
+    if (error.response?.status === 403) {
+      toast.error('No tienes permiso para realizar esta acción.');
+    } else if (error.response?.status === 409) {
+      toast.warning(
+        error.response?.data?.message || 'Conflicto al guardar. Intenta de nuevo.'
+      );
+    } else if (error.response?.status >= 500) {
+      toast.error('Error del servidor. Por favor intenta de nuevo.');
+    } else if (error.code === 'ECONNABORTED' || error.code === 'ERR_NETWORK') {
+      toast.error('Sin conexión. Verifica tu red e intenta de nuevo.');
     }
 
     return Promise.reject(error);

@@ -2,10 +2,15 @@
 
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { toast } from 'sonner';
 
 const formatCurrency = (amount) => `Q${Number(amount || 0).toFixed(2)}`;
 
-export function generateMaterialsPDF({ reportData, projectName, orderId, isConsolidated = false, showPrices = true }) {
+export async function generateMaterialsPDF({ reportData, projectName, orderId, isConsolidated = false, showPrices = true }) {
+  const toastId = toast.loading('Generando PDF...');
+  // Cede el hilo para que el toast se renderice antes
+  await new Promise(resolve => setTimeout(resolve, 50));
+  try {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
 
   const pageW = doc.internal.pageSize.getWidth();
@@ -222,4 +227,10 @@ export function generateMaterialsPDF({ reportData, projectName, orderId, isConso
     : `Materiales_Pedido${orderId}_${projectName?.replace(/\s+/g, "_") || ""}`;
 
   doc.save(`${fileName}.pdf`);
+  toast.success('PDF generado correctamente.', { id: toastId });
+  } catch (error) {
+    console.error('❌ Error al generar PDF:', error);
+    toast.error('Error al generar el PDF. Intenta de nuevo.', { id: toastId });
+    throw error;
+  }
 }

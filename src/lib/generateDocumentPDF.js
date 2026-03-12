@@ -2,6 +2,7 @@
 
 import jsPDF from "jspdf";
 import autoTable from 'jspdf-autotable';
+import { toast } from 'sonner';
 
 // --- Cache e imagen loader con compresión via canvas ---
 const imageCache = {};
@@ -57,6 +58,9 @@ const companyDetails = {
  * @param {string} mode - 'quotation' o 'order'
  */
 export const generateDocumentPDF = async (data, mode = 'quotation') => {
+  const toastId = toast.loading('Generando PDF...');
+  // Cede el hilo para que el toast se renderice antes
+  await new Promise(resolve => setTimeout(resolve, 50));
   try {
     // Cargar imágenes comprimidas en paralelo
     const [logoBase64, backgroundImageBase64] = await Promise.all([
@@ -287,8 +291,10 @@ export const generateDocumentPDF = async (data, mode = 'quotation') => {
 
     const fileName = isOrder ? `Pedido_${data.id}_${data.project}` : `Cotizacion_${data.quotationNumber || data.id}_${data.project}`;
     doc.save(`${fileName}.pdf`);
+    toast.success('PDF generado correctamente.', { id: toastId });
   } catch (error) {
     console.error('❌ Error al generar PDF:', error);
+    toast.error('Error al generar el PDF. Intenta de nuevo.', { id: toastId });
     throw error;
   }
 };

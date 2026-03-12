@@ -1,6 +1,6 @@
 // src/pages/Quotations.jsx
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "@/services/api";
 import { FaPlus, FaSearch, FaChevronLeft, FaChevronRight } from "react-icons/fa";
@@ -31,17 +31,30 @@ export default function Quotations() {
     const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
-    const [searchTerm, setSearchTerm] = useState("");
-    const [filters, setFilters] = useState({ quotationStatus: 'all', clientStatus: 'all' });
+    const [searchInput, setSearchInput] = useState("");
+    const [filters, setFilters] = useState({ quotationStatus: 'all', clientStatus: 'all', search: '' });
     const navigate = useNavigate();
 
-    // ── Fetch paginado ────────────────────────────────────────────────────────
-    // El backend devuelve { data, total, page, totalPages }.
-    // Los filtros de status/cliente se aplican sobre la página actual (50 registros).
+    // ── Debounce: actualiza filters.search 400ms después de que el usuario deja de escribir ──
+    const debounceRef = useRef(null);
+    const handleSearchChange = (e) => {
+        const value = e.target.value;
+        setSearchInput(value);
+        clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => {
+            setFilters(prev => ({ ...prev, search: value }));
+        }, 400);
+    };
+
+    // ── Fetch paginado — envía filtros al backend ─────────────────────────────
     const fetchQuotations = useCallback(async (page = 1) => {
         setLoading(true);
         try {
-            const response = await api.get("/quotations", { params: { page, limit: 50 } });
+            const params = { page, limit: 50 };
+            if (filters.search) params.search = filters.search;
+            if (filters.quotationStatus !== 'all') params.status = filters.quotationStatus;
+            if (filters.clientStatus !== 'all') params.clientStatus = filters.clientStatus;
+            const response = await api.get("/quotations", { params });
             const { data, total, totalPages } = response.data;
             setQuotations(data);
             setPagination({ page, total, totalPages });
@@ -50,7 +63,7 @@ export default function Quotations() {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [filters]);
 
     useEffect(() => { fetchQuotations(1); }, [fetchQuotations]);
 
@@ -76,23 +89,7 @@ export default function Quotations() {
         }
     };
 
-    const filteredQuotations = useMemo(() => {
-        return quotations
-            .filter(q => filters.quotationStatus === 'all' || q.status === filters.quotationStatus)
-            .filter(q => filters.clientStatus === 'all' || q.client?.status === filters.clientStatus)
-            .filter(q => {
-                if (!searchTerm) return true;
-                const s = searchTerm.toLowerCase();
-                return (
-                    q.client?.name?.toLowerCase().includes(s) ||
-                    q.project.toLowerCase().includes(s) ||
-                    q.quotationNumber?.toLowerCase().includes(s)
-                );
-            });
-    }, [quotations, searchTerm, filters]);
-
     const totals = useMemo(() => ({
-        // total usa el count real del backend, no solo la página actual
         total: pagination.total,
         confirmadas: quotations.filter(q => q.status === 'confirmado').length,
         enProceso: quotations.filter(q => q.status !== 'confirmado').length,
@@ -129,8 +126,8 @@ export default function Quotations() {
                         <input
                             type="text"
                             placeholder="Buscar por proyecto, cliente o #..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
+                            value={searchInput}
+                            onChange={handleSearchChange}
                             className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none bg-gray-50 focus:bg-white transition-colors"
                         />
                     </div>
@@ -167,7 +164,7 @@ export default function Quotations() {
                             </svg>
                             Cargando...
                         </div>
-                    ) : filteredQuotations.length === 0 ? (
+                    ) : quotations.length === 0 ? (
                         <div className="text-center py-16 text-gray-400">
                             <div className="flex flex-col items-center gap-2">
                                 <FaSearch size={24} className="opacity-30" />
@@ -193,7 +190,7 @@ export default function Quotations() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-50">
-                                        {filteredQuotations.map((quote) => (
+                                        {quotations.map((quote) => (
                                             <tr
                                                 key={quote.id}
                                                 className="hover:bg-blue-50/40 cursor-pointer transition-colors group"
@@ -235,7 +232,7 @@ export default function Quotations() {
 
                             {/* ── CARDS — solo en móvil (< md) ── */}
                             <div className="md:hidden divide-y divide-gray-100">
-                                {filteredQuotations.map((quote) => (
+                                {quotations.map((quote) => (
                                     <div
                                         key={quote.id}
                                         className="p-4 hover:bg-blue-50/30 active:bg-blue-50 cursor-pointer transition-colors"
@@ -280,7 +277,7 @@ export default function Quotations() {
                             {/* Footer con paginación */}
                             <div className="px-4 sm:px-5 py-3 border-t border-gray-100 bg-gray-50/50 flex flex-wrap justify-between items-center gap-2">
                                 <span className="text-xs text-gray-400">
-                                    {filteredQuotations.length} en página · {pagination.total} totales
+                                    {quotations.length} en página · {pagination.total} totales
                                 </span>
                                 {/* Controles de paginación */}
                                 {pagination.totalPages > 1 && (
@@ -305,7 +302,7 @@ export default function Quotations() {
                                     </div>
                                 )}
                                 <span className="text-xs font-semibold text-gray-600">
-                                    Q {filteredQuotations.reduce((s, q) => s + (q.total_price || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                    Q {quotations.reduce((s, q) => s + (q.total_price || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                                 </span>
                             </div>
                         </>

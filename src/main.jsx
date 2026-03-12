@@ -21,6 +21,7 @@ import GananciasPage from './pages/GananciasPage';
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./context/AuthContext";
 import AdminRoute from "./components/AdminRoute";
+import { Toaster } from 'sonner';
 import MaterialesConsolidado from './pages/MaterialesConsolidado';
 
 const router = createBrowserRouter([
@@ -70,6 +71,15 @@ const router = createBrowserRouter([
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <AuthProvider>
+      <Toaster
+        position="top-right"
+        richColors
+        closeButton
+        duration={4000}
+        toastOptions={{
+          style: { fontFamily: 'system-ui, sans-serif' },
+        }}
+      />
       <RouterProvider router={router} />
     </AuthProvider>
   </React.StrictMode>
