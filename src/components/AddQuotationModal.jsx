@@ -562,6 +562,12 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                 // Checkbox desactivado: eliminar la key
                 const { [optionName]: _removed, ...rest } = win.options || {};
                 newOptions = rest;
+                // ── Regla de dependencia: sin mosquitero → sin refuerzo de mosquitero ──
+                // No tiene sentido tener refuerzo de mosquitero si no hay mosquitero
+                if (optionName === 'mosquitero') {
+                    const { refuerzo_mosquitero: _rm, ...rest2 } = newOptions;
+                    newOptions = rest2;
+                }
             } else {
                 newOptions = { ...win.options, [optionName]: optionValue };
             }
@@ -576,7 +582,6 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             return newWindow;
         });
         setQuotation(prev => ({ ...prev, windows: updatedWindows }));
-        // Las opciones son selects — cambio inmediato, sin debounce
         calculateWindowCost(updatedWindows[index]);
     };
 
