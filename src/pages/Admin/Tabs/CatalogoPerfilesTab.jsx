@@ -63,8 +63,9 @@ const catalogToForm = (catalogo, windowTypeId) => {
     const form = {
         window_type_id: windowTypeId,
         cant_vidrios: catalogo?.cant_vidrios ?? 0,
-        refuerzo_hoja_id: catalogo?.refuerzo_hoja_id ?? "",
-        refuerzo_mosquitero_id: catalogo?.refuerzo_mosquitero_id ?? "",
+        // ✅ FIX: leer ID desde campo directo o desde objeto anidado (refuerzoHoja.id)
+        refuerzo_hoja_id: catalogo?.refuerzo_hoja_id ?? catalogo?.refuerzoHoja?.id ?? "",
+        refuerzo_mosquitero_id: catalogo?.refuerzo_mosquitero_id ?? catalogo?.refuerzoMosquitero?.id ?? "",
     };
     SLOTS.forEach(({ key, reglaKey }) => {
         form[key] = catalogo?.[key] ?? "";
@@ -442,7 +443,8 @@ export default function CatalogoPerfilesTab() {
     };
     const tieneRefuerzo = (wid) => {
         const cat = catalogos[wid];
-        return cat?.refuerzo_hoja_id || cat?.refuerzo_mosquitero_id;
+        return (cat?.refuerzo_hoja_id ?? cat?.refuerzoHoja?.id) ||
+            (cat?.refuerzo_mosquitero_id ?? cat?.refuerzoMosquitero?.id);
     };
 
     // ── Render ───────────────────────────────────────────────────────────────
@@ -517,11 +519,17 @@ export default function CatalogoPerfilesTab() {
                                             <td className="py-2.5 px-4 text-gray-500 text-xs">{cat ? getPerfilName(cat.perfil_hoja_id) : "—"}</td>
                                             <td className="py-2.5 px-4 text-gray-500 text-xs">{cat ? getPerfilName(cat.perfil_mosquitero_id) : "—"}</td>
                                             <td className="py-2.5 px-4 text-xs">
-                                                {cat?.refuerzo_hoja_id || cat?.refuerzo_mosquitero_id ? (
-                                                    <span className="text-purple-600 font-medium">
-                                                        {[cat.refuerzo_hoja_id && getPerfilName(cat.refuerzo_hoja_id), cat.refuerzo_mosquitero_id && getPerfilName(cat.refuerzo_mosquitero_id)].filter(Boolean).join(", ")}
-                                                    </span>
-                                                ) : "—"}
+                                                {(() => {
+                                                    const refHojaId = cat?.refuerzo_hoja_id ?? cat?.refuerzoHoja?.id;
+                                                    const refMosqId = cat?.refuerzo_mosquitero_id ?? cat?.refuerzoMosquitero?.id;
+                                                    const nombres = [
+                                                        refHojaId ? getPerfilName(refHojaId) : null,
+                                                        refMosqId ? getPerfilName(refMosqId) : null,
+                                                    ].filter(Boolean);
+                                                    return nombres.length > 0
+                                                        ? <span className="text-purple-600 font-medium">{nombres.join(", ")}</span>
+                                                        : "—";
+                                                })()}
                                             </td>
                                             <td className="py-2.5 px-4 text-center text-gray-500">{cat?.cant_vidrios ?? "—"}</td>
                                             <td className="py-2.5 px-4 text-center">
