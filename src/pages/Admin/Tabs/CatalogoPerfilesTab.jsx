@@ -14,6 +14,12 @@ const SLOTS = [
     { key: "perfil_tapajamba_id", reglaKey: "regla_tapajamba", label: "Tapajamba", usaHoja: false },
 ];
 
+// Slots de refuerzo — solo selector de material, sin fórmula (heredan la de hoja/mosquitero)
+const REFUERZO_SLOTS = [
+    { key: "refuerzo_hoja_id", label: "Refuerzo Hoja", hint: "Mismo corte que Hoja — ej: REFUERZO HOJA 5,5 CM" },
+    { key: "refuerzo_mosquitero_id", label: "Refuerzo Mosquitero", hint: "Mismo corte que Mosquitero — ej: REFUERZO CEDAZO" },
+];
+
 const FORMULAS = [
     { value: "SUMAR ANCHO Y ALTO", label: "Ancho + Alto  ×  N" },
     { value: "SUMAR ANCHO Y MULTIPLICAR ALTO", label: "Ancho + (Alto × N)" },
@@ -45,7 +51,7 @@ const parseRegla = (regla) => {
 };
 
 const buildEmptyForm = (windowTypeId) => {
-    const form = { window_type_id: windowTypeId, cant_vidrios: 0 };
+    const form = { window_type_id: windowTypeId, cant_vidrios: 0, refuerzo_hoja_id: "", refuerzo_mosquitero_id: "" };
     SLOTS.forEach(({ key, reglaKey }) => {
         form[key] = "";
         form[reglaKey] = { formula: FORMULAS[0].value, mult: 2 };
@@ -54,7 +60,12 @@ const buildEmptyForm = (windowTypeId) => {
 };
 
 const catalogToForm = (catalogo, windowTypeId) => {
-    const form = { window_type_id: windowTypeId, cant_vidrios: catalogo?.cant_vidrios ?? 0 };
+    const form = {
+        window_type_id: windowTypeId,
+        cant_vidrios: catalogo?.cant_vidrios ?? 0,
+        refuerzo_hoja_id: catalogo?.refuerzo_hoja_id ?? "",
+        refuerzo_mosquitero_id: catalogo?.refuerzo_mosquitero_id ?? "",
+    };
     SLOTS.forEach(({ key, reglaKey }) => {
         form[key] = catalogo?.[key] ?? "";
         form[reglaKey] = parseRegla(catalogo?.[reglaKey] ?? "");
@@ -74,27 +85,22 @@ const rowsToRuleOverrides = (rows) => {
     if (!rows || rows.length === 0) return null;
     const result = {};
     rows.forEach(({ optionKey, fields }) => {
-        if (optionKey.trim()) {
-            result[optionKey.trim()] = { ...fields };
-        }
+        if (optionKey.trim()) result[optionKey.trim()] = { ...fields };
     });
     return Object.keys(result).length > 0 ? result : null;
 };
 
-// ─── PerfilSlotRow — stack vertical en móvil, grid en sm+ ────────────────────
+// ─── PerfilSlotRow ────────────────────────────────────────────────────────────
 function PerfilSlotRow({ slot, formData, perfiles, onChange }) {
     const { key, reglaKey, label, usaHoja } = slot;
     const regla = formData[reglaKey] || { formula: FORMULAS[0].value, mult: 2 };
 
     return (
         <div className="py-3 border-b border-gray-100 last:border-0 space-y-2 sm:space-y-0 sm:grid sm:grid-cols-12 sm:gap-2 sm:items-center">
-            {/* Etiqueta */}
             <div className="sm:col-span-2 flex items-center gap-2">
                 <span className={`w-2 h-2 rounded-full flex-shrink-0 ${usaHoja ? "bg-blue-400" : "bg-gray-400"}`} />
                 <span className="text-sm font-medium text-gray-700">{label}</span>
             </div>
-
-            {/* Material + Fórmula + Mult — en móvil stacked, en sm grid */}
             <div className="sm:col-span-4">
                 <select
                     value={formData[key] ?? ""}
@@ -107,7 +113,6 @@ function PerfilSlotRow({ slot, formData, perfiles, onChange }) {
                     ))}
                 </select>
             </div>
-
             <div className="sm:col-span-4 flex gap-2">
                 <select
                     value={regla.formula}
@@ -119,8 +124,6 @@ function PerfilSlotRow({ slot, formData, perfiles, onChange }) {
                         <option key={f.value} value={f.value}>{f.label}</option>
                     ))}
                 </select>
-
-                {/* Mult — inline en sm */}
                 <div className="flex items-center gap-1 sm:hidden">
                     <span className="text-gray-400 text-sm">×</span>
                     <input
@@ -132,7 +135,6 @@ function PerfilSlotRow({ slot, formData, perfiles, onChange }) {
                     />
                 </div>
             </div>
-
             <div className="hidden sm:block sm:col-span-2">
                 <div className="flex items-center gap-1">
                     <span className="text-gray-400 text-sm">×</span>
@@ -167,7 +169,6 @@ function OverrideRow({ row, index, perfiles, optionValues, onChange, onRemove })
         if (fieldKey in fields) return;
         const fieldDef = OVERRIDE_FIELDS.find(f => f.key === fieldKey);
         let defaultVal = "";
-        if (fieldDef?.type === "perfil") defaultVal = "";
         if (fieldDef?.type === "regla") defaultVal = "SUMAR ANCHO Y ALTO *2";
         if (fieldDef?.type === "number") defaultVal = 1;
         onChange(index, { ...row, fields: { ...fields, [fieldKey]: defaultVal } });
@@ -177,7 +178,6 @@ function OverrideRow({ row, index, perfiles, optionValues, onChange, onRemove })
 
     return (
         <div className="border border-orange-200 rounded-lg bg-orange-50 p-3 space-y-2">
-            {/* Header: key */}
             <div className="flex items-center gap-2">
                 <div className="flex-1">
                     <label className="text-xs font-semibold text-orange-700 uppercase tracking-wide block mb-1">
@@ -213,7 +213,6 @@ function OverrideRow({ row, index, perfiles, optionValues, onChange, onRemove })
                 </button>
             </div>
 
-            {/* Campos del override */}
             {Object.entries(fields).map(([fieldKey, fieldVal]) => {
                 const fieldDef = OVERRIDE_FIELDS.find(f => f.key === fieldKey);
                 if (!fieldDef) return null;
@@ -222,7 +221,6 @@ function OverrideRow({ row, index, perfiles, optionValues, onChange, onRemove })
                         <span className="text-xs text-orange-600 font-medium w-28 sm:w-32 flex-shrink-0 truncate">
                             {fieldDef.label}:
                         </span>
-
                         {fieldDef.type === "perfil" && (
                             <select
                                 value={fieldVal ?? ""}
@@ -235,7 +233,6 @@ function OverrideRow({ row, index, perfiles, optionValues, onChange, onRemove })
                                 ))}
                             </select>
                         )}
-
                         {fieldDef.type === "regla" && (() => {
                             const parsed = parseRegla(fieldVal);
                             return (
@@ -259,7 +256,6 @@ function OverrideRow({ row, index, perfiles, optionValues, onChange, onRemove })
                                 </div>
                             );
                         })()}
-
                         {fieldDef.type === "number" && (
                             <input
                                 type="number" min="0" max="10"
@@ -268,7 +264,6 @@ function OverrideRow({ row, index, perfiles, optionValues, onChange, onRemove })
                                 className="w-20 border border-gray-200 rounded p-1 text-xs text-center font-mono focus:ring-1 focus:ring-orange-400 focus:outline-none"
                             />
                         )}
-
                         <button
                             onClick={() => removeField(fieldKey)}
                             className="text-gray-300 hover:text-red-400 transition flex-shrink-0"
@@ -331,7 +326,7 @@ export default function CatalogoPerfilesTab() {
             setPerfilesMaterials(Array.isArray(materialsRes.data) ? materialsRes.data : []);
 
             const map = {};
-            (Array.isArray(catalogosRes.data) ? catalogosRes.data : []).forEach((c) => {
+            (Array.isArray(catalogosRes.data) ? catalogosRes.data : []).forEach(c => {
                 map[c.window_type_id] = c;
             });
             setCatalogos(map);
@@ -339,7 +334,7 @@ export default function CatalogoPerfilesTab() {
             try {
                 const optRes = await api.get("/window-type-options");
                 const optMap = {};
-                (Array.isArray(optRes.data) ? optRes.data : []).forEach((wto) => {
+                (Array.isArray(optRes.data) ? optRes.data : []).forEach(wto => {
                     if (!optMap[wto.window_type_id]) optMap[wto.window_type_id] = [];
                     if (wto.group?.values) {
                         wto.group.values.forEach(v => {
@@ -351,7 +346,6 @@ export default function CatalogoPerfilesTab() {
             } catch {
                 setOptionValuesByType({});
             }
-
         } catch (err) {
             console.error("Error cargando datos:", err);
             setError("No se pudieron cargar los datos. Verifica que el servidor esté activo.");
@@ -382,10 +376,9 @@ export default function CatalogoPerfilesTab() {
     };
 
     const handleChange = (field, value) => {
-        setFormData((prev) => ({ ...prev, [field]: value }));
+        setFormData(prev => ({ ...prev, [field]: value }));
     };
 
-    // ── Handlers de overrides ────────────────────────────────────────────────
     const addOverrideRow = () => {
         setOverrideRows(prev => [...prev, { optionKey: "", fields: {} }]);
         setShowOverrides(true);
@@ -407,17 +400,16 @@ export default function CatalogoPerfilesTab() {
         const payload = {
             window_type_id: formData.window_type_id,
             cant_vidrios: Number(formData.cant_vidrios) || 0,
+            // ── Refuerzos ──────────────────────────────────────────────────
+            refuerzo_hoja_id: formData.refuerzo_hoja_id !== "" && formData.refuerzo_hoja_id != null ? Number(formData.refuerzo_hoja_id) : null,
+            refuerzo_mosquitero_id: formData.refuerzo_mosquitero_id !== "" && formData.refuerzo_mosquitero_id != null ? Number(formData.refuerzo_mosquitero_id) : null,
         };
 
         SLOTS.forEach(({ key, reglaKey }) => {
             const matId = formData[key];
             payload[key] = matId !== "" && matId != null ? Number(matId) : null;
             const regla = formData[reglaKey];
-            if (matId && regla?.formula) {
-                payload[reglaKey] = buildRegla(regla.formula, regla.mult);
-            } else {
-                payload[reglaKey] = null;
-            }
+            payload[reglaKey] = matId && regla?.formula ? buildRegla(regla.formula, regla.mult) : null;
         });
 
         payload.ruleOverrides = rowsToRuleOverrides(overrideRows);
@@ -440,35 +432,35 @@ export default function CatalogoPerfilesTab() {
         }
     };
 
-    // ── Helpers UI ───────────────────────────────────────────────────────────
     const getPerfilName = (id) =>
-        perfilesMaterials.find((p) => p.id === id)?.name ?? "—";
+        perfilesMaterials.find(p => p.id === id)?.name ?? "—";
 
-    const tieneConfig = (windowTypeId) => !!catalogos[windowTypeId];
-
-    const tieneOverrides = (windowTypeId) => {
-        const cat = catalogos[windowTypeId];
+    const tieneConfig = (wid) => !!catalogos[wid];
+    const tieneOverrides = (wid) => {
+        const cat = catalogos[wid];
         return cat?.ruleOverrides && Object.keys(cat.ruleOverrides).length > 0;
+    };
+    const tieneRefuerzo = (wid) => {
+        const cat = catalogos[wid];
+        return cat?.refuerzo_hoja_id || cat?.refuerzo_mosquitero_id;
     };
 
     // ── Render ───────────────────────────────────────────────────────────────
     return (
         <div className="bg-white p-4 sm:p-6 rounded-lg shadow-md">
 
-            {/* Header */}
             <div className="mb-4 sm:mb-6">
                 <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">Catálogo de Perfiles</h2>
                 <p className="text-gray-500 text-xs sm:text-sm mt-0.5">
-                    Configura qué perfiles usa cada tipo de ventana, sus fórmulas de cálculo y los
-                    overrides por opción.
+                    Configura qué perfiles usa cada tipo de ventana, sus fórmulas de cálculo, overrides y refuerzos de metal.
                 </p>
             </div>
 
-            {/* Leyenda */}
             <div className="flex flex-wrap gap-x-4 gap-y-1 mb-4 text-xs text-gray-500">
                 <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-400 inline-block" />Usa medidas de hoja</span>
                 <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-gray-400 inline-block" />Usa medidas originales</span>
                 <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-orange-400 inline-block" />Tiene overrides</span>
+                <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-purple-400 inline-block" />Tiene refuerzo configurado</span>
             </div>
 
             {error && (
@@ -487,7 +479,7 @@ export default function CatalogoPerfilesTab() {
                 </div>
             ) : (
                 <>
-                    {/* ── Tabla desktop (md+) ── */}
+                    {/* Tabla desktop */}
                     <div className="hidden md:block overflow-x-auto rounded-lg border border-gray-200">
                         <table className="min-w-full text-sm">
                             <thead className="bg-gray-50 text-gray-600 text-xs uppercase tracking-wide">
@@ -496,31 +488,41 @@ export default function CatalogoPerfilesTab() {
                                     <th className="py-3 px-4 text-left">Marco</th>
                                     <th className="py-3 px-4 text-left">Hoja</th>
                                     <th className="py-3 px-4 text-left">Mosquitero</th>
+                                    <th className="py-3 px-4 text-left">Refuerzo</th>
                                     <th className="py-3 px-4 text-center">Vidrios</th>
                                     <th className="py-3 px-4 text-center">Estado</th>
                                     <th className="py-3 px-4 text-center">Acción</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {windowTypes.map((wt) => {
+                                {windowTypes.map(wt => {
                                     const cat = catalogos[wt.id];
                                     const configurado = tieneConfig(wt.id);
                                     const conOverrides = tieneOverrides(wt.id);
+                                    const conRefuerzo = tieneRefuerzo(wt.id);
                                     return (
                                         <tr key={wt.id} className="hover:bg-gray-50 transition-colors">
                                             <td className="py-2.5 px-4">
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex items-center gap-2 flex-wrap">
                                                     <span className="font-medium text-gray-900">{wt.name}</span>
                                                     {conOverrides && (
-                                                        <span className="inline-flex items-center px-1.5 py-0.5 text-xs rounded-full bg-orange-100 text-orange-600 font-medium">
-                                                            overrides
-                                                        </span>
+                                                        <span className="inline-flex items-center px-1.5 py-0.5 text-xs rounded-full bg-orange-100 text-orange-600 font-medium">overrides</span>
+                                                    )}
+                                                    {conRefuerzo && (
+                                                        <span className="inline-flex items-center px-1.5 py-0.5 text-xs rounded-full bg-purple-100 text-purple-600 font-medium">refuerzo</span>
                                                     )}
                                                 </div>
                                             </td>
                                             <td className="py-2.5 px-4 text-gray-500 text-xs">{cat ? getPerfilName(cat.perfil_marco_id) : "—"}</td>
                                             <td className="py-2.5 px-4 text-gray-500 text-xs">{cat ? getPerfilName(cat.perfil_hoja_id) : "—"}</td>
                                             <td className="py-2.5 px-4 text-gray-500 text-xs">{cat ? getPerfilName(cat.perfil_mosquitero_id) : "—"}</td>
+                                            <td className="py-2.5 px-4 text-xs">
+                                                {cat?.refuerzo_hoja_id || cat?.refuerzo_mosquitero_id ? (
+                                                    <span className="text-purple-600 font-medium">
+                                                        {[cat.refuerzo_hoja_id && getPerfilName(cat.refuerzo_hoja_id), cat.refuerzo_mosquitero_id && getPerfilName(cat.refuerzo_mosquitero_id)].filter(Boolean).join(", ")}
+                                                    </span>
+                                                ) : "—"}
+                                            </td>
                                             <td className="py-2.5 px-4 text-center text-gray-500">{cat?.cant_vidrios ?? "—"}</td>
                                             <td className="py-2.5 px-4 text-center">
                                                 {configurado ? (
@@ -545,24 +547,21 @@ export default function CatalogoPerfilesTab() {
                         </table>
                     </div>
 
-                    {/* ── Cards móvil (< md) ── */}
+                    {/* Cards móvil */}
                     <div className="md:hidden border border-gray-200 rounded-lg overflow-hidden divide-y divide-gray-100">
-                        {windowTypes.map((wt) => {
+                        {windowTypes.map(wt => {
                             const cat = catalogos[wt.id];
                             const configurado = tieneConfig(wt.id);
                             const conOverrides = tieneOverrides(wt.id);
+                            const conRefuerzo = tieneRefuerzo(wt.id);
                             return (
                                 <div key={wt.id} className="p-3">
-                                    {/* Fila 1: nombre + botón */}
                                     <div className="flex items-start justify-between gap-2 mb-2">
                                         <div className="min-w-0">
                                             <div className="flex items-center gap-2 flex-wrap">
                                                 <p className="font-medium text-sm text-gray-900">{wt.name}</p>
-                                                {conOverrides && (
-                                                    <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] rounded-full bg-orange-100 text-orange-600 font-medium">
-                                                        overrides
-                                                    </span>
-                                                )}
+                                                {conOverrides && <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] rounded-full bg-orange-100 text-orange-600 font-medium">overrides</span>}
+                                                {conRefuerzo && <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] rounded-full bg-purple-100 text-purple-600 font-medium">refuerzo</span>}
                                             </div>
                                             <div className="mt-1">
                                                 {configurado ? (
@@ -580,25 +579,12 @@ export default function CatalogoPerfilesTab() {
                                             {configurado ? "Editar" : "Configurar"}
                                         </button>
                                     </div>
-                                    {/* Datos en grid 2 col */}
                                     {cat && (
                                         <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs mt-2">
-                                            <div>
-                                                <span className="text-gray-400">Marco: </span>
-                                                <span className="text-gray-700">{getPerfilName(cat.perfil_marco_id)}</span>
-                                            </div>
-                                            <div>
-                                                <span className="text-gray-400">Hoja: </span>
-                                                <span className="text-gray-700">{getPerfilName(cat.perfil_hoja_id)}</span>
-                                            </div>
-                                            <div>
-                                                <span className="text-gray-400">Mosquitero: </span>
-                                                <span className="text-gray-700">{getPerfilName(cat.perfil_mosquitero_id)}</span>
-                                            </div>
-                                            <div>
-                                                <span className="text-gray-400">Vidrios: </span>
-                                                <span className="font-mono text-gray-700">{cat.cant_vidrios ?? "—"}</span>
-                                            </div>
+                                            <div><span className="text-gray-400">Marco: </span><span className="text-gray-700">{getPerfilName(cat.perfil_marco_id)}</span></div>
+                                            <div><span className="text-gray-400">Hoja: </span><span className="text-gray-700">{getPerfilName(cat.perfil_hoja_id)}</span></div>
+                                            <div><span className="text-gray-400">Mosquitero: </span><span className="text-gray-700">{getPerfilName(cat.perfil_mosquitero_id)}</span></div>
+                                            <div><span className="text-gray-400">Vidrios: </span><span className="font-mono text-gray-700">{cat.cant_vidrios ?? "—"}</span></div>
                                         </div>
                                     )}
                                 </div>
@@ -614,15 +600,13 @@ export default function CatalogoPerfilesTab() {
                 </>
             )}
 
-            {/* ── MODAL — bottom sheet móvil / centrado sm+ ── */}
+            {/* ── MODAL ── */}
             {showModal && editingType && (
                 <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm">
                     <div className="bg-white w-full flex flex-col rounded-t-2xl sm:rounded-xl h-[95dvh] sm:h-auto sm:max-h-[90vh] sm:max-w-2xl overflow-hidden shadow-2xl">
 
-                        {/* Drag handle móvil */}
                         <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mt-3 sm:hidden" />
 
-                        {/* Header */}
                         <div className="flex justify-between items-start px-5 pt-4 pb-3 sm:p-6 sm:pb-4 border-b border-gray-100 flex-shrink-0">
                             <div>
                                 <h3 className="text-base sm:text-lg font-semibold text-gray-800">
@@ -630,15 +614,11 @@ export default function CatalogoPerfilesTab() {
                                 </h3>
                                 <p className="text-sm text-blue-600 font-medium mt-0.5">{editingType.name}</p>
                             </div>
-                            <button
-                                onClick={closeModal}
-                                className="text-gray-400 hover:text-gray-600 transition w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100"
-                            >
+                            <button onClick={closeModal} className="text-gray-400 hover:text-gray-600 transition w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100">
                                 <FaTimes />
                             </button>
                         </div>
 
-                        {/* Body scrollable */}
                         <div className="overflow-y-auto flex-1 px-5 py-4 sm:p-6 space-y-6">
 
                             {/* Sección 1: Perfiles base */}
@@ -649,7 +629,6 @@ export default function CatalogoPerfilesTab() {
                                     <span className="text-xs text-gray-400 font-normal">— Sin override activo</span>
                                 </h4>
 
-                                {/* Encabezados de columna — solo sm+ */}
                                 <div className="hidden sm:grid grid-cols-12 gap-2 mb-1 text-xs font-semibold text-gray-400 uppercase tracking-wide">
                                     <div className="col-span-2">Perfil</div>
                                     <div className="col-span-4">Material</div>
@@ -658,7 +637,7 @@ export default function CatalogoPerfilesTab() {
                                 </div>
 
                                 <div className="mb-4">
-                                    {SLOTS.map((slot) => (
+                                    {SLOTS.map(slot => (
                                         <PerfilSlotRow
                                             key={slot.key}
                                             slot={slot}
@@ -688,12 +667,50 @@ export default function CatalogoPerfilesTab() {
                                 </div>
                             </div>
 
-                            {/* Sección 2: Overrides */}
+                            {/* ── Sección 2: Refuerzos de metal (NUEVO) ── */}
+                            <div>
+                                <h4 className="text-sm font-semibold text-gray-700 mb-1 flex items-center gap-2">
+                                    <span className="w-5 h-5 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center text-xs font-bold flex-shrink-0">2</span>
+                                    Refuerzos de Metal
+                                </h4>
+                                <p className="text-xs text-gray-400 mb-3 ml-7">
+                                    Si el vendedor activa "Refuerzo Hojas" o "Refuerzo Mosquitero" en el cotizador,
+                                    se añade la misma cantidad de barras del material seleccionado aquí.
+                                </p>
+
+                                <div className="space-y-3">
+                                    {REFUERZO_SLOTS.map(slot => (
+                                        <div key={slot.key} className="p-3 bg-purple-50 rounded-lg border border-purple-100">
+                                            <div className="flex items-start gap-3">
+                                                <div className="flex-1">
+                                                    <label className="block text-xs font-semibold text-purple-700 mb-1">{slot.label}</label>
+                                                    <select
+                                                        value={formData[slot.key] ?? ""}
+                                                        onChange={(e) => handleChange(slot.key, e.target.value)}
+                                                        className="w-full border border-purple-200 rounded-md p-1.5 text-sm focus:ring-2 focus:ring-purple-400 focus:outline-none bg-white"
+                                                    >
+                                                        <option value="">— Sin refuerzo —</option>
+                                                        {perfilesMaterials
+                                                            .filter(p => p.name.toUpperCase().includes('REFUERZO'))
+                                                            .map(p => (
+                                                                <option key={p.id} value={p.id}>{p.name}</option>
+                                                            ))
+                                                        }
+                                                    </select>
+                                                    <p className="text-xs text-purple-500 mt-1">{slot.hint}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Sección 3: Overrides */}
                             <div>
                                 <div className="flex items-start justify-between gap-2 mb-3">
                                     <div className="flex-1 min-w-0">
                                         <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2 flex-wrap">
-                                            <span className="w-5 h-5 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-xs font-bold flex-shrink-0">2</span>
+                                            <span className="w-5 h-5 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-xs font-bold flex-shrink-0">3</span>
                                             Overrides por opción
                                             {overrideRows.length > 0 && (
                                                 <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-medium">
@@ -727,9 +744,6 @@ export default function CatalogoPerfilesTab() {
                                 {overrideRows.length === 0 ? (
                                     <div className="text-center py-6 bg-gray-50 rounded-lg border border-dashed border-gray-200">
                                         <p className="text-sm text-gray-400">Sin overrides configurados</p>
-                                        <p className="text-xs text-gray-400 mt-1">
-                                            Usa esto para cambiar el perfil según si el usuario elige "adentro" o "afuera".
-                                        </p>
                                     </div>
                                 ) : showOverrides ? (
                                     <div className="space-y-3">
@@ -773,9 +787,7 @@ export default function CatalogoPerfilesTab() {
                                     {SLOTS.map(({ key, reglaKey, label }) => {
                                         const matId = formData[key];
                                         const regla = formData[reglaKey];
-                                        const texto = matId && regla?.formula
-                                            ? buildRegla(regla.formula, regla.mult)
-                                            : null;
+                                        const texto = matId && regla?.formula ? buildRegla(regla.formula, regla.mult) : null;
                                         return (
                                             <div key={key} className="flex items-center gap-2 text-xs flex-wrap">
                                                 <span className="text-blue-500 w-20 sm:w-24 font-medium flex-shrink-0">{label}:</span>
@@ -796,13 +808,8 @@ export default function CatalogoPerfilesTab() {
                             )}
                         </div>
 
-                        {/* Footer */}
                         <div className="flex justify-end gap-3 px-5 py-4 sm:p-6 sm:pt-4 border-t border-gray-100 flex-shrink-0">
-                            <button
-                                type="button"
-                                onClick={closeModal}
-                                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
-                            >
+                            <button type="button" onClick={closeModal} className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition">
                                 Cancelar
                             </button>
                             <button
