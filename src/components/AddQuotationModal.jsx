@@ -17,16 +17,31 @@ import {
 
 // ─── Checkboxes: grupos que se renderizan como checkbox, NO como select ───────
 const CHECKBOX_GROUPS = new Set(['mosquitero', 'refuerzo_hojas', 'refuerzo_mosquitero']);
-const CHECKBOX_DEFAULTS = {
-    mosquitero: 'con_mosquitero',
-    refuerzo_hojas: null,
-    refuerzo_mosquitero: null,
-};
+
+// Valor guardado cuando el checkbox está ACTIVO
 const CHECKBOX_ACTIVE_VALUE = {
     mosquitero: 'con_mosquitero',
     refuerzo_hojas: 'con_refuerzo',
     refuerzo_mosquitero: 'con_refuerzo',
 };
+
+// Valor guardado cuando el checkbox está INACTIVO
+// Para mosquitero: valor explícito 'sin_mosquitero' — nunca eliminar la key —
+// así el backend siempre sabe el estado real sin ambigüedad.
+// Para refuerzos: null = eliminar la key (OFF es ausencia de valor)
+const CHECKBOX_INACTIVE_VALUE = {
+    mosquitero: 'sin_mosquitero',
+    refuerzo_hojas: null,
+    refuerzo_mosquitero: null,
+};
+
+// Default al asignar el grupo por primera vez
+const CHECKBOX_DEFAULTS = {
+    mosquitero: 'con_mosquitero', // ON por defecto
+    refuerzo_hojas: null,             // OFF por defecto
+    refuerzo_mosquitero: null,             // OFF por defecto
+};
+
 const applyCheckboxDefaults = (currentOptions, optionGroups) => {
     const newOptions = { ...currentOptions };
     optionGroups.forEach(wto => {
@@ -557,20 +572,28 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
     const handleOptionChange = (index, optionName, optionValue) => {
         const updatedWindows = quotation.windows.map((win, i) => {
             if (i !== index) return win;
-            let newOptions;
+            let newOptions = { ...win.options };
+
             if (optionValue === null) {
-                // Checkbox desactivado: eliminar la key
-                const { [optionName]: _removed, ...rest } = win.options || {};
-                newOptions = rest;
-                // ── Regla de dependencia: sin mosquitero → sin refuerzo de mosquitero ──
-                // No tiene sentido tener refuerzo de mosquitero si no hay mosquitero
+                // Checkbox desactivado
+                const inactiveVal = CHECKBOX_INACTIVE_VALUE[optionName];
+                if (inactiveVal !== null && inactiveVal !== undefined) {
+                    // Guardar valor explícito (ej: 'sin_mosquitero')
+                    newOptions[optionName] = inactiveVal;
+                } else {
+                    // Eliminar la key (refuerzos OFF = ausencia)
+                    const { [optionName]: _removed, ...rest } = newOptions;
+                    newOptions = rest;
+                }
+                // ── Regla de dependencia: sin mosquitero → sin refuerzo mosquitero ──
                 if (optionName === 'mosquitero') {
-                    const { refuerzo_mosquitero: _rm, ...rest2 } = newOptions;
-                    newOptions = rest2;
+                    const { refuerzo_mosquitero: _rm, ...rest } = newOptions;
+                    newOptions = rest;
                 }
             } else {
-                newOptions = { ...win.options, [optionName]: optionValue };
+                newOptions[optionName] = optionValue;
             }
+
             const newWindow = { ...win, options: newOptions };
             if (optionName === 'diseno' && optionValue === 'lisa') {
                 newWindow.design_image_url = null;
@@ -1215,15 +1238,23 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                                                                 const groupKey = wto.group.key;
                                                                                 const activeValue = CHECKBOX_ACTIVE_VALUE[groupKey];
                                                                                 const isChecked = win.options?.[groupKey] === activeValue;
+                                                                                // refuerzo_mosquitero solo disponible si mosquitero está ON
+                                                                                const isDisabled = groupKey === 'refuerzo_mosquitero' &&
+                                                                                    win.options?.['mosquitero'] !== 'con_mosquitero';
                                                                                 return (
-                                                                                    <label key={groupKey} className="flex items-center gap-1.5 cursor-pointer select-none">
+                                                                                    <label
+                                                                                        key={groupKey}
+                                                                                        className={`flex items-center gap-1.5 select-none ${isDisabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
+                                                                                        title={isDisabled ? 'Activa el mosquitero primero' : ''}
+                                                                                    >
                                                                                         <input
                                                                                             type="checkbox"
                                                                                             checked={isChecked}
+                                                                                            disabled={isDisabled}
                                                                                             onChange={(e) => handleOptionChange(index, groupKey, e.target.checked ? activeValue : null)}
-                                                                                            className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                                                                            className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer disabled:cursor-not-allowed"
                                                                                         />
-                                                                                        <span className={`text-xs font-medium ${isChecked ? 'text-blue-700' : 'text-gray-400'}`}>
+                                                                                        <span className={`text-xs font-medium ${isDisabled ? 'text-gray-300' : isChecked ? 'text-blue-700' : 'text-gray-400'}`}>
                                                                                             {wto.group.label}
                                                                                         </span>
                                                                                     </label>
