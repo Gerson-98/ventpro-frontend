@@ -1,9 +1,8 @@
 // RUTA: src/components/AddQuotationModal.jsx
 
-import { useState, useEffect, useCallback, useRef, Fragment } from 'react';
+import { useState, useEffect, useCallback, Fragment } from 'react';
 import api from '@/services/api';
-import { useAuth } from '@/context/AuthContext';
-import { FaPlus, FaTrashAlt, FaClone, FaUpload, FaCamera } from 'react-icons/fa';
+import { FaPlus, FaTrashAlt, FaClone, FaUpload, FaCheckCircle, FaCamera } from 'react-icons/fa';
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -14,6 +13,24 @@ import {
     findGroupAndVariants,
     WINDOW_GROUPS,
 } from '@/config/windowTypesConfig';
+
+// ─── Constantes ───────────────────────────────────────────────────────────────
+// Keys de los grupos que se renderizan como checkbox, NO como select
+const CHECKBOX_GROUPS = new Set(['mosquitero', 'refuerzo_hojas', 'refuerzo_mosquitero']);
+
+// Default ON para mosquitero, OFF para refuerzos
+const CHECKBOX_DEFAULTS = {
+    mosquitero: 'con_mosquitero', // ON por defecto
+    refuerzo_hojas: null,             // OFF por defecto
+    refuerzo_mosquitero: null,             // OFF por defecto
+};
+
+// Valor que se manda cuando el checkbox está activo
+const CHECKBOX_ACTIVE_VALUE = {
+    mosquitero: 'con_mosquitero',
+    refuerzo_hojas: 'con_refuerzo',
+    refuerzo_mosquitero: 'con_refuerzo',
+};
 
 // ─── Ventana vacía ────────────────────────────────────────────────────────────
 const emptyWindow = () => ({
@@ -34,11 +51,13 @@ const emptyWindow = () => ({
     _optionGroups: [],
 });
 
+// ─── Helper: construir displayName ────────────────────────────────────────────
 function buildDisplayName(typeName, options, optionGroups) {
     if (!typeName) return '';
     const parts = [typeName];
     optionGroups.forEach(wto => {
         const groupKey = wto.group.key;
+        if (CHECKBOX_GROUPS.has(groupKey)) return; // los checkboxes no van en el nombre
         const chosenKey = options[groupKey];
         if (chosenKey) {
             const value = wto.group.values.find(v => v.key === chosenKey);
@@ -48,8 +67,10 @@ function buildDisplayName(typeName, options, optionGroups) {
     return parts.join(' ');
 }
 
+// ─── Subcomponente: selector de tipo de ventana ───────────────────────────────
 function WindowTypeSelector({ win, selectorList, onGroupChange, onVariantChange }) {
     const group = WINDOW_GROUPS.find(g => g.id === win._groupId);
+
     const firstSelectValue = win._groupId
         ? win._groupId
         : win.window_type_id
@@ -75,7 +96,7 @@ function WindowTypeSelector({ win, selectorList, onGroupChange, onVariantChange 
                 ))}
             </select>
 
-            {group && group.steps.map((step) => (
+            {group && group.steps.map(step => (
                 <select
                     key={step.key}
                     value={win._variantValues?.[step.key] || ''}
@@ -99,10 +120,68 @@ function WindowTypeSelector({ win, selectorList, onGroupChange, onVariantChange 
     );
 }
 
-export default function AddQuotationModal({ open, onClose, onSave, quotationToEdit }) {
-    const { user } = useAuth();
-    const isAdmin = user?.role === 'ADMIN';
+// ─── Subcomponente: opciones dinámicas de una ventana ─────────────────────────
+// Separa los grupos en checkboxes (mosquitero/refuerzo) y selects normales
+function WindowOptions({ win, index, optionGroups, onOptionChange }) {
+    if (!optionGroups || optionGroups.length === 0) return null;
 
+    const selectGroups = optionGroups.filter(wto => !CHECKBOX_GROUPS.has(wto.group.key));
+    const checkboxGroups = optionGroups.filter(wto => CHECKBOX_GROUPS.has(wto.group.key));
+
+    return (
+        <div className="space-y-1.5">
+            {/* Selects normales */}
+            {selectGroups.map(wto => (
+                <select
+                    key={wto.group.key}
+                    value={win.options?.[wto.group.key] || ''}
+                    onChange={(e) => onOptionChange(index, wto.group.key, e.target.value)}
+                    className="w-full p-2 border rounded text-sm"
+                    required
+                >
+                    <option value="">{wto.group.label}...</option>
+                    {wto.group.values.map(v => (
+                        <option key={v.key} value={v.key}>{v.label}</option>
+                    ))}
+                </select>
+            ))}
+
+            {/* Checkboxes: mosquitero y refuerzos */}
+            {checkboxGroups.length > 0 && (
+                <div className="flex flex-col gap-1 pt-1">
+                    {checkboxGroups.map(wto => {
+                        const groupKey = wto.group.key;
+                        const activeValue = CHECKBOX_ACTIVE_VALUE[groupKey];
+                        const isChecked = win.options?.[groupKey] === activeValue;
+
+                        return (
+                            <label
+                                key={groupKey}
+                                className="flex items-center gap-2 cursor-pointer select-none group"
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={(e) => {
+                                        const newValue = e.target.checked ? activeValue : null;
+                                        onOptionChange(index, groupKey, newValue);
+                                    }}
+                                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                />
+                                <span className={`text-xs font-medium transition-colors ${isChecked ? 'text-blue-700' : 'text-gray-500'}`}>
+                                    {wto.group.label}
+                                </span>
+                            </label>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ─── Componente principal ─────────────────────────────────────────────────────
+export default function AddQuotationModal({ open, onClose, onSave, quotationToEdit }) {
     const [clients, setClients] = useState([]);
     const [windowTypes, setWindowTypes] = useState([]);
     const [pvcColors, setPvcColors] = useState([]);
@@ -112,97 +191,17 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
     const [showAddClientModal, setShowAddClientModal] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [showExtras, setShowExtras] = useState(false);
     const [catalogsLoaded, setCatalogsLoaded] = useState(false);
 
     const [quotation, setQuotation] = useState({
-        project: '',
-        clientId: '',
-        price_per_m2: '',
-        include_iva: false,
-        notes: '',
-        reference_image_url: '',
-        windows: [],
+        project: '', clientId: '', price_per_m2: '',
+        include_iva: false, notes: '', reference_image_url: '', windows: [],
     });
 
     const [windowCosts, setWindowCosts] = useState({});
     const [calculatingCost, setCalculatingCost] = useState({});
-    const [validationErrors, setValidationErrors] = useState([]);
-    const [useCm, setUseCm] = useState(false);
-    const [totalOverride, setTotalOverride] = useState(''); // total editable por el usuario
-    const [hasDraft, setHasDraft] = useState(false);
-    const [draftRestored, setDraftRestored] = useState(false);
-    const [ivaToggleLocked, setIvaToggleLocked] = useState(false);
 
-    // ── Auto-guardado en localStorage ──────────────────────────────────────────
-    const DRAFT_KEY = 'quotation_draft';
-    const autoSaveTimer = useRef(null);
-
-    // Guardar borrador cada 3 segundos cuando hay cambios
-    useEffect(() => {
-        if (!open || isEditing || !catalogsLoaded) return;
-        // Solo guardar si hay al menos 1 ventana con datos
-        const hasData = quotation.windows.length > 0 &&
-            (quotation.project || quotation.windows.some(w => w.window_type_id));
-        if (!hasData) return;
-
-        if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-        autoSaveTimer.current = setTimeout(() => {
-            try {
-                // Excluir datos no serializables (fileToUpload, _optionGroups)
-                const draftWindows = quotation.windows.map(w => ({
-                    ...w,
-                    fileToUpload: null,
-                    _optionGroups: [],
-                }));
-                const draft = {
-                    ...quotation,
-                    windows: draftWindows,
-                    _savedAt: Date.now(),
-                    _useCm: useCm,
-                    _totalOverride: totalOverride,
-                };
-                localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-            } catch { /* localStorage lleno o no disponible — ignorar */ }
-        }, 3000);
-
-        return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
-    }, [quotation, useCm, totalOverride, open, isEditing, catalogsLoaded]);
-
-    // Verificar si existe un borrador al abrir (solo para cotización nueva)
-    useEffect(() => {
-        if (!open || quotationToEdit || !catalogsLoaded || draftRestored) return;
-        try {
-            const raw = localStorage.getItem(DRAFT_KEY);
-            if (raw) {
-                const draft = JSON.parse(raw);
-                // Solo ofrecer restaurar si el draft tiene menos de 24h
-                if (draft._savedAt && Date.now() - draft._savedAt < 24 * 60 * 60 * 1000) {
-                    setHasDraft(true);
-                }
-            }
-        } catch { /* corrupto — ignorar */ }
-    }, [open, quotationToEdit, catalogsLoaded, draftRestored]);
-
-    // Limpiar borrador al guardar exitosamente
-    const clearDraft = () => {
-        try { localStorage.removeItem(DRAFT_KEY); } catch { }
-    };
-
-    const toDisplay = (valueInMeters) => {
-        if (valueInMeters === '' || valueInMeters === null || valueInMeters === undefined) return '';
-        return useCm
-            ? parseFloat((parseFloat(valueInMeters) * 100).toFixed(2))
-            : parseFloat(parseFloat(valueInMeters).toFixed(4));
-    };
-
-    const fromDisplay = (displayValue) => {
-        if (displayValue === '' || displayValue === null) return '';
-        return useCm
-            ? parseFloat(displayValue) / 100
-            : parseFloat(displayValue);
-    };
-
+    // ── Calcular costo de una ventana ──────────────────────────────────────────
     const calculateWindowCost = useCallback(async (win) => {
         if (!win.window_type_id || !win.width_m || !win.height_m || !win.color_id) return;
         const key = win.tempId || win.id;
@@ -231,22 +230,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
         }
     }, []);
 
-    // ── Debounce del cálculo de costos ────────────────────────────────────────
-    // Sin debounce, cada pulsación en ancho/alto/cantidad dispara una llamada
-    // al backend. Con 80 ventanas y 3 vendedores = ~1,400 llamadas simultáneas.
-    // 700ms cubre la velocidad normal de escritura de números (ej: "1.20").
-    const debounceTimers = useRef({});
-    const debouncedCalculateCost = useCallback((win) => {
-        const key = win.tempId || win.id;
-        if (debounceTimers.current[key]) {
-            clearTimeout(debounceTimers.current[key]);
-        }
-        debounceTimers.current[key] = setTimeout(() => {
-            delete debounceTimers.current[key];
-            calculateWindowCost(win);
-        }, 700);
-    }, [calculateWindowCost]);
-
+    // ── Cargar option groups para un window_type_id ────────────────────────────
     const loadOptionGroups = useCallback(async (windowTypeId) => {
         if (!windowTypeId) return [];
         try {
@@ -257,54 +241,29 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
         }
     }, []);
 
-    const restoreDraft = useCallback(async () => {
-        try {
-            const raw = localStorage.getItem(DRAFT_KEY);
-            if (!raw) return;
-            const draft = JSON.parse(raw);
-            // Restaurar optionGroups para cada ventana
-            const restoredWindows = await Promise.all(
-                (draft.windows || []).map(async (win) => {
-                    const optGroups = win.window_type_id
-                        ? await loadOptionGroups(win.window_type_id)
-                        : [];
-                    return { ...win, _optionGroups: optGroups };
-                })
-            );
-            setQuotation({
-                project: draft.project || '',
-                clientId: draft.clientId || '',
-                price_per_m2: draft.price_per_m2 || '',
-                include_iva: Boolean(draft.include_iva),
-                notes: draft.notes || '',
-                reference_image_url: draft.reference_image_url || '',
-                windows: restoredWindows,
-            });
-            if (draft._useCm) setUseCm(draft._useCm);
-            if (draft._totalOverride) setTotalOverride(draft._totalOverride);
-            // Calcular costos de cada ventana restaurada
-            for (const win of restoredWindows) {
-                calculateWindowCost(win);
+    // ── Helper: aplicar defaults de checkboxes a las opciones de una ventana ───
+    // Se llama al cargar option groups para pre-activar mosquitero=ON
+    const applyCheckboxDefaults = (currentOptions, optionGroups) => {
+        const newOptions = { ...currentOptions };
+        optionGroups.forEach(wto => {
+            const groupKey = wto.group.key;
+            if (!CHECKBOX_GROUPS.has(groupKey)) return;
+            // Solo aplicar default si el grupo no tiene valor ya asignado
+            if (!(groupKey in newOptions)) {
+                const defaultValue = CHECKBOX_DEFAULTS[groupKey];
+                if (defaultValue !== null) {
+                    newOptions[groupKey] = defaultValue;
+                }
+                // Si default es null (refuerzos), no se agrega → checkbox OFF
             }
-        } catch { /* corrupto — ignorar */ }
-        setHasDraft(false);
-        setDraftRestored(true);
-    }, [loadOptionGroups, calculateWindowCost]);
+        });
+        return newOptions;
+    };
 
-    const discardDraft = useCallback(() => {
-        try { localStorage.removeItem(DRAFT_KEY); } catch { }
-        setHasDraft(false);
-        setDraftRestored(true);
-    }, []);
-
+    // ── PASO 1: Cargar catálogos ───────────────────────────────────────────────
     useEffect(() => {
-        if (!open) {
-            setCatalogsLoaded(false);
-            setValidationErrors([]);
-            setUseCm(false);
-            setTotalOverride('');
-            return;
-        }
+        if (!open) { setCatalogsLoaded(false); return; }
+
         const fetchCatalogs = async () => {
             setCatalogsLoaded(false);
             try {
@@ -332,22 +291,27 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                 setCatalogsLoaded(true);
             }
         };
+
         fetchCatalogs();
     }, [open]);
 
+    // ── PASO 2: Poblar formulario cuando catálogos están listos ───────────────
     useEffect(() => {
         if (!open || !catalogsLoaded) return;
+
         if (quotationToEdit) {
             setIsEditing(true);
             setWindowCosts({});
             setCalculatingCost({});
+
             const buildEditWindows = async () => {
                 const windows = await Promise.all(
                     (quotationToEdit.quotation_windows || []).map(async (win) => {
                         const found = findGroupAndVariants(win.window_type_id, windowTypes);
-                        const optionGroups = win.window_type_id
-                            ? await loadOptionGroups(win.window_type_id)
-                            : [];
+                        const optionGroups = win.window_type_id ? await loadOptionGroups(win.window_type_id) : [];
+                        // Aplicar defaults de checkboxes a las opciones guardadas
+                        const options = applyCheckboxDefaults(win.options || {}, optionGroups);
+
                         return {
                             id: win.id,
                             displayName: win.displayName || win.windowType?.name || '',
@@ -358,7 +322,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                             window_type_id: win.window_type_id,
                             color_id: win.color_id,
                             glass_color_id: win.glass_color_id || '',
-                            options: win.options || {},
+                            options,
                             design_image_url: win.design_image_url || null,
                             fileToUpload: null,
                             tempId: `existing_${win.id}`,
@@ -368,6 +332,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                         };
                     })
                 );
+
                 setQuotation({
                     project: quotationToEdit.project,
                     clientId: quotationToEdit.clientId || '',
@@ -377,56 +342,50 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                     reference_image_url: quotationToEdit.reference_image_url || '',
                     windows,
                 });
-                for (const win of windows) {
-                    calculateWindowCost(win);
-                }
+
+                for (const win of windows) calculateWindowCost(win);
             };
+
             buildEditWindows();
         } else {
             setIsEditing(false);
             setWindowCosts({});
             setCalculatingCost({});
             setQuotation({
-                project: '',
-                clientId: '',
-                price_per_m2: '',
-                include_iva: false,
-                notes: '',
-                reference_image_url: '',
-                windows: [],
+                project: '', clientId: '', price_per_m2: '',
+                include_iva: false, notes: '', reference_image_url: '', windows: [],
             });
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, catalogsLoaded]);
 
+    // ── Cambio en el primer select (grupo o tipo simple) ──────────────────────
     const handleGroupChange = async (index, value) => {
         const isSimple = value.startsWith('simple_');
-        let wtId = null;
-        let wtName = '';
-        let optionGroups = [];
+        let wtId = null, wtName = '', optionGroups = [];
+
         if (isSimple) {
             wtId = Number(value.replace('simple_', ''));
             const wt = windowTypes.find(w => w.id === wtId);
             wtName = wt?.name || '';
             optionGroups = await loadOptionGroups(wtId);
         }
+
+        // Aplicar defaults de checkboxes para los nuevos option groups
+        const defaultOptions = isSimple ? applyCheckboxDefaults({}, optionGroups) : {};
+
         setQuotation(prev => {
             const updatedWindows = prev.windows.map((win, i) => {
                 if (i !== index) return win;
                 if (isSimple) {
-                    const newType = windowTypes.find(w => w.id === wtId);
-                    const allowedIds = new Set((newType?.pvcLinks || []).map(l => l.pvcColor_id));
                     return {
                         ...win,
                         window_type_id: wtId,
                         displayName: wtName,
-                        options: {},
-                        color_id: allowedIds.has(Number(win.color_id)) ? win.color_id : '',
+                        options: defaultOptions,
                         _groupId: '',
                         _variantValues: {},
                         _optionGroups: optionGroups,
-                        design_image_url: null,
-                        fileToUpload: null,
                     };
                 }
                 return {
@@ -434,58 +393,58 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                     window_type_id: '',
                     displayName: '',
                     options: {},
-                    color_id: '',
                     _groupId: value,
                     _variantValues: {},
                     _optionGroups: [],
-                    design_image_url: null,
-                    fileToUpload: null,
                 };
             });
             return { ...prev, windows: updatedWindows };
         });
     };
 
+    // ── Cambio en un step de variante ─────────────────────────────────────────
     const handleVariantChange = async (index, stepKey, stepValue) => {
         let resolvedId = null;
+
         setQuotation(prev => {
             const win = prev.windows[index];
             const newVariants = { ...win._variantValues, [stepKey]: stepValue };
             resolvedId = resolveWindowTypeId(win._groupId, newVariants, windowTypes);
             const resolvedType = resolvedId ? windowTypes.find(wt => wt.id === resolvedId) : null;
+
             const updatedWindows = prev.windows.map((w, i) => {
                 if (i !== index) return w;
-                const allowedIds = new Set((resolvedType?.pvcLinks || []).map(l => l.pvcColor_id));
                 return {
                     ...w,
                     _variantValues: newVariants,
                     window_type_id: resolvedId || '',
                     displayName: resolvedType?.name || '',
                     options: {},
-                    color_id: (resolvedId && allowedIds.has(Number(w.color_id))) ? w.color_id : '',
                     _optionGroups: [],
-                    design_image_url: null,
-                    fileToUpload: null,
                 };
             });
             return { ...prev, windows: updatedWindows };
         });
+
         if (resolvedId) {
             const optionGroups = await loadOptionGroups(resolvedId);
+            const defaultOptions = applyCheckboxDefaults({}, optionGroups);
             setQuotation(prev => ({
                 ...prev,
                 windows: prev.windows.map((w, i) =>
-                    i === index ? { ...w, _optionGroups: optionGroups } : w
+                    i === index ? { ...w, _optionGroups: optionGroups, options: defaultOptions } : w
                 ),
             }));
         }
     };
 
+    // ── Cambio en campos normales de ventana ──────────────────────────────────
     const handleWindowChange = (index, e) => {
         const { name, value } = e.target;
         const finalValue = ['width_m', 'height_m', 'quantity', 'price_per_m2'].includes(name)
             ? (value === '' ? '' : parseFloat(value))
             : value;
+
         const updatedWindows = quotation.windows.map((win, i) => {
             if (i !== index) return win;
             const updatedWindow = { ...win, [name]: finalValue };
@@ -495,17 +454,52 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             }
             return updatedWindow;
         });
+
         setQuotation(prev => ({ ...prev, windows: updatedWindows }));
+
         if (['width_m', 'height_m', 'color_id', 'glass_color_id', 'quantity'].includes(name)) {
-            // Campos numéricos se debouncean — el usuario puede estar escribiendo "1.20"
-            // color_id y glass_color_id son selects (cambio instantáneo), se calculan sin delay
-            const isSelectField = ['color_id', 'glass_color_id'].includes(name);
-            if (isSelectField) {
-                calculateWindowCost(updatedWindows[index]);
-            } else {
-                debouncedCalculateCost(updatedWindows[index]);
-            }
+            calculateWindowCost(updatedWindows[index]);
         }
+    };
+
+    // ── Cambio en opciones (selects Y checkboxes) ─────────────────────────────
+    const handleOptionChange = (index, optionName, optionValue) => {
+        const updatedWindows = quotation.windows.map((win, i) => {
+            if (i !== index) return win;
+
+            let newOptions;
+            if (optionValue === null) {
+                // Checkbox desactivado: eliminar la key del objeto options
+                const { [optionName]: removed, ...rest } = win.options || {};
+                newOptions = rest;
+            } else {
+                newOptions = { ...win.options, [optionName]: optionValue };
+            }
+
+            const newWindow = { ...win, options: newOptions };
+
+            if (optionName === 'diseno' && optionValue === 'lisa') {
+                newWindow.design_image_url = null;
+                newWindow.fileToUpload = null;
+            }
+
+            // Reconstruir displayName solo con los grupos que NO son checkboxes
+            const selectedType = windowTypes.find(wt => wt.id === Number(newWindow.window_type_id));
+            const typeName = selectedType?.name || '';
+            newWindow.displayName = buildDisplayName(typeName, newWindow.options, newWindow._optionGroups);
+
+            return newWindow;
+        });
+
+        setQuotation(prev => ({ ...prev, windows: updatedWindows }));
+        calculateWindowCost(updatedWindows[index]);
+    };
+
+    const handleFileChange = (index, file) => {
+        const updatedWindows = quotation.windows.map((win, i) =>
+            i === index ? { ...win, fileToUpload: file, design_image_url: null } : win
+        );
+        setQuotation(prev => ({ ...prev, windows: updatedWindows }));
     };
 
     const handleReferenceImageUpload = async (e) => {
@@ -523,31 +517,6 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
         }
     };
 
-    const handleOptionChange = (index, optionName, optionValue) => {
-        const updatedWindows = quotation.windows.map((win, i) => {
-            if (i !== index) return win;
-            const newWindow = { ...win, options: { ...win.options, [optionName]: optionValue } };
-            if (optionName === 'diseno' && optionValue === 'lisa') {
-                newWindow.design_image_url = null;
-                newWindow.fileToUpload = null;
-            }
-            const selectedType = windowTypes.find(wt => wt.id === Number(newWindow.window_type_id));
-            const typeName = selectedType?.name || '';
-            newWindow.displayName = buildDisplayName(typeName, newWindow.options, newWindow._optionGroups);
-            return newWindow;
-        });
-        setQuotation(prev => ({ ...prev, windows: updatedWindows }));
-        // Las opciones son selects — cambio inmediato, sin debounce
-        calculateWindowCost(updatedWindows[index]);
-    };
-
-    const handleFileChange = (index, file) => {
-        const updatedWindows = quotation.windows.map((win, i) =>
-            i === index ? { ...win, fileToUpload: file, design_image_url: null } : win
-        );
-        setQuotation(prev => ({ ...prev, windows: updatedWindows }));
-    };
-
     const addWindow = () => {
         setQuotation(prev => ({ ...prev, windows: [...prev.windows, emptyWindow()] }));
     };
@@ -563,8 +532,6 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
         const src = quotation.windows[index];
         const newWin = {
             ...src,
-            width_m: '',       // No duplicar medidas
-            height_m: '',      // No duplicar medidas
             options: { ...src.options },
             _variantValues: { ...src._variantValues },
             _optionGroups: [...(src._optionGroups || [])],
@@ -577,6 +544,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             ...quotation.windows.slice(index + 1),
         ];
         setQuotation(prev => ({ ...prev, windows: updatedWindows }));
+        calculateWindowCost(newWin);
     };
 
     const calculateGrandTotal = () => {
@@ -598,101 +566,18 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
 
     const totalsInRealTime = calculateGrandTotal();
     const totalMaterialCost = Object.values(windowCosts).reduce((s, c) => s + (c?.costo_total || 0), 0);
-    const totalPrecioSugerido = Object.values(windowCosts).reduce((s, c) => s + (c?.precio_sugerido_minimo || 0), 0);
     const isCalculatingAny = Object.values(calculatingCost).some(Boolean);
-
-    // Total efectivo: el que el usuario haya escrito, o el calculado automáticamente
-    const effectiveTotal = totalOverride !== '' ? parseFloat(totalOverride) || 0 : totalsInRealTime.total;
-
-    // m² totales de todas las ventanas (para calcular precio/m² inverso)
-    const totalM2 = quotation.windows.reduce((acc, win) => {
-        const w = parseFloat(win.width_m) || 0;
-        const h = parseFloat(win.height_m) || 0;
-        const q = parseInt(win.quantity) || 0;
-        return acc + (w * h * q);
-    }, 0);
-
-    // Cuando el usuario edita el total, recalculamos el precio global por m²
-    const handleTotalChange = (e) => {
-        const val = e.target.value;
-        setTotalOverride(val);
-        if (val !== '' && totalM2 > 0) {
-            const newPrice = (parseFloat(val) || 0) / totalM2;
-            setQuotation(prev => ({ ...prev, price_per_m2: parseFloat(newPrice.toFixed(4)) }));
-        }
-    };
-
-    // Igualar al precio mínimo sugerido
-    const handleIgualMinimo = () => {
-        if (totalPrecioSugerido <= 0 || totalM2 <= 0) return;
-        const newPricePerM2 = totalPrecioSugerido / totalM2;
-        setQuotation(prev => ({
-            ...prev,
-            price_per_m2: parseFloat(newPricePerM2.toFixed(4)),
-            windows: prev.windows.map(win => ({ ...win, price_per_m2: '' })), // limpiar overrides individuales
-        }));
-        setTotalOverride('');
-    };
-
-    const validateQuotation = () => {
-        const errors = [];
-        if (!quotation.project?.trim()) errors.push('El nombre del proyecto es obligatorio.');
-        if (!quotation.clientId) errors.push('Debes seleccionar un cliente.');
-        if (!quotation.price_per_m2 || Number(quotation.price_per_m2) <= 0)
-            errors.push('El precio global por m² es obligatorio.');
-        if (!quotation.windows?.length) {
-            errors.push('Debes agregar al menos una ventana.');
-            return errors;
-        }
-        quotation.windows.forEach((win, index) => {
-            const label = win.displayName?.trim() || `Ventana ${index + 1}`;
-            if (!win.window_type_id) errors.push(`${label}: falta seleccionar el tipo de ventana.`);
-            if (!win.width_m || Number(win.width_m) <= 0) errors.push(`${label}: el ancho debe ser mayor a 0.`);
-            if (!win.height_m || Number(win.height_m) <= 0) errors.push(`${label}: el alto debe ser mayor a 0.`);
-            if (!win.quantity || Number(win.quantity) <= 0) errors.push(`${label}: la cantidad debe ser mayor a 0.`);
-            if (!win.color_id) errors.push(`${label}: falta seleccionar el color PVC.`);
-            if (!win.glass_color_id) errors.push(`${label}: falta seleccionar el color de vidrio.`);
-            const optionGroups = win._optionGroups || [];
-            optionGroups.forEach((wto) => {
-                const groupKey = wto.group?.key;
-                const groupLabel = wto.group?.label || groupKey;
-                if (groupKey && !win.options?.[groupKey])
-                    errors.push(`${label}: falta seleccionar "${groupLabel}".`);
-            });
-        });
-        return errors;
-    };
-
-    const handleIvaToggle = (e) => {
-        if (ivaToggleLocked) return; // Ignora clicks dobles
-        setIvaToggleLocked(true);
-        setQuotation(p => ({ ...p, include_iva: e.target.checked }));
-        setTimeout(() => setIvaToggleLocked(false), 500); // 500ms de bloqueo
-    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (loading) return;
-        const errors = validateQuotation();
-        if (errors.length > 0) {
-            setValidationErrors(errors);
-            e.target.closest('.overflow-y-auto')?.scrollTo({ top: 0, behavior: 'smooth' });
-            return;
-        }
-        setValidationErrors([]);
         setLoading(true);
         const freshTotals = calculateGrandTotal();
-        const finalTotal = totalOverride !== '' ? (parseFloat(totalOverride) || 0) : freshTotals.total;
-        const windowsSnapshot = quotation.windows.map(win => ({
-            existingId: win.id ?? null,
-            fileToUpload: win.fileToUpload ?? null,
-        }));
         const payload = {
             project: quotation.project,
             clientId: Number(quotation.clientId) || null,
             price_per_m2: quotation.price_per_m2 ? Number(quotation.price_per_m2) : null,
             include_iva: Boolean(quotation.include_iva),
-            total_price: finalTotal,
+            total_price: freshTotals.total,
             notes: quotation.notes || null,
             reference_image_url: quotation.reference_image_url || null,
             windows: quotation.windows.map(win => ({
@@ -713,620 +598,315 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             const response = isEditing
                 ? await api.patch(`/quotations/${quotationToEdit.id}`, payload)
                 : await api.post('/quotations', payload);
+
             const savedWindows = response.data?.quotation_windows || [];
-            for (let i = 0; i < windowsSnapshot.length; i++) {
-                const snap = windowsSnapshot[i];
-                if (!snap.fileToUpload) continue;
-                const savedId = snap.existingId ?? savedWindows[i]?.id;
-                if (!savedId) {
-                    console.warn(`Sin id para ventana #${i} — no se pudo subir el diseño`);
-                    continue;
-                }
-                const fd = new FormData();
-                fd.append('file', snap.fileToUpload);
-                await api.post(`/uploads/design/${savedId}`, fd, {
+            for (let i = 0; i < quotation.windows.length; i++) {
+                const win = quotation.windows[i];
+                if (!win.fileToUpload) continue;
+                const savedId = win.id ?? savedWindows[i]?.id;
+                if (!savedId) continue;
+                const formData = new FormData();
+                formData.append('file', win.fileToUpload);
+                await api.post(`/quotation-windows/${savedId}/upload-design`, formData, {
                     headers: { 'Content-Type': 'multipart/form-data' },
                 });
             }
-            clearDraft();
+
             onSave();
         } catch (error) {
             console.error("Error guardando cotización:", error);
-            const msg = error?.response?.data?.message || 'Hubo un error al guardar la cotización.';
-            setValidationErrors([Array.isArray(msg) ? msg.join(', ') : msg]);
+            alert('Hubo un error al guardar.');
         } finally {
             setLoading(false);
         }
     };
 
-    const API_BASE = import.meta.env.VITE_API_URL?.replace(/\/+$/, '') || 'http://localhost:3000';
-
-    const resolveImageUrl = (url) => {
-        if (!url) return '';
-        if (url.startsWith('http://') || url.startsWith('https://')) return url;
-        return `${API_BASE}${url}`;
-    };
-
+    // ── Render ─────────────────────────────────────────────────────────────────
     return (
         <>
             <DialogPrimitive.Root open={open} onOpenChange={onClose}>
                 <DialogPrimitive.Portal>
                     <DialogPrimitive.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40" />
-                    {/*
-                      ── Responsive modal container ──
-                      • Móvil (<sm): fullscreen con scroll
-                      • sm+: centrado, max-w-7xl, max-h-[90vh]
-                    */}
-                    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-                        <DialogContent
-                            aria-describedby={undefined}
-                            className="
-                                bg-white w-full flex flex-col
-                                rounded-t-2xl sm:rounded-xl
-                                shadow-2xl
-                                h-[95dvh] sm:h-auto sm:max-h-[90vh]
-                                sm:max-w-7xl
-                                overflow-hidden
-                            "
-                        >
-                            <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-2 border-b border-gray-100 flex-shrink-0">
-                                {/* Drag handle visual en móvil */}
-                                <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-3 sm:hidden" />
-                                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                    <DialogContent
+                        aria-describedby={undefined}
+                        className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white p-6 rounded-xl shadow-2xl w-full max-w-7xl max-h-[90vh] flex flex-col z-50"
+                    >
+                        <DialogHeader>
+                            <DialogTitle>Cotización de Proyecto</DialogTitle>
+                            <DialogDescription>Detalles y cálculo de precios para el cliente.</DialogDescription>
+                        </DialogHeader>
+
+                        <form onSubmit={handleSubmit} className="mt-4 flex-grow flex flex-col overflow-hidden">
+                            <div className="flex-grow overflow-y-auto pr-2 custom-scrollbar">
+
+                                {/* Cabecera */}
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                                     <div>
-                                        <DialogTitle className="text-base sm:text-lg">Cotización de Proyecto</DialogTitle>
-                                        <DialogDescription className="text-xs sm:text-sm text-gray-500">
-                                            Detalles y cálculo de precios para el cliente.
-                                        </DialogDescription>
-                                    </div>
-
-                                    {/* ── Totales sticky en el header ── */}
-                                    <div className="flex flex-wrap items-center gap-2 sm:gap-3 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 flex-shrink-0">
-                                        {/* Total m² del proyecto */}
-                                        {totalM2 > 0 && (
-                                            <div className="flex flex-col items-center">
-                                                <span className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide">Total m²</span>
-                                                <span className="text-sm font-bold text-gray-700">
-                                                    {totalM2.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                </span>
-                                            </div>
-                                        )}
-
-                                        {/* Separador */}
-                                        {totalM2 > 0 && totalPrecioSugerido > 0 && <div className="w-px h-8 bg-gray-200" />}
-
-                                        {/* Precio sugerido mínimo */}
-                                        {totalPrecioSugerido > 0 && (
-                                            <div className="flex flex-col items-center">
-                                                <span className="text-[10px] text-amber-600 font-semibold uppercase tracking-wide">Mín. sugerido</span>
-                                                <span className="text-sm font-bold text-amber-700">
-                                                    Q {totalPrecioSugerido.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                                                </span>
-                                            </div>
-                                        )}
-
-                                        {/* Separador */}
-                                        {totalPrecioSugerido > 0 && <div className="w-px h-8 bg-gray-200" />}
-
-                                        {/* Sub-total e IVA */}
-                                        <div className="flex flex-col items-end gap-0.5">
-                                            <div className="flex items-center gap-2 text-xs text-gray-500">
-                                                <span>Sub-total:</span>
-                                                <span className="font-medium text-gray-700">
-                                                    Q {totalsInRealTime.subTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                                                </span>
-                                            </div>
-                                            {quotation.include_iva && (
-                                                <div className="flex items-center gap-2 text-xs text-green-600">
-                                                    <span>IVA (12%):</span>
-                                                    <span className="font-medium">
-                                                        Q {totalsInRealTime.ivaTax.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                                                    </span>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Separador */}
-                                        <div className="w-px h-8 bg-gray-200" />
-
-                                        {/* TOTAL editable */}
-                                        <div className="flex flex-col items-center">
-                                            <span className="text-[10px] text-blue-600 font-semibold uppercase tracking-wide">Total</span>
-                                            <div className="flex items-center gap-1">
-                                                <span className="text-sm font-bold text-blue-700">Q</span>
-                                                <input
-                                                    type="number"
-                                                    step="0.01"
-                                                    value={totalOverride !== '' ? totalOverride : totalsInRealTime.total}
-                                                    onChange={handleTotalChange}
-                                                    onFocus={(e) => { if (totalOverride === '') setTotalOverride(String(totalsInRealTime.total)); e.target.select(); }}
-                                                    onBlur={(e) => { if (e.target.value === '' || parseFloat(e.target.value) === 0) setTotalOverride(''); }}
-                                                    className="w-24 text-lg font-black text-blue-700 bg-transparent border-b-2 border-blue-300 focus:border-blue-600 focus:outline-none text-center"
-                                                />
-                                            </div>
-                                        </div>
-
-                                        {/* Botón igualar */}
-                                        {totalPrecioSugerido > 0 && totalM2 > 0 && (
-                                            <button
-                                                type="button"
-                                                onClick={handleIgualMinimo}
-                                                className="text-[10px] sm:text-xs font-semibold px-2 py-1.5 rounded-lg bg-amber-100 text-amber-700 hover:bg-amber-200 active:bg-amber-300 border border-amber-300 transition-colors whitespace-nowrap"
-                                                title="Ajusta el precio/m² para que el total iguale el precio mínimo sugerido"
-                                            >
-                                                ↓ Igualar mínimo
-                                            </button>
-                                        )}
-
-                                        {/* Indicador de override activo */}
-                                        {totalOverride !== '' && (
-                                            <button
-                                                type="button"
-                                                onClick={() => { setTotalOverride(''); setQuotation(prev => ({ ...prev })); }}
-                                                className="text-[10px] text-gray-400 hover:text-red-500 transition-colors"
-                                                title="Restaurar cálculo automático"
-                                            >
-                                                ↺ auto
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            </DialogHeader>
-
-                            <form onSubmit={handleSubmit} className="flex-grow flex flex-col overflow-hidden">
-                                <div className="flex-grow overflow-y-auto px-4 sm:px-6 py-4 space-y-5">
-
-                                    {/* ── Banner de borrador recuperable ── */}
-                                    {hasDraft && !isEditing && (
-                                        <div className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                                            <span className="text-sm text-blue-700">
-                                                Se encontró una cotización sin guardar. ¿Deseas recuperarla?
-                                            </span>
-                                            <div className="flex gap-2 ml-auto flex-shrink-0">
-                                                <button
-                                                    type="button"
-                                                    onClick={restoreDraft}
-                                                    className="px-3 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-                                                >
-                                                    Recuperar
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={discardDraft}
-                                                    className="px-3 py-1.5 text-xs font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-                                                >
-                                                    Descartar
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* ── Cabecera ── */}
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del Proyecto</label>
-                                            <input
-                                                type="text"
-                                                name="project"
-                                                value={quotation.project}
-                                                onChange={(e) => setQuotation(p => ({ ...p, project: e.target.value }))}
-                                                className="block w-full p-2 border rounded-md text-sm"
-                                                required
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Cliente</label>
-                                            <div className="flex items-center gap-2">
-                                                <select
-                                                    name="clientId"
-                                                    value={quotation.clientId}
-                                                    onChange={(e) => setQuotation(p => ({ ...p, clientId: e.target.value }))}
-                                                    className="flex-1 min-w-0 p-2 border rounded-md text-sm"
-                                                    required
-                                                >
-                                                    <option value="">Seleccione un cliente</option>
-                                                    {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                                </select>
-                                                <Button type="button" onClick={() => setShowAddClientModal(true)} className="h-9 w-9 p-0 flex-shrink-0">
-                                                    <FaPlus size={12} />
-                                                </Button>
-                                            </div>
-                                        </div>
-                                        <div className="sm:col-span-2 md:col-span-1">
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Precio Global por m²</label>
-                                            <input
-                                                type="number"
-                                                step="0.01"
-                                                name="price_per_m2"
-                                                value={quotation.price_per_m2}
-                                                onChange={(e) => setQuotation(p => ({ ...p, price_per_m2: e.target.value }))}
-                                                className="block w-full p-2 border rounded-md text-sm"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {/* ── IVA ── */}
-                                    <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                                        <label className="block text-sm font-medium text-gray-700">Nombre del Proyecto</label>
                                         <input
-                                            type="checkbox"
-                                            id="include_iva"
-                                            checked={quotation.include_iva}
-                                            onChange={handleIvaToggle}
-                                            disabled={ivaToggleLocked}
-                                            className="w-4 h-4 text-blue-600 rounded cursor-pointer"
+                                            type="text" name="project" value={quotation.project} required
+                                            onChange={(e) => setQuotation(p => ({ ...p, project: e.target.value }))}
+                                            className="mt-1 block w-full p-2 border rounded-md"
                                         />
-                                        <label htmlFor="include_iva" className="text-sm font-bold text-blue-800 cursor-pointer select-none">
-                                            ¿Incluir IVA (12%) en esta cotización?
-                                        </label>
                                     </div>
-
-                                    {/* ── Notas y foto — colapsables ── */}
+                                    <div className="flex items-end gap-2">
+                                        <div className="flex-grow">
+                                            <label className="block text-sm font-medium text-gray-700">Cliente</label>
+                                            <select
+                                                name="clientId" value={quotation.clientId} required
+                                                onChange={(e) => setQuotation(p => ({ ...p, clientId: e.target.value }))}
+                                                className="mt-1 block w-full p-2 border rounded-md"
+                                            >
+                                                <option value="">Seleccione un cliente</option>
+                                                {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                            </select>
+                                        </div>
+                                        <Button type="button" onClick={() => setShowAddClientModal(true)} className="h-10"><FaPlus /></Button>
+                                    </div>
                                     <div>
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowExtras(p => !p)}
-                                            className="flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-blue-600 transition-colors group"
-                                        >
-                                            <span className={`w-4 h-4 flex items-center justify-center rounded border border-gray-300 group-hover:border-blue-400 transition-colors text-xs ${showExtras ? 'bg-blue-50 border-blue-400 text-blue-600' : 'text-gray-400'}`}>
-                                                {showExtras ? '−' : '+'}
-                                            </span>
-                                            Notas y foto de referencia
-                                            {(quotation.notes || quotation.reference_image_url) && (
-                                                <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
-                                            )}
-                                        </button>
+                                        <label className="block text-sm font-medium text-gray-700">Precio Global por m²</label>
+                                        <input
+                                            type="number" step="0.01" name="price_per_m2" value={quotation.price_per_m2}
+                                            onChange={(e) => setQuotation(p => ({ ...p, price_per_m2: e.target.value }))}
+                                            className="mt-1 block w-full p-2 border rounded-md"
+                                        />
+                                    </div>
+                                </div>
 
-                                        {showExtras && (
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                                        Notas <span className="text-gray-400 font-normal">(opcional)</span>
-                                                    </label>
-                                                    <textarea
-                                                        value={quotation.notes}
-                                                        onChange={(e) => setQuotation(p => ({ ...p, notes: e.target.value }))}
-                                                        placeholder="Observaciones, condiciones especiales, acuerdos con el cliente..."
-                                                        rows={3}
-                                                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                                        Foto de referencia <span className="text-gray-400 font-normal">(opcional)</span>
-                                                    </label>
-                                                    {quotation.reference_image_url ? (
-                                                        <div className="flex flex-col gap-2">
-                                                            <a
-                                                                href={resolveImageUrl(quotation.reference_image_url)}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                className="block w-fit"
-                                                            >
-                                                                <img
-                                                                    src={resolveImageUrl(quotation.reference_image_url)}
-                                                                    alt="Foto de referencia"
-                                                                    className="h-20 w-auto rounded-lg border border-gray-200 object-cover shadow-sm hover:opacity-90 transition-opacity"
-                                                                />
-                                                            </a>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setQuotation(p => ({ ...p, reference_image_url: '' }))}
-                                                                className="text-xs text-red-500 hover:text-red-700 w-fit"
-                                                            >
-                                                                Quitar imagen
-                                                            </button>
-                                                        </div>
-                                                    ) : (
-                                                        <label className="flex items-center gap-2 cursor-pointer w-fit px-3 py-2.5 rounded-lg border border-dashed border-gray-300 text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors">
-                                                            <FaCamera size={13} />
-                                                            <span>Subir foto de referencia</span>
-                                                            <input
-                                                                type="file"
-                                                                accept="image/*"
-                                                                className="hidden"
-                                                                onChange={handleReferenceImageUpload}
-                                                            />
-                                                        </label>
-                                                    )}
-                                                </div>
+                                {/* IVA */}
+                                <div className="flex items-center gap-2 mb-6 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                                    <input
+                                        type="checkbox" id="include_iva" checked={quotation.include_iva}
+                                        onChange={(e) => setQuotation(p => ({ ...p, include_iva: e.target.checked }))}
+                                        className="w-4 h-4 text-blue-600 rounded cursor-pointer"
+                                    />
+                                    <label htmlFor="include_iva" className="text-sm font-bold text-blue-800 cursor-pointer select-none">
+                                        ¿Incluir IVA (12%) en esta cotización?
+                                    </label>
+                                </div>
+
+                                {/* Notas y foto */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Notas <span className="text-gray-400 font-normal">(opcional)</span>
+                                        </label>
+                                        <textarea
+                                            value={quotation.notes}
+                                            onChange={(e) => setQuotation(p => ({ ...p, notes: e.target.value }))}
+                                            placeholder="Observaciones, condiciones especiales..."
+                                            rows={3}
+                                            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Foto de referencia <span className="text-gray-400 font-normal">(opcional)</span>
+                                        </label>
+                                        {quotation.reference_image_url ? (
+                                            <div className="flex flex-col gap-2">
+                                                <a href={`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${quotation.reference_image_url}`} target="_blank" rel="noopener noreferrer" className="block w-fit">
+                                                    <img src={`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${quotation.reference_image_url}`} alt="Foto de referencia" className="h-20 w-auto rounded-lg border border-gray-200 object-cover shadow-sm hover:opacity-90 transition-opacity" />
+                                                </a>
+                                                <button type="button" onClick={() => setQuotation(p => ({ ...p, reference_image_url: '' }))} className="text-xs text-red-500 hover:text-red-700 w-fit">
+                                                    Quitar imagen
+                                                </button>
                                             </div>
+                                        ) : (
+                                            <label className="flex items-center gap-2 cursor-pointer w-fit px-3 py-2.5 rounded-lg border border-dashed border-gray-300 text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors">
+                                                <FaCamera size={13} />
+                                                <span>Subir foto de referencia</span>
+                                                <input type="file" accept="image/*" className="hidden" onChange={handleReferenceImageUpload} />
+                                            </label>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <h3 className="text-lg font-semibold text-gray-700 mb-2">Ventanas</h3>
+
+                                {/* Tabla de ventanas */}
+                                <div className="w-full border rounded-lg shadow-sm bg-white mt-4 overflow-x-auto">
+                                    <table className="w-full text-sm table-auto border-collapse min-w-[1000px]">
+                                        <thead className="bg-gray-100 border-b sticky top-0 z-10">
+                                            <tr>
+                                                <th className="p-2 text-left w-64">Tipo</th>
+                                                <th className="p-2 text-center w-32">Medidas (m)</th>
+                                                <th className="p-2 text-center w-20">Cant.</th>
+                                                <th className="p-2 text-center w-32">Precio m² (Ind.)</th>
+                                                <th className="p-2 text-left w-48">Opciones</th>
+                                                <th className="p-2 text-left w-36">Color PVC</th>
+                                                <th className="p-2 text-left w-36">Color Vidrio</th>
+                                                <th className="p-2 text-center w-24">Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-200">
+                                            {quotation.windows.map((win, index) => {
+                                                const selectedGlass = glassColors.find(gc => gc.id === Number(win.glass_color_id));
+                                                const needsAddGlass = selectedGlass?.name.toUpperCase() === 'VIDRIO Y DUELA';
+                                                const optionGroups = win._optionGroups || [];
+                                                const showUpload = optionGroups.some(wto => wto.group.key === 'diseno') && win.options?.diseno === 'con_diseno';
+
+                                                return (
+                                                    <Fragment key={win.tempId || win.id}>
+                                                        <tr className="border-b align-top hover:bg-gray-50">
+
+                                                            {/* Tipo */}
+                                                            <td className="p-2">
+                                                                <WindowTypeSelector
+                                                                    win={win}
+                                                                    selectorList={selectorList}
+                                                                    onGroupChange={(val) => handleGroupChange(index, val)}
+                                                                    onVariantChange={(key, val) => handleVariantChange(index, key, val)}
+                                                                />
+                                                            </td>
+
+                                                            {/* Medidas */}
+                                                            <td className="p-2">
+                                                                <div className="flex items-center justify-center gap-1">
+                                                                    <input type="number" step="0.01" name="width_m" value={win.width_m || ''} onChange={(e) => handleWindowChange(index, e)} className="w-16 p-2 border rounded text-center" placeholder="Ancho" required />
+                                                                    <span>×</span>
+                                                                    <input type="number" step="0.01" name="height_m" value={win.height_m || ''} onChange={(e) => handleWindowChange(index, e)} className="w-16 p-2 border rounded text-center" placeholder="Alto" required />
+                                                                </div>
+                                                            </td>
+
+                                                            {/* Cantidad */}
+                                                            <td className="p-2">
+                                                                <input type="number" name="quantity" value={win.quantity} onChange={(e) => handleWindowChange(index, e)} className="w-full p-2 border rounded text-center" required />
+                                                            </td>
+
+                                                            {/* Precio individual */}
+                                                            <td className="p-2">
+                                                                <input type="number" step="0.01" name="price_per_m2" value={win.price_per_m2} onChange={(e) => handleWindowChange(index, e)} className="w-24 p-2 border rounded text-center" placeholder={quotation.price_per_m2 || 'Global'} />
+                                                            </td>
+
+                                                            {/* Opciones (selects + checkboxes) */}
+                                                            <td className="p-2 space-y-1.5">
+                                                                <WindowOptions
+                                                                    win={win}
+                                                                    index={index}
+                                                                    optionGroups={optionGroups}
+                                                                    onOptionChange={handleOptionChange}
+                                                                />
+
+                                                                {showUpload && (
+                                                                    <div className="mt-1">
+                                                                        <label htmlFor={`file-upload-${index}`} className="flex items-center gap-2 text-sm text-blue-600 cursor-pointer hover:text-blue-800">
+                                                                            <FaUpload /><span>Adjuntar Diseño</span>
+                                                                        </label>
+                                                                        <input id={`file-upload-${index}`} type="file" className="hidden" accept="image/*" onChange={(e) => handleFileChange(index, e.target.files[0])} />
+                                                                        {win.fileToUpload && (
+                                                                            <p className="text-xs text-gray-600 mt-1 truncate">Archivo: {win.fileToUpload.name}</p>
+                                                                        )}
+                                                                        {win.design_image_url && !win.fileToUpload && (
+                                                                            <a href={`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${win.design_image_url}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-green-600 mt-1">
+                                                                                <FaCheckCircle /> Ver Diseño Cargado
+                                                                            </a>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                            </td>
+
+                                                            {/* Color PVC */}
+                                                            <td className="p-2">
+                                                                <select name="color_id" value={win.color_id} onChange={(e) => handleWindowChange(index, e)} className="w-full p-2 border rounded" required>
+                                                                    <option value="">Seleccione...</option>
+                                                                    {pvcColors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                                                </select>
+                                                            </td>
+
+                                                            {/* Color Vidrio */}
+                                                            <td className="p-2">
+                                                                <select name="glass_color_id" value={win.glass_color_id} onChange={(e) => handleWindowChange(index, e)} className="w-full p-2 border rounded">
+                                                                    <option value="">Seleccione...</option>
+                                                                    {glassColors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                                                </select>
+                                                                {needsAddGlass && (
+                                                                    <select value={win.options?.vidrio_adicional_id || ''} onChange={(e) => handleOptionChange(index, 'vidrio_adicional_id', e.target.value)} className="w-full p-2 border border-blue-400 rounded mt-2" required>
+                                                                        <option value="">Seleccionar Vidrio...</option>
+                                                                        {realGlassTypes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                                                    </select>
+                                                                )}
+                                                            </td>
+
+                                                            {/* Acciones */}
+                                                            <td className="p-2 text-center">
+                                                                <div className="flex justify-center items-center gap-2 text-gray-600">
+                                                                    <button type="button" onClick={() => duplicateWindow(index)} title="Duplicar"><FaClone /></button>
+                                                                    <button type="button" onClick={() => removeWindow(index)} title="Eliminar"><FaTrashAlt className="text-red-500" /></button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    </Fragment>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <Button type="button" variant="outline" onClick={addWindow} className="self-start mt-4">
+                                    <FaPlus className="mr-2" /> Añadir Ventana
+                                </Button>
+
+                                {/* Resumen totales */}
+                                <div className="bg-gray-50 p-4 border rounded-lg mt-6 flex justify-between items-end gap-4">
+                                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm min-w-0 flex-1">
+                                        <p className="text-xs text-amber-700 font-semibold uppercase mb-2 tracking-wide">
+                                            Análisis de Costos del Proyecto
+                                        </p>
+                                        {isCalculatingAny ? (
+                                            <span className="text-xs text-gray-400 italic animate-pulse">⏳ Calculando costo de materiales...</span>
+                                        ) : totalMaterialCost > 0 ? (
+                                            <div className="flex flex-wrap gap-x-6 gap-y-1">
+                                                <span className="text-gray-600">
+                                                    Costo total materiales:{' '}
+                                                    <span className="font-bold text-gray-800 ml-1">Q {totalMaterialCost.toFixed(2)}</span>
+                                                </span>
+                                                <span className="text-green-700 font-bold">
+                                                    Precio mínimo sugerido:{' '}
+                                                    <span className="ml-1 text-green-800">Q {(totalMaterialCost / 0.40).toFixed(2)}</span>
+                                                </span>
+                                                <span className="text-gray-400 italic text-xs self-center">(margen del 60%)</span>
+                                            </div>
+                                        ) : (
+                                            <span className="text-xs text-gray-400 italic">
+                                                Completa tipo, medidas y color PVC para ver el análisis.
+                                            </span>
                                         )}
                                     </div>
 
-                                    {/* ── Título ventanas + toggle CM/M ── */}
-                                    <div className="flex items-center justify-between">
-                                        <h3 className="text-base sm:text-lg font-semibold text-gray-700">Ventanas</h3>
-
-                                    </div>
-
-                                    {/* ── Tabla de ventanas — scroll horizontal en todos los tamaños ── */}
-                                    <div className="w-full border rounded-lg shadow-sm bg-white overflow-x-auto -mx-0">
-                                        <table className="w-full text-sm table-auto border-collapse min-w-[860px]">
-                                            <thead className="bg-gray-100 border-b sticky top-0 z-10">
-                                                <tr>
-                                                    <th className="p-2 text-left w-52">Tipo</th>
-                                                    <th className="p-2 text-center w-28">
-                                                        <div className="flex flex-col items-center gap-1">
-                                                            <span>Medidas</span>
-                                                            <div className="flex items-center gap-0.5 bg-gray-200 rounded-md p-0.5">
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => setUseCm(false)}
-                                                                    className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors ${!useCm ? 'bg-white shadow text-blue-700' : 'text-gray-500 hover:text-gray-700'}`}
-                                                                >
-                                                                    m
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => setUseCm(true)}
-                                                                    className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors ${useCm ? 'bg-white shadow text-blue-700' : 'text-gray-500 hover:text-gray-700'}`}
-                                                                >
-                                                                    cm
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    </th>
-                                                    <th className="p-2 text-center w-16">Cant.</th>
-                                                    <th className="p-2 text-center w-28">m² Ind.</th>
-                                                    <th className="p-2 text-left w-40">Opciones</th>
-                                                    <th className="p-2 text-left w-32">Color PVC</th>
-                                                    <th className="p-2 text-left w-32">Vidrio</th>
-                                                    <th className="p-2 text-center w-16">Acc.</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-gray-200">
-                                                {quotation.windows.map((win, index) => {
-                                                    const selectedGlass = glassColors.find(gc => gc.id === Number(win.glass_color_id));
-                                                    const needsAddGlass = selectedGlass?.name.toUpperCase() === 'VIDRIO Y DUELA';
-                                                    const optionGroups = win._optionGroups || [];
-                                                    const showUpload = optionGroups.some(wto => wto.group.key === 'diseno')
-                                                        && win.options?.diseno === 'con_diseno';
-
-                                                    return (
-                                                        <Fragment key={win.tempId || win.id}>
-                                                            <tr className="border-b align-top hover:bg-gray-50">
-                                                                <td className="p-2">
-                                                                    <WindowTypeSelector
-                                                                        win={win}
-                                                                        selectorList={selectorList}
-                                                                        onGroupChange={(val) => handleGroupChange(index, val)}
-                                                                        onVariantChange={(key, val) => handleVariantChange(index, key, val)}
-                                                                    />
-                                                                </td>
-                                                                <td className="p-2">
-                                                                    <div className="flex items-center justify-center gap-1">
-                                                                        <input
-                                                                            type="number"
-                                                                            step={useCm ? "0.1" : "any"}
-                                                                            name="width_m"
-                                                                            value={toDisplay(win.width_m)}
-                                                                            onChange={(e) => {
-                                                                                const inMeters = fromDisplay(e.target.value);
-                                                                                handleWindowChange(index, { target: { name: 'width_m', value: inMeters } });
-                                                                            }}
-                                                                            onWheel={(e) => e.target.blur()}
-                                                                            className="w-20 p-2 border rounded text-center text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                                                            placeholder={useCm ? "cm" : "m"}
-                                                                            required
-                                                                        />
-                                                                        <span className="text-gray-400">×</span>
-                                                                        <input
-                                                                            type="number"
-                                                                            step={useCm ? "0.1" : "any"}
-                                                                            name="height_m"
-                                                                            value={toDisplay(win.height_m)}
-                                                                            onChange={(e) => {
-                                                                                const inMeters = fromDisplay(e.target.value);
-                                                                                handleWindowChange(index, { target: { name: 'height_m', value: inMeters } });
-                                                                            }}
-                                                                            onWheel={(e) => e.target.blur()}
-                                                                            className="w-20 p-2 border rounded text-center text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                                                            placeholder={useCm ? "cm" : "m"}
-                                                                            required
-                                                                        />
-                                                                    </div>
-                                                                </td>
-                                                                <td className="p-2">
-                                                                    <input
-                                                                        type="number"
-                                                                        name="quantity"
-                                                                        value={win.quantity}
-                                                                        onChange={(e) => handleWindowChange(index, e)}
-                                                                        className="w-full p-2 border rounded text-center text-xs"
-                                                                        required
-                                                                    />
-                                                                </td>
-                                                                <td className="p-2">
-                                                                    <input
-                                                                        type="number"
-                                                                        step="0.01"
-                                                                        name="price_per_m2"
-                                                                        value={win.price_per_m2}
-                                                                        onChange={(e) => handleWindowChange(index, e)}
-                                                                        className="w-full p-2 border rounded text-center text-xs"
-                                                                        placeholder={quotation.price_per_m2 || 'Global'}
-                                                                    />
-                                                                </td>
-                                                                <td className="p-2 space-y-1.5">
-                                                                    {optionGroups.map(wto => (
-                                                                        <select
-                                                                            key={wto.group.key}
-                                                                            value={win.options?.[wto.group.key] || ''}
-                                                                            onChange={(e) => handleOptionChange(index, wto.group.key, e.target.value)}
-                                                                            className="w-full p-2 border rounded text-xs"
-                                                                            required
-                                                                        >
-                                                                            <option value="">{wto.group.label}...</option>
-                                                                            {wto.group.values.map(v => (
-                                                                                <option key={v.key} value={v.key}>{v.label}</option>
-                                                                            ))}
-                                                                        </select>
-                                                                    ))}
-                                                                    {showUpload && (
-                                                                        <div className="mt-1">
-                                                                            <label htmlFor={`file-upload-${index}`} className="flex items-center gap-1.5 text-xs text-blue-600 cursor-pointer hover:text-blue-800">
-                                                                                <FaUpload size={11} /><span>Adjuntar Diseño</span>
-                                                                            </label>
-                                                                            <input
-                                                                                id={`file-upload-${index}`}
-                                                                                type="file"
-                                                                                className="hidden"
-                                                                                accept="image/*"
-                                                                                onChange={(e) => handleFileChange(index, e.target.files[0])}
-                                                                            />
-                                                                            {win.fileToUpload && (
-                                                                                <p className="text-xs text-gray-600 mt-1 truncate max-w-[120px]">
-                                                                                    {win.fileToUpload.name}
-                                                                                </p>
-                                                                            )}
-                                                                            {win.design_image_url && !win.fileToUpload && (
-                                                                                <a
-                                                                                    href={resolveImageUrl(win.design_image_url)}
-                                                                                    target="_blank"
-                                                                                    rel="noopener noreferrer"
-                                                                                    className="block w-fit mt-1"
-                                                                                >
-                                                                                    <img
-                                                                                        src={resolveImageUrl(win.design_image_url)}
-                                                                                        alt="Diseño adjunto"
-                                                                                        className="h-10 w-auto rounded-lg border border-blue-200 object-cover shadow-sm hover:opacity-80 transition-opacity"
-                                                                                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                                                                    />
-                                                                                </a>
-                                                                            )}
-                                                                        </div>
-                                                                    )}
-                                                                </td>
-                                                                <td className="p-2">
-                                                                    {(() => {
-                                                                        const selectedType = windowTypes.find(wt => wt.id === Number(win.window_type_id));
-                                                                        const availableColors = selectedType?.pvcLinks?.length
-                                                                            ? pvcColors.filter(c => selectedType.pvcLinks.some(l => l.pvcColor_id === c.id))
-                                                                            : pvcColors;
-                                                                        return (
-                                                                            <select
-                                                                                name="color_id"
-                                                                                value={win.color_id}
-                                                                                onChange={(e) => handleWindowChange(index, e)}
-                                                                                className="w-full p-2 border rounded text-xs"
-                                                                                required
-                                                                                disabled={!win.window_type_id}
-                                                                            >
-                                                                                <option value="">
-                                                                                    {win.window_type_id ? 'Seleccione...' : 'Primero tipo'}
-                                                                                </option>
-                                                                                {availableColors.map(c => (
-                                                                                    <option key={c.id} value={c.id}>{c.name}</option>
-                                                                                ))}
-                                                                            </select>
-                                                                        );
-                                                                    })()}
-                                                                </td>
-                                                                <td className="p-2">
-                                                                    <select
-                                                                        name="glass_color_id"
-                                                                        value={win.glass_color_id}
-                                                                        onChange={(e) => handleWindowChange(index, e)}
-                                                                        className="w-full p-2 border rounded text-xs"
-                                                                    >
-                                                                        <option value="">Seleccione...</option>
-                                                                        {glassColors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                                                    </select>
-                                                                    {needsAddGlass && (
-                                                                        <select
-                                                                            value={win.options?.vidrio_adicional_id || ''}
-                                                                            onChange={(e) => handleOptionChange(index, 'vidrio_adicional_id', e.target.value)}
-                                                                            className="w-full p-2 border border-blue-400 rounded mt-1.5 text-xs"
-                                                                            required
-                                                                        >
-                                                                            <option value="">Seleccionar Vidrio...</option>
-                                                                            {realGlassTypes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                                                        </select>
-                                                                    )}
-                                                                </td>
-                                                                <td className="p-2 text-center">
-                                                                    <div className="flex justify-center items-center gap-2 text-gray-500">
-                                                                        <button type="button" onClick={() => duplicateWindow(index)} title="Duplicar" className="hover:text-blue-600 transition-colors">
-                                                                            <FaClone size={13} />
-                                                                        </button>
-                                                                        <button type="button" onClick={() => removeWindow(index)} title="Eliminar" className="hover:text-red-600 transition-colors">
-                                                                            <FaTrashAlt size={13} className="text-red-400" />
-                                                                        </button>
-                                                                    </div>
-                                                                </td>
-                                                            </tr>
-                                                        </Fragment>
-                                                    );
-                                                })}
-                                            </tbody>
-                                        </table>
-                                    </div>
-
-                                    <Button type="button" variant="outline" onClick={addWindow} className="self-start">
-                                        <FaPlus className="mr-2" size={11} /> Añadir Ventana
-                                    </Button>
-
-                                    {/* ── Análisis de costos (solo visible cuando hay datos) ── */}
-                                    {(totalMaterialCost > 0 || isCalculatingAny) && (
-                                        <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-sm">
-                                            {isCalculatingAny ? (
-                                                <span className="text-xs text-gray-400 italic animate-pulse">⏳ Calculando costos...</span>
-                                            ) : isAdmin ? (
-                                                <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs items-center">
-                                                    <span className="text-amber-700 font-semibold uppercase tracking-wide">Análisis de Costos</span>
-                                                    <span className="text-gray-600">
-                                                        Materiales: <span className="font-bold text-gray-800">Q {totalMaterialCost.toFixed(2)}</span>
-                                                    </span>
-                                                    <span className="text-green-700 font-bold">
-                                                        Mín. sugerido: <span className="text-green-800">Q {totalPrecioSugerido.toFixed(2)}</span>
-                                                    </span>
-                                                </div>
-                                            ) : (
-                                                <div className="flex items-center gap-2 text-xs">
-                                                    <span className="text-amber-700 font-semibold">Precio mínimo sugerido:</span>
-                                                    <span className="text-green-700 font-bold">Q {totalPrecioSugerido.toFixed(2)}</span>
-                                                </div>
-                                            )}
+                                    <div className="space-y-1 w-64 flex-shrink-0">
+                                        <div className="flex justify-between text-sm text-gray-600">
+                                            <span>Sub-total:</span>
+                                            <span>Q {totalsInRealTime.subTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                                         </div>
-                                    )}
-                                </div>
-
-                                {/* ── Errores de validación ── */}
-                                {validationErrors.length > 0 && (
-                                    <div className="mx-4 sm:mx-6 mt-3 p-3 sm:p-4 bg-red-50 border border-red-200 rounded-lg flex-shrink-0">
-                                        <p className="text-sm font-semibold text-red-700 mb-2 flex items-center gap-2">
-                                            <span>⚠️</span>
-                                            Por favor corrige los siguientes errores:
-                                        </p>
-                                        <ul className="space-y-1 max-h-32 overflow-y-auto">
-                                            {validationErrors.map((err, i) => (
-                                                <li key={i} className="text-sm text-red-600 flex items-start gap-2">
-                                                    <span className="mt-0.5 shrink-0">•</span>
-                                                    <span>{err}</span>
-                                                </li>
-                                            ))}
-                                        </ul>
+                                        {quotation.include_iva && (
+                                            <div className="flex justify-between text-sm text-green-600 font-medium">
+                                                <span>IVA (12%):</span>
+                                                <span>Q {totalsInRealTime.ivaTax.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                                            </div>
+                                        )}
+                                        <div className="flex justify-between items-center pt-2 border-t border-gray-300">
+                                            <span className="text-lg font-bold text-gray-800">TOTAL:</span>
+                                            <span className="text-2xl font-black text-blue-700">
+                                                Q {totalsInRealTime.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                            </span>
+                                        </div>
                                     </div>
-                                )}
-
-                                {/* ── Footer ── */}
-                                <div className="px-4 sm:px-6 py-4 border-t border-gray-100 flex-shrink-0">
-                                    <DialogFooter className="flex justify-end gap-2">
-                                        <Button type="button" variant="ghost" onClick={onClose} className="px-4 sm:px-6">
-                                            Cancelar
-                                        </Button>
-                                        <Button
-                                            type="submit"
-                                            disabled={loading}
-                                            className="px-6 sm:px-10 bg-blue-600 hover:bg-blue-700 text-white"
-                                        >
-                                            {loading ? 'Guardando...' : 'Guardar Cotización'}
-                                        </Button>
-                                    </DialogFooter>
                                 </div>
-                            </form>
-                        </DialogContent>
-                    </div>
+
+                            </div>
+
+                            {/* Footer */}
+                            <div className="pt-6 border-t mt-auto">
+                                <DialogFooter className="flex justify-end gap-2">
+                                    <Button type="button" variant="ghost" onClick={onClose} className="px-6">Cancelar</Button>
+                                    <Button type="submit" disabled={loading} className="px-10 bg-blue-600 hover:bg-blue-700 text-white">
+                                        {loading ? 'Guardando...' : 'Guardar Cotización'}
+                                    </Button>
+                                </DialogFooter>
+                            </div>
+                        </form>
+                    </DialogContent>
                 </DialogPrimitive.Portal>
             </DialogPrimitive.Root>
 
