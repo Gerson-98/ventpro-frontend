@@ -1,8 +1,10 @@
 // RUTA: src/components/ProfilesReportModal.jsx
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { generateMaterialsPDF } from '@/lib/generateMaterialsPDF';
-import { FaFilePdf } from 'react-icons/fa';
+import { FaFilePdf, FaSave } from 'react-icons/fa';
+import api from '@/services/api';
+import { useAuth } from '@/context/AuthContext';
 
 const groupReportByType = (reportData) => {
     if (!Array.isArray(reportData)) {
@@ -16,17 +18,59 @@ const groupReportByType = (reportData) => {
 };
 
 export default function ProfilesReportModal({ data, isLoading, onClose, showPrices, projectName, orderId }) {
+    const { user } = useAuth();
+    const isAdmin = user?.role === 'ADMIN';
+
     const reportData = data || [];
     const { profilesReport, glassReport, accessoriesReport } = groupReportByType(reportData);
+
     const [profitMargin, setProfitMargin] = useState(60);
+    const [savingMargin, setSavingMargin] = useState(false);
+    const [marginSaved, setMarginSaved] = useState(false);
     const [generatingPDF, setGeneratingPDF] = useState(false);
+
+    // ── Cargar margen desde la API al abrir ──────────────────────────────────
+    useEffect(() => {
+        const fetchMargin = async () => {
+            try {
+                const res = await api.get('/app-settings/profit-margin');
+                if (res.data?.profit_margin) {
+                    setProfitMargin(Number(res.data.profit_margin));
+                }
+            } catch {
+                // Si falla, queda el default de 60
+            }
+        };
+        fetchMargin();
+    }, []);
+
+    // ── Guardar margen (solo admin) ──────────────────────────────────────────
+    const handleSaveMargin = async () => {
+        if (!isAdmin) return;
+        setSavingMargin(true);
+        setMarginSaved(false);
+        try {
+            await api.patch('/app-settings/profit-margin', { profit_margin: profitMargin });
+            setMarginSaved(true);
+            setTimeout(() => setMarginSaved(false), 2500);
+        } catch {
+            alert('No se pudo guardar el margen.');
+        } finally {
+            setSavingMargin(false);
+        }
+    };
 
     const formatCurrency = (amount) => `Q${Number(amount || 0).toFixed(2)}`;
 
     const costTotal = Array.isArray(reportData)
         ? reportData.reduce((sum, item) => sum + (item.precioTotal || 0), 0)
         : 0;
-    const finalTotal = costTotal * (1 + profitMargin / 100);
+
+    // ✅ FIX: fórmula correcta — precio / (1 - margen)
+    // Con margen 60%: 2941 / 0.40 = 7352  ✓
+    // La fórmula anterior  2941 * 1.60 = 4705 era markup, no margen
+    const marginDecimal = Math.max(0.01, Math.min(0.99, profitMargin / 100));
+    const finalTotal = costTotal / (1 - marginDecimal);
 
     const handleDownloadPDF = async () => {
         setGeneratingPDF(true);
@@ -46,7 +90,6 @@ export default function ProfilesReportModal({ data, isLoading, onClose, showPric
         </tr>
     );
 
-    // Encabezado de sección reutilizable
     const SectionHeader = ({ color, title }) => (
         <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
             <span className={`w-1 h-5 ${color} rounded-full inline-block`} />
@@ -191,33 +234,86 @@ export default function ProfilesReportModal({ data, isLoading, onClose, showPric
 
                         {/* Totales / margen */}
                         {showPrices ? (
-                            <div className="flex flex-wrap items-center gap-3 sm:gap-4 bg-white p-3 rounded-xl border shadow-sm">
-                                <div className="flex flex-col">
-                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Margen (%)</label>
-                                    <input
-                                        type="number"
-                                        value={profitMargin}
-                                        onChange={(e) => setProfitMargin(Number(e.target.value))}
-                                        className="w-20 px-2 py-1 border rounded-lg font-bold text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
+                            <div className="flex flex-wrap items-end gap-3 sm:gap-4 bg-white p-3 rounded-xl border shadow-sm">
+
+                                {/* Input margen — solo admin puede editarlo y guardarlo */}
+                                <div className="flex flex-col gap-1">
+                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+                                        Margen de ganancia
+                                    </label>
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex items-center border rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-blue-500">
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                max="99"
+                                                step="1"
+                                                value={profitMargin}
+                                                onChange={(e) => setProfitMargin(Number(e.target.value))}
+                                                disabled={!isAdmin}
+                                                className="w-16 px-2 py-1.5 font-bold text-blue-600 focus:outline-none disabled:bg-gray-50 disabled:text-gray-400 text-center"
+                                            />
+                                            <span className="px-2 text-gray-400 text-sm bg-gray-50 border-l h-full flex items-center py-1.5">%</span>
+                                        </div>
+
+                                        {/* Botón guardar — solo admin */}
+                                        {isAdmin && (
+                                            <button
+                                                onClick={handleSaveMargin}
+                                                disabled={savingMargin}
+                                                title="Guardar margen como predeterminado"
+                                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${marginSaved
+                                                        ? 'bg-green-100 text-green-700 border border-green-200'
+                                                        : 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'
+                                                    } disabled:opacity-60`}
+                                            >
+                                                <FaSave size={11} />
+                                                {savingMargin ? 'Guardando...' : marginSaved ? '¡Guardado!' : 'Guardar'}
+                                            </button>
+                                        )}
+                                    </div>
+                                    {isAdmin && (
+                                        <p className="text-[10px] text-gray-400">
+                                            Aplica a todas las cotizaciones
+                                        </p>
+                                    )}
                                 </div>
-                                <div className="h-8 w-px bg-gray-200 hidden sm:block" />
-                                <div className="flex flex-col">
-                                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Costo Base</span>
-                                    <span className="text-base sm:text-lg font-semibold text-gray-700">{formatCurrency(costTotal)}</span>
-                                </div>
+
+                                <div className="h-10 w-px bg-gray-200 hidden sm:block self-center" />
+
+                                {/* Costo base — solo admin lo ve */}
+                                {isAdmin && (
+                                    <>
+                                        <div className="flex flex-col">
+                                            <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Costo Base</span>
+                                            <span className="text-base sm:text-lg font-semibold text-gray-700">{formatCurrency(costTotal)}</span>
+                                        </div>
+                                        <div className="h-10 w-px bg-gray-200 hidden sm:block self-center" />
+                                    </>
+                                )}
+
+                                {/* Precio sugerido — visible para todos */}
                                 <div className="flex flex-col">
                                     <span className="text-xs font-bold text-blue-700 uppercase tracking-wide">Precio Sugerido</span>
                                     <span className="text-xl sm:text-2xl font-black text-blue-700">{formatCurrency(finalTotal)}</span>
+                                    <span className="text-[10px] text-gray-400 mt-0.5">
+                                        Costo ÷ (1 − {profitMargin}%)
+                                    </span>
                                 </div>
                             </div>
                         ) : (
-                            <div className="flex items-center gap-3">
-                                <span className="text-sm font-bold text-gray-500 uppercase tracking-wide">Total de Costos:</span>
-                                <span className="text-lg sm:text-xl font-bold text-gray-800 bg-gray-200 px-3 sm:px-4 py-1.5 rounded-xl">
-                                    {formatCurrency(costTotal)}
-                                </span>
-                            </div>
+                            // Modo pedido — solo muestra costo total (solo admin)
+                            isAdmin ? (
+                                <div className="flex items-center gap-3">
+                                    <span className="text-sm font-bold text-gray-500 uppercase tracking-wide">Total de Costos:</span>
+                                    <span className="text-lg sm:text-xl font-bold text-gray-800 bg-gray-200 px-3 sm:px-4 py-1.5 rounded-xl">
+                                        {formatCurrency(costTotal)}
+                                    </span>
+                                </div>
+                            ) : (
+                                // Vendedor en modo pedido: no ve costos
+                                <div />
+                            )
                         )}
 
                         {/* Botones de acción */}
