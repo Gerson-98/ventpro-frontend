@@ -434,7 +434,8 @@ export default function CutOptimizationModal({
 <title>Plan de Corte — ${projectName || 'Pedido'}</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;padding:18px 22px;max-width:1100px;margin:0 auto}
+body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;padding:18px 22px;max-width:1100px;margin:0 auto;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.pc{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .hdr{border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:12px}
 .htit{font-size:17px;font-weight:900}
 .hsub{font-size:10px;color:#666;margin-top:2px}
@@ -455,7 +456,7 @@ body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;padd
 .ruler{display:flex;align-items:center;margin-left:90px;margin-right:36px;margin-top:2px;margin-bottom:8px}
 .ruler-line{flex:1;height:1px;background:#e53935}
 .ruler-lbl{font-size:10px;font-weight:700;color:#e53935;padding:0 5px}
-@media print{.sblk{page-break-inside:avoid}}
+@media print{.sblk{page-break-inside:avoid}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}}
 </style></head><body>
 <div class="hdr">
   <div class="htit">✂ PLAN DE CORTE</div>
