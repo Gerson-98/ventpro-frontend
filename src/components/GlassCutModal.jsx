@@ -1,96 +1,329 @@
 // RUTA: src/components/GlassCutModal.jsx
 
-import { FaPrint, FaTimes } from 'react-icons/fa';
+import { useState } from 'react';
+import { FaPrint, FaTimes, FaThLarge, FaList } from 'react-icons/fa';
 
-const GLASS_COLORS = [
-    '#2563eb', '#0891b2', '#059669', '#7c3aed',
-    '#dc2626', '#d97706', '#0d9488', '#6366f1',
+// ─── Colores pastel por ventana ───────────────────────────────────────────────
+const PIECE_COLORS = [
+    { bg: '#fce4ec', border: '#f48fb1', text: '#880e4f' }, // rosa
+    { bg: '#fff9c4', border: '#fff176', text: '#f57f17' }, // amarillo
+    { bg: '#e8f5e9', border: '#a5d6a7', text: '#1b5e20' }, // verde
+    { bg: '#e3f2fd', border: '#90caf9', text: '#0d47a1' }, // azul
+    { bg: '#f3e5f5', border: '#ce93d8', text: '#4a148c' }, // violeta
+    { bg: '#fff3e0', border: '#ffcc80', text: '#e65100' }, // naranja
+    { bg: '#e0f7fa', border: '#80deea', text: '#006064' }, // cyan
+    { bg: '#fbe9e7', border: '#ffab91', text: '#bf360c' }, // rojo claro
 ];
 
-function glassColor(idx) {
-    return GLASS_COLORS[idx % GLASS_COLORS.length];
+// Asignar color por etiqueta de ventana (V1, V2, etc.)
+const labelColorMap = new Map();
+let colorIdx = 0;
+function pieceColor(label) {
+    const base = (label || '').match(/V\d+/)?.[0] || label;
+    if (!labelColorMap.has(base)) {
+        labelColorMap.set(base, PIECE_COLORS[colorIdx % PIECE_COLORS.length]);
+        colorIdx++;
+    }
+    return labelColorMap.get(base);
 }
 
+// ─── Una plancha con layout 2D ────────────────────────────────────────────────
+function SheetLayout({ sheetIndex, sheet, sheetWidth, sheetHeight, scale }) {
+    const W = sheetWidth * scale;
+    const H = sheetHeight * scale;
+
+    return (
+        <div className="mb-6">
+            <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs font-bold text-gray-600 uppercase tracking-wide">
+                    Plancha {sheetIndex + 1}
+                </span>
+                <span className="text-xs text-gray-400">
+                    {sheet.pieces.length} pieza{sheet.pieces.length !== 1 ? 's' : ''}
+                </span>
+            </div>
+
+            <div className="relative border-2 border-red-400 bg-gray-50 overflow-hidden"
+                style={{ width: W, height: H }}>
+
+                {/* Piezas */}
+                {sheet.pieces.map((piece, pi) => {
+                    const color = pieceColor(piece.label);
+                    const pw = piece.width * scale;
+                    const ph = piece.height * scale;
+                    const px = piece.x * scale;
+                    const py = piece.y * scale;
+                    return (
+                        <div
+                            key={pi}
+                            className="absolute border flex flex-col items-center justify-center overflow-hidden"
+                            style={{
+                                left: px, top: py, width: pw, height: ph,
+                                background: color.bg,
+                                borderColor: color.border,
+                                borderWidth: 1.5,
+                            }}
+                            title={`${piece.label} — ${piece.width}×${piece.height} cm`}
+                        >
+                            {/* Medida ancho (top) */}
+                            {pw > 35 && ph > 18 && (
+                                <span className="text-[9px] font-bold leading-none select-none"
+                                    style={{ color: color.text }}>
+                                    {piece.width}
+                                </span>
+                            )}
+                            {/* Etiqueta ventana (centro) */}
+                            {pw > 25 && ph > 30 && (
+                                <span className="text-[11px] font-black leading-none mt-0.5 select-none"
+                                    style={{ color: color.text }}>
+                                    {piece.label}
+                                </span>
+                            )}
+                            {/* Medida alto (lado izquierdo vertical) */}
+                            {pw > 20 && ph > 25 && (
+                                <span
+                                    className="absolute left-0.5 top-1/2 text-[8px] font-semibold select-none"
+                                    style={{
+                                        color: color.text,
+                                        writingMode: 'vertical-rl',
+                                        transform: 'translateY(-50%) rotate(180deg)',
+                                        lineHeight: 1,
+                                    }}
+                                >
+                                    {piece.height}
+                                </span>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+
+            {/* Dimensión ancho (debajo, roja) */}
+            <div className="flex items-center mt-0.5" style={{ width: W }}>
+                <div className="flex-1 h-px bg-red-400" />
+                <span className="text-[10px] font-bold text-red-500 px-1">{sheetWidth}</span>
+                <div className="flex-1 h-px bg-red-400" />
+            </div>
+        </div>
+    );
+}
+
+// ─── Vista de tabla (lista de piezas) ─────────────────────────────────────────
+function TableView({ glassData }) {
+    return (
+        <div className="space-y-6">
+            {Object.entries(glassData).map(([key, data]) => (
+                <div key={key}>
+                    <div className="flex items-center gap-2 mb-2">
+                        <h3 className="text-sm font-black text-gray-900 uppercase tracking-wide">
+                            {data.glassName}
+                        </h3>
+                        <span className="text-xs text-gray-400">
+                            {data.planchaSize} · {data.totalPieces} pieza{data.totalPieces !== 1 ? 's' : ''} · {data.minPlanchas} plancha{data.minPlanchas !== 1 ? 's' : ''}
+                        </span>
+                    </div>
+                    <div className="overflow-x-auto rounded-lg border border-gray-200">
+                        <table className="w-full text-xs">
+                            <thead>
+                                <tr className="bg-gray-50 border-b border-gray-200">
+                                    <th className="px-3 py-2 text-left text-gray-500 font-semibold">Ventana</th>
+                                    <th className="px-3 py-2 text-center text-gray-500 font-semibold">Ancho (cm)</th>
+                                    <th className="px-3 py-2 text-center text-gray-500 font-semibold">Alto (cm)</th>
+                                    <th className="px-3 py-2 text-center text-gray-500 font-semibold">Cant.</th>
+                                    <th className="px-3 py-2 text-right text-gray-500 font-semibold">Área (cm²)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {data.pieces.map((p, pi) => {
+                                    const color = pieceColor(p.windowLabel);
+                                    return (
+                                        <tr key={pi} className="border-b border-gray-100 hover:bg-gray-50">
+                                            <td className="px-3 py-2 font-bold" style={{ color: color.text }}>{p.windowLabel}</td>
+                                            <td className="px-3 py-2 text-center font-mono">{p.width}</td>
+                                            <td className="px-3 py-2 text-center font-mono">{p.height}</td>
+                                            <td className="px-3 py-2 text-center font-bold">{p.quantity}</td>
+                                            <td className="px-3 py-2 text-right font-mono text-gray-600">
+                                                {(p.width * p.height * p.quantity).toFixed(0)}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+// ─── Vista visual de planchas ─────────────────────────────────────────────────
+function VisualView({ glassData }) {
+    // Escala: ajustar para que la plancha más grande quepa en ~420px de ancho
+    const maxW = Math.max(...Object.values(glassData).map(d => d.sheetWidth || 213));
+    const scale = Math.min(1.8, 420 / maxW);
+
+    return (
+        <div className="space-y-8">
+            {Object.entries(glassData).map(([key, data]) => {
+                if (!data.sheets || data.sheets.length === 0) return null;
+                // Reset color map per glass type
+                labelColorMap.clear();
+                colorIdx = 0;
+                return (
+                    <div key={key}>
+                        <div className="flex items-center gap-3 mb-3 pb-2 border-b border-gray-100">
+                            <h3 className="text-sm font-black text-gray-900 uppercase tracking-wide">
+                                {data.glassName}
+                            </h3>
+                            <span className="text-xs text-gray-400">
+                                {data.planchaSize} · {data.minPlanchas} plancha{data.minPlanchas !== 1 ? 's' : ''} optimizada{data.minPlanchas !== 1 ? 's' : ''}
+                            </span>
+                        </div>
+                        <div className="flex flex-wrap gap-6">
+                            {data.sheets.map((sheet, si) => (
+                                <SheetLayout
+                                    key={si}
+                                    sheetIndex={si}
+                                    sheet={sheet}
+                                    sheetWidth={data.sheetWidth || 213}
+                                    sheetHeight={data.sheetHeight || 165.8}
+                                    scale={scale}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
+// ─── Modal principal ──────────────────────────────────────────────────────────
 export default function GlassCutModal({ glassCutData = {}, isLoading, onClose, projectName }) {
+    const [viewMode, setViewMode] = useState('visual'); // 'visual' | 'table'
+
     const glassTypes = Object.entries(glassCutData);
     const totalPlanchas = glassTypes.reduce((s, [, v]) => s + (v.minPlanchas || 0), 0);
     const totalPieces = glassTypes.reduce((s, [, v]) => s + (v.totalPieces || 0), 0);
 
     const handlePrint = () => {
         const date = new Date().toLocaleDateString('es-GT', { day: 'numeric', month: 'long', year: 'numeric' });
-        let bodyHtml = '';
 
-        glassTypes.forEach(([, data], gi) => {
-            const bg = glassColor(gi);
+        // Construir SVG por plancha para el PDF
+        let bodyHtml = '';
+        for (const [, data] of glassTypes) {
+            if (!data.sheets) continue;
+            const sw = data.sheetWidth || 213;
+            const sh = data.sheetHeight || 165.8;
+            const pscale = 2.2;
+            const W = sw * pscale;
+            const H = sh * pscale;
+
             bodyHtml += `<div class="gblock">
-                <div class="gtit" style="border-left:4px solid ${bg};padding-left:8px">${data.glassName}
-                    <span style="font-weight:400;font-size:10px;color:#666;margin-left:8px">${data.totalPieces} piezas · ${data.minPlanchas} plancha${data.minPlanchas !== 1 ? 's' : ''} mín.</span>
+                <div class="gtit">${data.glassName}
+                    <span style="font-weight:400;font-size:10px;color:#666;margin-left:8px">
+                        ${data.planchaSize} · ${data.totalPieces} piezas · ${data.minPlanchas} plancha${data.minPlanchas !== 1 ? 's' : ''}
+                    </span>
                 </div>
-                <table class="gtbl">
-                    <thead><tr><th>Ventana</th><th>Ancho (cm)</th><th>Alto (cm)</th><th>Cant.</th><th>Área (cm²)</th></tr></thead>
-                    <tbody>`;
-            for (const p of data.pieces) {
-                bodyHtml += `<tr>
-                    <td>${p.windowLabel}</td>
-                    <td>${p.width}</td>
-                    <td>${p.height}</td>
-                    <td>${p.quantity}</td>
-                    <td>${(p.width * p.height * p.quantity).toFixed(0)}</td>
-                </tr>`;
-            }
-            bodyHtml += `</tbody></table></div>`;
-        });
+                <div style="display:flex;flex-wrap:wrap;gap:16px">`;
+
+            data.sheets.forEach((sheet, si) => {
+                bodyHtml += `<div>
+                    <div style="font-size:9px;font-weight:700;color:#666;margin-bottom:3px">PLANCHA ${si + 1}</div>
+                    <svg width="${W}" height="${H}" style="border:2px solid #e53935;background:#fafafa">`;
+
+                sheet.pieces.forEach((piece, pi) => {
+                    const COLORS = ['#fce4ec', '#fff9c4', '#e8f5e9', '#e3f2fd', '#f3e5f5', '#fff3e0', '#e0f7fa', '#fbe9e7'];
+                    const BORDERS = ['#f48fb1', '#fff176', '#a5d6a7', '#90caf9', '#ce93d8', '#ffcc80', '#80deea', '#ffab91'];
+                    const TEXTS = ['#880e4f', '#f57f17', '#1b5e20', '#0d47a1', '#4a148c', '#e65100', '#006064', '#bf360c'];
+                    const ci = pi % COLORS.length;
+                    const px = piece.x * pscale;
+                    const py = piece.y * pscale;
+                    const pw = piece.width * pscale;
+                    const ph = piece.height * pscale;
+                    bodyHtml += `<rect x="${px}" y="${py}" width="${pw}" height="${ph}" fill="${COLORS[ci]}" stroke="${BORDERS[ci]}" stroke-width="1.5"/>`;
+                    if (pw > 30 && ph > 20) {
+                        bodyHtml += `<text x="${px + pw / 2}" y="${py + ph / 2 - 5}" text-anchor="middle" font-size="10" font-weight="900" fill="${TEXTS[ci]}">${piece.label}</text>`;
+                        bodyHtml += `<text x="${px + pw / 2}" y="${py + ph / 2 + 8}" text-anchor="middle" font-size="8" fill="${TEXTS[ci]}">${piece.width}×${piece.height}</text>`;
+                    }
+                });
+
+                bodyHtml += `</svg>
+                    <div style="display:flex;align-items:center;margin-top:2px">
+                        <div style="flex:1;height:1px;background:#e53935"></div>
+                        <span style="font-size:9px;font-weight:700;color:#e53935;padding:0 4px">${sw}</span>
+                        <div style="flex:1;height:1px;background:#e53935"></div>
+                    </div>
+                </div>`;
+            });
+
+            bodyHtml += `</div></div>`;
+        }
 
         const html = `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
 <title>Corte de Vidrio — ${projectName || 'Pedido'}</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;padding:18px 22px;max-width:900px;margin:0 auto}
+body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;padding:18px 22px;max-width:1100px;margin:0 auto}
 .hdr{border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:14px}
 .htit{font-size:17px;font-weight:900}
 .hsub{font-size:10px;color:#666;margin-top:2px}
 .smry{display:flex;gap:22px;margin-bottom:16px;padding:6px 10px;background:#f5f5f5;border-radius:3px;width:fit-content}
 .smry span{font-size:10px;color:#555} .smry b{font-size:12px;font-weight:900;color:#111;display:block}
-.gblock{margin-bottom:18px;page-break-inside:avoid}
-.gtit{font-size:13px;font-weight:900;text-transform:uppercase;margin-bottom:6px}
-.gtbl{width:100%;border-collapse:collapse;font-size:10px}
-.gtbl th{background:#f5f5f5;padding:4px 8px;text-align:left;font-weight:700;border-bottom:2px solid #ddd}
-.gtbl td{padding:4px 8px;border-bottom:1px solid #eee}
-.gtbl tr:hover td{background:#fafafa}
+.gblock{margin-bottom:24px;page-break-inside:avoid}
+.gtit{font-size:13px;font-weight:900;text-transform:uppercase;margin-bottom:8px;border-left:4px solid #e53935;padding-left:8px}
 @media print{.gblock{page-break-inside:avoid}}
 </style></head><body>
 <div class="hdr">
-  <div class="htit">CORTE DE VIDRIO</div>
+  <div class="htit">CORTE DE VIDRIO — OPTIMIZADO</div>
   <div class="hsub">${projectName || 'Pedido'} · ${date}</div>
 </div>
 <div class="smry">
-  <span>Planchas mín.<b>${totalPlanchas}</b></span>
+  <span>Planchas optimizadas<b>${totalPlanchas}</b></span>
   <span>Piezas totales<b>${totalPieces}</b></span>
 </div>
 ${bodyHtml}
 <script>window.onload=()=>{window.print();setTimeout(()=>window.close(),900)}<\/script>
 </body></html>`;
 
-        const w = window.open('', '_blank', 'width=900,height=700');
+        const w = window.open('', '_blank', 'width=1100,height=800');
         w.document.write(html);
         w.document.close();
     };
 
     return (
         <div className="fixed inset-0 bg-black/50 flex justify-center items-start z-50 overflow-y-auto p-4 sm:p-8">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col my-4 overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl flex flex-col my-4 overflow-hidden">
 
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
                     <div>
                         <h2 className="text-sm font-black text-gray-900 uppercase tracking-wide leading-none">
-                            Corte de Vidrio
+                            Optimizador de Vidrio
                         </h2>
                         {projectName && (
                             <p className="text-xs text-gray-400 leading-tight mt-0.5">{projectName}</p>
                         )}
                     </div>
                     <div className="flex items-center gap-2">
+                        {/* Toggle vista */}
+                        {!isLoading && glassTypes.length > 0 && (
+                            <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+                                <button
+                                    onClick={() => setViewMode('visual')}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition-colors ${viewMode === 'visual' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-50'}`}
+                                >
+                                    <FaThLarge size={9} /> Visual
+                                </button>
+                                <button
+                                    onClick={() => setViewMode('table')}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition-colors ${viewMode === 'table' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-50'}`}
+                                >
+                                    <FaList size={9} /> Lista
+                                </button>
+                            </div>
+                        )}
                         {!isLoading && glassTypes.length > 0 && (
                             <button
                                 onClick={handlePrint}
@@ -114,7 +347,7 @@ ${bodyHtml}
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                             </svg>
-                            <p className="text-sm font-medium">Calculando corte de vidrio...</p>
+                            <p className="text-sm font-medium">Optimizando corte de vidrio...</p>
                         </div>
                     ) : glassTypes.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-24 text-gray-400">
@@ -125,7 +358,7 @@ ${bodyHtml}
                             {/* Resumen */}
                             <div className="flex flex-wrap gap-8 mb-6 pb-5 border-b border-gray-100">
                                 <div>
-                                    <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold mb-0.5">Planchas mín.</p>
+                                    <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold mb-0.5">Planchas optimizadas</p>
                                     <p className="text-2xl font-black text-gray-900 leading-none">{totalPlanchas}</p>
                                 </div>
                                 <div>
@@ -134,54 +367,18 @@ ${bodyHtml}
                                 </div>
                             </div>
 
-                            {/* Por tipo de vidrio */}
-                            {glassTypes.map(([key, data], gi) => (
-                                <div key={key} className="mb-6">
-                                    <div className="flex items-center gap-2 mb-3">
-                                        <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: glassColor(gi) }} />
-                                        <h3 className="text-sm font-black text-gray-900 uppercase tracking-wide">
-                                            {data.glassName}
-                                        </h3>
-                                        <span className="text-xs text-gray-400 ml-2">
-                                            {data.totalPieces} pieza{data.totalPieces !== 1 ? 's' : ''} · {data.minPlanchas} plancha{data.minPlanchas !== 1 ? 's' : ''} mín.
-                                        </span>
-                                    </div>
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-xs">
-                                            <thead>
-                                                <tr className="border-b-2 border-gray-200">
-                                                    <th className="px-3 py-2 text-left text-gray-500 font-semibold uppercase tracking-wide">Ventana</th>
-                                                    <th className="px-3 py-2 text-center text-gray-500 font-semibold uppercase tracking-wide">Ancho (cm)</th>
-                                                    <th className="px-3 py-2 text-center text-gray-500 font-semibold uppercase tracking-wide">Alto (cm)</th>
-                                                    <th className="px-3 py-2 text-center text-gray-500 font-semibold uppercase tracking-wide">Cant.</th>
-                                                    <th className="px-3 py-2 text-right text-gray-500 font-semibold uppercase tracking-wide">Área (cm²)</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {data.pieces.map((p, pi) => (
-                                                    <tr key={pi} className="border-b border-gray-100 hover:bg-gray-50">
-                                                        <td className="px-3 py-2 font-bold" style={{ color: glassColor(gi) }}>{p.windowLabel}</td>
-                                                        <td className="px-3 py-2 text-center font-mono">{p.width}</td>
-                                                        <td className="px-3 py-2 text-center font-mono">{p.height}</td>
-                                                        <td className="px-3 py-2 text-center font-bold">{p.quantity}</td>
-                                                        <td className="px-3 py-2 text-right font-mono text-gray-600">{(p.width * p.height * p.quantity).toFixed(0)}</td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            ))}
+                            {viewMode === 'visual'
+                                ? <VisualView glassData={glassCutData} />
+                                : <TableView glassData={glassCutData} />
+                            }
                         </div>
                     )}
                 </div>
 
                 {/* Footer */}
                 <div className="px-6 py-3 border-t border-gray-100 flex items-center justify-end flex-shrink-0">
-                    <button
-                        onClick={onClose}
-                        className="px-4 py-1.5 text-xs font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-                    >
+                    <button onClick={onClose}
+                        className="px-4 py-1.5 text-xs font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
                         Cerrar
                     </button>
                 </div>

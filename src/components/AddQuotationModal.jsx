@@ -244,9 +244,20 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             : parseFloat(displayValue);
     };
 
+    // Guarda el AbortController activo por ventana para cancelar requests anteriores
+    const abortControllers = useRef({});
+
     const calculateWindowCost = useCallback(async (win) => {
         if (!win.window_type_id || !win.width_m || !win.height_m || !win.color_id) return;
         const key = win.tempId || win.id;
+
+        // Cancelar el request anterior de esta ventana si sigue en vuelo
+        if (abortControllers.current[key]) {
+            abortControllers.current[key].abort();
+        }
+        const controller = new AbortController();
+        abortControllers.current[key] = controller;
+
         setCalculatingCost(prev => ({ ...prev, [key]: true }));
         try {
             const response = await api.post('/cost-calculator/window', {
@@ -257,18 +268,26 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                 glass_color_id: win.glass_color_id ? Number(win.glass_color_id) : undefined,
                 options: win.options || {},
                 quantity: Number(win.quantity) || 1,
-            });
-            setWindowCosts(prev => ({
-                ...prev,
-                [key]: {
-                    costo_total: response.data.costo_total,
-                    precio_sugerido_minimo: response.data.precio_sugerido_minimo,
-                },
-            }));
+            }, { signal: controller.signal });
+            // Solo actualizar si este request no fue cancelado
+            if (!controller.signal.aborted) {
+                setWindowCosts(prev => ({
+                    ...prev,
+                    [key]: {
+                        costo_total: response.data.costo_total,
+                        precio_sugerido_minimo: response.data.precio_sugerido_minimo,
+                    },
+                }));
+            }
         } catch (error) {
+            // Ignorar errores de requests cancelados
+            if (error?.code === 'ERR_CANCELED' || error?.name === 'AbortError' || error?.name === 'CanceledError') return;
             console.error('Error calculando costo:', error);
         } finally {
-            setCalculatingCost(prev => ({ ...prev, [key]: false }));
+            if (!controller.signal.aborted) {
+                setCalculatingCost(prev => ({ ...prev, [key]: false }));
+                delete abortControllers.current[key];
+            }
         }
     }, []);
 
@@ -383,9 +402,15 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             setWindowCosts({});
             setCalculatingCost({});
             const buildEditWindows = async () => {
+                // ── Leer windowTypes directamente del estado actual via función ──
+                // Evita el problema de closure con el valor viejo del estado
+                const currentTypes = await new Promise < any[] > (resolve => {
+                    setWindowTypes(prev => { resolve(prev); return prev; });
+                });
+
                 const windows = await Promise.all(
                     (quotationToEdit.quotation_windows || []).map(async (win) => {
-                        const found = findGroupAndVariants(win.window_type_id, windowTypes);
+                        const found = findGroupAndVariants(win.window_type_id, currentTypes);
                         const optionGroups = win.window_type_id
                             ? await loadOptionGroups(win.window_type_id)
                             : [];
@@ -1109,7 +1134,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
 
                                     {/* ── Tabla de ventanas — scroll horizontal en todos los tamaños ── */}
                                     <div className="w-full border rounded-lg shadow-sm bg-white overflow-x-auto -mx-0">
-                                        <table className="w-full text-sm table-auto border-collapse min-w-[860px]">
+                                        <table className="w-full text-sm table-auto border-collapse min-w-[920px]">
                                             <thead className="bg-gray-100 border-b sticky top-0 z-10">
                                                 <tr>
                                                     <th className="p-2 text-left w-52">Tipo</th>
@@ -1135,7 +1160,12 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                                         </div>
                                                     </th>
                                                     <th className="p-2 text-center w-16">Cant.</th>
-                                                    <th className="p-2 text-center w-28">m² Ind.</th>
+                                                    <th className="p-2 text-center w-36">
+                                                        <div className="flex flex-col items-center gap-0.5">
+                                                            <span>Precio m²</span>
+                                                            <span className="text-[10px] font-normal text-gray-400">Total ventana</span>
+                                                        </div>
+                                                    </th>
                                                     <th className="p-2 text-left w-40">Opciones</th>
                                                     <th className="p-2 text-left w-32">Color PVC</th>
                                                     <th className="p-2 text-left w-32">Vidrio</th>
@@ -1205,15 +1235,33 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                                                     />
                                                                 </td>
                                                                 <td className="p-2">
-                                                                    <input
-                                                                        type="number"
-                                                                        step="0.01"
-                                                                        name="price_per_m2"
-                                                                        value={win.price_per_m2}
-                                                                        onChange={(e) => handleWindowChange(index, e)}
-                                                                        className="w-full p-2 border rounded text-center text-xs"
-                                                                        placeholder={quotation.price_per_m2 || 'Global'}
-                                                                    />
+                                                                    {/* Precio/m² individual + total calculado */}
+                                                                    <div className="flex flex-col gap-1">
+                                                                        <input
+                                                                            type="number"
+                                                                            step="0.01"
+                                                                            name="price_per_m2"
+                                                                            value={win.price_per_m2}
+                                                                            onChange={(e) => handleWindowChange(index, e)}
+                                                                            className="w-full p-1.5 border rounded text-center text-xs"
+                                                                            placeholder={quotation.price_per_m2 || 'Global'}
+                                                                        />
+                                                                        {(() => {
+                                                                            const w = parseFloat(win.width_m) || 0;
+                                                                            const h = parseFloat(win.height_m) || 0;
+                                                                            const q = parseInt(win.quantity) || 0;
+                                                                            const p = parseFloat(win.price_per_m2) || parseFloat(quotation.price_per_m2) || 0;
+                                                                            const total = w * h * q * p;
+                                                                            if (total <= 0) return null;
+                                                                            return (
+                                                                                <div className="text-center">
+                                                                                    <span className="text-[11px] font-black text-green-700 whitespace-nowrap">
+                                                                                        Q {total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                                                    </span>
+                                                                                </div>
+                                                                            );
+                                                                        })()}
+                                                                    </div>
                                                                 </td>
                                                                 <td className="p-2 space-y-1.5">
                                                                     {/* Selects normales (excluye checkboxes) */}

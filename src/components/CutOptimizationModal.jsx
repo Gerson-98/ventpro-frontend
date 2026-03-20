@@ -12,22 +12,28 @@
 
 import { FaPrint, FaTimes, FaRuler } from 'react-icons/fa';
 
-// ─── Paletas por serie (verde/dorado alternantes, igual que imagen cliente) ────
+// ─── Paletas por serie — colores pastel claros, aptos para impresión ──────────
 const PALETTES = [
-    { bg: '#2d7a2d', alt: '#3aaa3a' },
-    { bg: '#b8860b', alt: '#d4a017' },
-    { bg: '#2d7a2d', alt: '#3aaa3a' },
-    { bg: '#b8860b', alt: '#d4a017' },
-    { bg: '#2d7a2d', alt: '#3aaa3a' },
-    { bg: '#b8860b', alt: '#d4a017' },
-    { bg: '#2d7a2d', alt: '#3aaa3a' },
-    { bg: '#b8860b', alt: '#d4a017' },
+    { bg: '#c8e6c9', alt: '#a5d6a7' },  // verde claro
+    { bg: '#fff9c4', alt: '#fff176' },  // amarillo claro
+    { bg: '#c8e6c9', alt: '#a5d6a7' },
+    { bg: '#fff9c4', alt: '#fff176' },
+    { bg: '#c8e6c9', alt: '#a5d6a7' },
+    { bg: '#fff9c4', alt: '#fff176' },
+    { bg: '#c8e6c9', alt: '#a5d6a7' },
+    { bg: '#fff9c4', alt: '#fff176' },
 ];
 
-// Colores por ventana para perfiles individuales (no combo)
+// Colores pastel por ventana para perfiles individuales
 const WIN_BG = [
-    '#1d6fa4', '#2d7a2d', '#7c3aed', '#b8860b',
-    '#b91c1c', '#0e7490', '#c2410c', '#0f766e',
+    '#bbdefb', // azul claro
+    '#c8e6c9', // verde claro
+    '#e1bee7', // violeta claro
+    '#fff9c4', // amarillo claro
+    '#ffcdd2', // rojo/rosa claro
+    '#b2ebf2', // cyan claro
+    '#ffe0b2', // naranja claro
+    '#b2dfdb', // teal claro
 ];
 
 function winBg(label) {
@@ -207,56 +213,92 @@ function buildSeries(optimizationData) {
 }
 
 // ─── Una pieza en la barra ────────────────────────────────────────────────────
-function Piece({ cut, bg, minW = 38 }) {
-    const label = fmt(cut);
+function Piece({ cut, bg, minW = 42 }) {
+    const { vNum, dim } = parseLabel(cut.windowLabel);
+    const num = vNum.replace('V', '');
+    const dc = dim === 'A' ? 'AN' : dim === 'H' ? 'AL' : '';
+    const n = cut.length;
+    const len = Number.isInteger(n) ? `${n}` : `${n}`.replace('.', ',');
     const pct = (cut.length / 580) * 100;
+
     return (
         <div
-            title={label}
-            className="flex items-center justify-center border-r border-white/40 overflow-hidden flex-shrink-0"
+            title={fmt(cut)}
+            className="flex flex-col items-center justify-center border-r border-white/60 overflow-hidden flex-shrink-0"
             style={{ width: `${pct}%`, minWidth: minW, height: '100%', background: bg }}
         >
-            <span
-                className="text-[9.5px] font-bold text-white px-1 truncate leading-none select-none"
-                style={{ textShadow: '0 1px 2px rgba(0,0,0,.35)' }}
-            >
-                {label}
+            <span className="text-[12px] font-black text-gray-800 leading-none select-none">
+                {len}
+            </span>
+            <span className="text-[10px] font-semibold text-gray-600 leading-none mt-0.5 select-none">
+                {dc}V{num}
             </span>
         </div>
     );
 }
 
 // ─── Una fila de barra ────────────────────────────────────────────────────────
+const BAR_H = 50;
+
 function BarRow({ rowLabel, cuts, waste, palette, singleMode = false }) {
+    const wasteLabel = fmtWaste(waste);
+    const wastePct = ((waste || 0) / 580) * 100;
+
     return (
-        <div className="flex items-center mb-[3px]" style={{ minHeight: 30 }}>
-            {/* Etiqueta */}
-            <div className="flex-shrink-0 pr-2" style={{ width: 115 }}>
-                <span className="text-[10px] text-gray-600 uppercase tracking-wide leading-tight">
-                    {rowLabel}
-                </span>
-            </div>
-
-            {/* Barra proporcional */}
-            <div
-                className="flex overflow-hidden rounded-[2px]"
-                style={{ flex: 1, height: 30 }}
-            >
-                {cuts.map((cut, ci) => {
-                    const bg = singleMode
-                        ? winBg(cut.windowLabel)
-                        : ci % 2 === 0 ? palette.bg : palette.alt;
-                    return <Piece key={ci} cut={cut} bg={bg} />;
-                })}
-            </div>
-
-            {/* Retal */}
-            <div className="flex-shrink-0 pl-3" style={{ width: 98 }}>
-                {fmtWaste(waste) && (
-                    <span className="text-[10.5px] text-gray-800 whitespace-nowrap">
-                        {fmtWaste(waste)}
+        <div className="mb-1">
+            <div className="flex items-center" style={{ minHeight: BAR_H }}>
+                {/* Etiqueta izquierda */}
+                <div className="flex-shrink-0 pr-2" style={{ width: 120 }}>
+                    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide leading-tight">
+                        {rowLabel}
                     </span>
-                )}
+                </div>
+
+                {/* Barra proporcional */}
+                <div
+                    className="flex overflow-hidden border border-gray-300"
+                    style={{ flex: 1, height: BAR_H }}
+                >
+                    {cuts.map((cut, ci) => {
+                        const bg = singleMode
+                            ? winBg(cut.windowLabel)
+                            : ci % 2 === 0 ? palette.bg : palette.alt;
+                        return <Piece key={ci} cut={cut} bg={bg} />;
+                    })}
+                    {/* Zona de sobra */}
+                    {wastePct > 0.5 && (
+                        <div
+                            className="flex items-center justify-center border-l border-dashed border-gray-400 bg-white flex-shrink-0"
+                            style={{ width: `${wastePct}%`, height: '100%' }}
+                        >
+                            {wasteLabel && (
+                                <span
+                                    className="text-[10px] font-semibold text-gray-400 select-none"
+                                    style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+                                >
+                                    {wasteLabel}
+                                </span>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {/* Dimensión total */}
+                <div className="flex-shrink-0 pl-2" style={{ width: 50 }}>
+                    <span
+                        className="text-[10px] font-bold text-red-500 select-none"
+                        style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+                    >
+                        {BAR_H}
+                    </span>
+                </div>
+            </div>
+
+            {/* Línea roja con "580" debajo */}
+            <div className="flex items-center ml-[120px] mr-[50px] mt-0.5">
+                <div className="flex-1 h-px bg-red-400" />
+                <span className="text-[10px] font-bold text-red-500 px-1.5">580</span>
+                <div className="flex-1 h-px bg-red-400" />
             </div>
         </div>
     );
@@ -356,21 +398,33 @@ export default function CutOptimizationModal({
                 <div class="stit">${ordinal(it.groupIdx)}</div>`;
 
             for (const row of rows) {
+                const wastePct = ((row.waste || 0) / 580 * 100).toFixed(2);
                 seriesHtml += `<div class="brow">
                     <div class="rlbl">${row.lbl}</div>
                     <div class="bwrp">`;
                 row.cuts.forEach((cut, ci) => {
-                    const lbl = fmt(cut);
+                    const { vNum, dim } = parseLabel(cut.windowLabel);
+                    const num = vNum.replace('V', '');
+                    const dc = dim === 'A' ? 'AN' : dim === 'H' ? 'AL' : '';
+                    const n = cut.length;
+                    const len = Number.isInteger(n) ? `${n}` : `${n}`.replace('.', ',');
                     const pct = ((cut.length / 580) * 100).toFixed(2);
                     const bg = it.type === 'single'
                         ? winBg(cut.windowLabel)
                         : ci % 2 === 0 ? it.palette.bg : it.palette.alt;
                     seriesHtml += `<div class="pc" style="width:${pct}%;background:${bg}">
-                        <span>${lbl}</span></div>`;
+                        <span class="top">${len}</span>
+                        <span class="bot">${dc}V${num}</span></div>`;
                 });
-                seriesHtml += `</div>`;
-                const wt = fmtWaste(row.waste);
-                if (wt) seriesHtml += `<div class="wlbl">${wt}</div>`;
+                // Zona de sobra
+                if (parseFloat(wastePct) > 0.5) {
+                    const wt = fmtWaste(row.waste);
+                    seriesHtml += `<div class="pc waste" style="width:${wastePct}%"><span>${wt || ''}</span></div>`;
+                }
+                seriesHtml += `</div>
+                    <div class="dim"><span>50</span></div>
+                </div>
+                <div class="ruler"><div class="ruler-line"></div><span class="ruler-lbl">580</span><div class="ruler-line"></div></div>`;
                 seriesHtml += `</div>`;
             }
             seriesHtml += `</div><div style="height:10px"></div>`;
@@ -387,13 +441,20 @@ body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;padd
 .smry{display:flex;gap:22px;margin-bottom:14px;padding:6px 10px;background:#f5f5f5;border-radius:3px;width:fit-content}
 .smry span{font-size:10px;color:#555} .smry b{font-size:12px;font-weight:900;color:#111;display:block}
 .sblk{page-break-inside:avoid}
-.stit{font-size:13px;font-weight:900;text-transform:uppercase;color:#111;margin-bottom:5px}
-.brow{display:flex;align-items:center;margin-bottom:3px;min-height:26px}
-.rlbl{width:90px;flex-shrink:0;font-size:8.5px;text-transform:uppercase;color:#777;padding-right:5px;line-height:1.2}
-.bwrp{flex:1;display:flex;height:26px;overflow:hidden}
-.pc{display:flex;align-items:center;justify-content:center;height:100%;border-right:1px solid rgba(255,255,255,.4);min-width:26px;overflow:hidden;flex-shrink:0}
-.pc span{font-size:7.5px;font-weight:700;color:#fff;text-shadow:0 1px 1px rgba(0,0,0,.3);padding:0 2px;white-space:nowrap}
-.wlbl{width:84px;flex-shrink:0;padding-left:7px;font-size:9.5px;color:#333;white-space:nowrap}
+.stit{font-size:13px;font-weight:900;text-transform:uppercase;color:#111;margin-bottom:6px}
+.brow{display:flex;align-items:stretch;margin-bottom:2px}
+.rlbl{width:90px;flex-shrink:0;font-size:9px;text-transform:uppercase;color:#666;padding-right:6px;display:flex;align-items:center;font-weight:600}
+.bwrp{flex:1;display:flex;height:50px;border:1px solid #ccc;overflow:hidden}
+.pc{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;border-right:1px solid rgba(255,255,255,.6);min-width:30px;overflow:hidden;flex-shrink:0}
+.pc .top{font-size:12px;font-weight:900;color:#333;line-height:1}
+.pc .bot{font-size:10px;font-weight:600;color:#555;line-height:1;margin-top:2px}
+.pc.waste{background:#fff!important;border-left:1px dashed #aaa;flex:1}
+.pc.waste span{font-size:9px;color:#aaa;writing-mode:vertical-rl;transform:rotate(180deg)}
+.dim{width:36px;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding-left:4px}
+.dim span{font-size:10px;font-weight:700;color:#e53935;writing-mode:vertical-rl;transform:rotate(180deg)}
+.ruler{display:flex;align-items:center;margin-left:90px;margin-right:36px;margin-top:2px;margin-bottom:8px}
+.ruler-line{flex:1;height:1px;background:#e53935}
+.ruler-lbl{font-size:10px;font-weight:700;color:#e53935;padding:0 5px}
 @media print{.sblk{page-break-inside:avoid}}
 </style></head><body>
 <div class="hdr">
