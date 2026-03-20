@@ -283,21 +283,10 @@ function BarRow({ rowLabel, cuts, waste, palette, singleMode = false }) {
                     )}
                 </div>
 
-                {/* Dimensión total */}
-                <div className="flex-shrink-0 pl-2" style={{ width: 50 }}>
-                    <span
-                        className="text-[10px] font-bold text-red-500 select-none"
-                        style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
-                    >
-                        {BAR_H}
-                    </span>
-                </div>
             </div>
 
-            {/* Línea roja con "580" debajo */}
-            <div className="flex items-center ml-[120px] mr-[50px] mt-0.5">
-                <div className="flex-1 h-px bg-red-400" />
-                <span className="text-[10px] font-bold text-red-500 px-1.5">580</span>
+            {/* Línea roja simple */}
+            <div className="flex items-center ml-[120px] mt-0.5">
                 <div className="flex-1 h-px bg-red-400" />
             </div>
         </div>
@@ -422,9 +411,8 @@ export default function CutOptimizationModal({
                     seriesHtml += `<div class="pc waste" style="width:${wastePct}%"><span>${wt || ''}</span></div>`;
                 }
                 seriesHtml += `</div>
-                    <div class="dim"><span>50</span></div>
                 </div>
-                <div class="ruler"><div class="ruler-line"></div><span class="ruler-lbl">580</span><div class="ruler-line"></div></div>`;
+                <div class="ruler"><div class="ruler-line"></div></div>`;
                 seriesHtml += `</div>`;
             }
             seriesHtml += `</div><div style="height:10px"></div>`;
