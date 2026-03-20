@@ -404,7 +404,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             const buildEditWindows = async () => {
                 // ── Leer windowTypes directamente del estado actual via función ──
                 // Evita el problema de closure con el valor viejo del estado
-                const currentTypes = await new Promise < any[] > (resolve => {
+                const currentTypes = await new Promise(resolve => {
                     setWindowTypes(prev => { resolve(prev); return prev; });
                 });
 
