@@ -31,6 +31,9 @@ export default function LoginPage() {
         try {
             const { data } = await api.post('/auth/login', { email, password });
             localStorage.setItem('authToken', data.access_token);
+            if (data.refresh_token) {
+                localStorage.setItem('refreshToken', data.refresh_token);
+            }
             window.location.href = '/';
         } catch (err) {
             if (err.code === 'ECONNABORTED' || err.code === 'ERR_NETWORK') {

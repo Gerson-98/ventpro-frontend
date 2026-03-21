@@ -70,10 +70,21 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const { data } = await api.post('/auth/refresh', {}, { withCredentials: true });
+        const refreshToken = localStorage.getItem('refreshToken');
+        if (!refreshToken) throw new Error('No refresh token');
+
+        const { data } = await api.post(
+          '/auth/refresh',
+          { refresh_token: refreshToken },
+          { withCredentials: false },
+        );
         const newToken = data.access_token;
 
         localStorage.setItem('authToken', newToken);
+        // Rotar el refresh token si el backend devuelve uno nuevo
+        if (data.refresh_token) {
+          localStorage.setItem('refreshToken', data.refresh_token);
+        }
         api.defaults.headers.common.Authorization = `Bearer ${newToken}`;
         originalRequest.headers.Authorization = `Bearer ${newToken}`;
 
@@ -82,6 +93,7 @@ api.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError, null);
         localStorage.removeItem('authToken');
+        localStorage.removeItem('refreshToken');
         window.location.href = '/login';
         return Promise.reject(refreshError);
       } finally {
