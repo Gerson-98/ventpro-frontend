@@ -42,14 +42,22 @@ const CHECKBOX_DEFAULTS = {
     refuerzo_mosquitero: null,             // OFF por defecto
 };
 
-const applyCheckboxDefaults = (currentOptions, optionGroups) => {
+// IDs de tipos de ventana donde mosquitero debe estar OFF por default
+const MOSQUITERO_OFF_BY_DEFAULT = new Set([17]); // 17 = VENTANA PROYECTABLE
+
+const applyCheckboxDefaults = (currentOptions, optionGroups, windowTypeId = null) => {
     const newOptions = { ...currentOptions };
     optionGroups.forEach(wto => {
         const groupKey = wto.group?.key;
         if (!groupKey || !CHECKBOX_GROUPS.has(groupKey)) return;
         if (!(groupKey in newOptions)) {
-            const defaultValue = CHECKBOX_DEFAULTS[groupKey];
-            if (defaultValue !== null) newOptions[groupKey] = defaultValue;
+            // Para proyectable u otros tipos especiales, mosquitero OFF por default
+            if (groupKey === 'mosquitero' && windowTypeId && MOSQUITERO_OFF_BY_DEFAULT.has(Number(windowTypeId))) {
+                newOptions[groupKey] = 'sin_mosquitero';
+            } else {
+                const defaultValue = CHECKBOX_DEFAULTS[groupKey];
+                if (defaultValue !== null) newOptions[groupKey] = defaultValue;
+            }
         }
     });
     return newOptions;
@@ -307,11 +315,20 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
         }, 700);
     }, [calculateWindowCost]);
 
+    // Cache de option groups por window_type_id para evitar llamadas repetidas
+    const optionGroupsCache = useRef({});
+
     const loadOptionGroups = useCallback(async (windowTypeId) => {
         if (!windowTypeId) return [];
+        // Retornar del cache si ya se cargó
+        if (optionGroupsCache.current[windowTypeId]) {
+            return optionGroupsCache.current[windowTypeId];
+        }
         try {
             const res = await api.get(`/window-type-options?windowTypeId=${windowTypeId}`);
-            return Array.isArray(res.data) ? res.data : [];
+            const data = Array.isArray(res.data) ? res.data : [];
+            optionGroupsCache.current[windowTypeId] = data;
+            return data;
         } catch {
             return [];
         }
@@ -363,6 +380,10 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             setValidationErrors([]);
             setUseCm(false);
             setTotalOverride('');
+            setWindowCosts({});
+            setCalculatingCost({});
+            // Limpiar cache de option groups al cerrar
+            optionGroupsCache.current = {};
             return;
         }
         const fetchCatalogs = async () => {
@@ -415,7 +436,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                             ? await loadOptionGroups(win.window_type_id)
                             : [];
                         // Aplicar defaults de checkboxes a las opciones guardadas
-                        const options = applyCheckboxDefaults(win.options || {}, optionGroups);
+                        const options = applyCheckboxDefaults(win.options || {}, optionGroups, win.window_type_id);
                         return {
                             id: win.id,
                             displayName: win.displayName || win.windowType?.name || '',
@@ -485,7 +506,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                     const newType = windowTypes.find(w => w.id === wtId);
                     const allowedIds = new Set((newType?.pvcLinks || []).map(l => l.pvcColor_id));
                     // Aplicar defaults de checkboxes para los nuevos option groups
-                    const defaultOptions = applyCheckboxDefaults({}, optionGroups);
+                    const defaultOptions = applyCheckboxDefaults({}, optionGroups, wtId);
                     return {
                         ...win,
                         window_type_id: wtId,
@@ -542,7 +563,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
         });
         if (resolvedId) {
             const optionGroups = await loadOptionGroups(resolvedId);
-            const defaultOptions = applyCheckboxDefaults({}, optionGroups);
+            const defaultOptions = applyCheckboxDefaults({}, optionGroups, resolvedId);
             setQuotation(prev => ({
                 ...prev,
                 windows: prev.windows.map((w, i) =>
@@ -655,8 +676,9 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
         const src = quotation.windows[index];
         const newWin = {
             ...src,
-            width_m: '',       // No duplicar medidas
-            height_m: '',      // No duplicar medidas
+            width_m: '',
+            height_m: '',
+            quantity: 1,   // siempre duplicar con cantidad 1
             options: { ...src.options },
             _variantValues: { ...src._variantValues },
             _optionGroups: [...(src._optionGroups || [])],
