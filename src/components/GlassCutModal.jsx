@@ -31,10 +31,11 @@ function pieceColor(label) {
 function SheetLayout({ sheetIndex, sheet, sheetWidth, sheetHeight, scale }) {
     const W = sheetWidth * scale;
     const H = sheetHeight * scale;
-    const COTA = 18;
+    const COTA = 18; // ancho reservado para la cota de alto
 
     return (
         <div className="mb-6">
+            {/* Título */}
             <div className="flex items-center gap-2 mb-2">
                 <span className="text-xs font-bold text-gray-600 uppercase tracking-wide">
                     Plancha {sheetIndex + 1}
@@ -44,21 +45,25 @@ function SheetLayout({ sheetIndex, sheet, sheetWidth, sheetHeight, scale }) {
                 </span>
             </div>
 
-            <div className="flex items-stretch gap-0">
-                {/* Cota alto exterior izquierdo */}
-                <div className="flex flex-col items-center mr-1" style={{ width: COTA, height: H }}>
+            {/* Fila: cota-alto + plancha */}
+            <div className="flex items-stretch">
+                {/* Cota de alto — línea roja vertical con medida */}
+                <div className="flex flex-col items-center mr-1 flex-shrink-0" style={{ width: COTA, height: H }}>
                     <div className="flex-1 w-px bg-red-400" />
-                    <span className="text-[9px] font-bold text-red-500 my-0.5 select-none"
-                        style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
+                    <span
+                        className="text-[9px] font-bold text-red-500 my-0.5 select-none"
+                        style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', lineHeight: 1 }}
+                    >
                         {sheetHeight}
                     </span>
                     <div className="flex-1 w-px bg-red-400" />
                 </div>
 
-                <div className="relative border-2 border-red-400 bg-gray-50 overflow-hidden"
-                    style={{ width: W, height: H }}>
-
-                    {/* Piezas */}
+                {/* Plancha */}
+                <div
+                    className="relative border-2 border-red-400 bg-gray-50 overflow-hidden flex-shrink-0"
+                    style={{ width: W, height: H }}
+                >
                     {sheet.pieces.map((piece, pi) => {
                         const color = pieceColor(piece.label);
                         const pw = piece.width * scale;
@@ -77,21 +82,21 @@ function SheetLayout({ sheetIndex, sheet, sheetWidth, sheetHeight, scale }) {
                                 }}
                                 title={`${piece.label} — ${piece.width}×${piece.height} cm`}
                             >
-                                {/* Medida ancho (top) */}
+                                {/* Medida ancho arriba */}
                                 {pw > 35 && ph > 18 && (
                                     <span className="text-[9px] font-bold leading-none select-none"
                                         style={{ color: color.text }}>
                                         {piece.width}
                                     </span>
                                 )}
-                                {/* Etiqueta ventana (centro) */}
+                                {/* Etiqueta ventana centro */}
                                 {pw > 25 && ph > 30 && (
                                     <span className="text-[11px] font-black leading-none mt-0.5 select-none"
                                         style={{ color: color.text }}>
                                         {piece.label}
                                     </span>
                                 )}
-                                {/* Medida alto (lado izquierdo vertical) */}
+                                {/* Medida alto lado izquierdo */}
                                 {pw > 20 && ph > 25 && (
                                     <span
                                         className="absolute left-0.5 top-1/2 text-[8px] font-semibold select-none"
@@ -109,19 +114,18 @@ function SheetLayout({ sheetIndex, sheet, sheetWidth, sheetHeight, scale }) {
                         );
                     })}
                 </div>
+            </div>
 
-            </div>{/* fin cota-alto wrapper */}
+            {/* Cota de ancho — debajo, alineada con la plancha */}
+            <div className="flex items-center mt-0.5" style={{ width: W, marginLeft: COTA + 4 }}>
+                <div className="flex-1 h-px bg-red-400" />
+                <span className="text-[10px] font-bold text-red-500 px-1">{sheetWidth}</span>
+                <div className="flex-1 h-px bg-red-400" />
+            </div>
         </div>
-
-            {/* Dimensión ancho (debajo, con offset del cota lateral) */ }
-    <div className="flex items-center mt-0.5" style={{ width: W, marginLeft: COTA + 4 }}>
-        <div className="flex-1 h-px bg-red-400" />
-        <span className="text-[10px] font-bold text-red-500 px-1">{sheetWidth}</span>
-        <div className="flex-1 h-px bg-red-400" />
-    </div>
-        </div >
     );
 }
+
 
 // ─── Vista de tabla (lista de piezas) ─────────────────────────────────────────
 function TableView({ glassData }) {
