@@ -66,6 +66,10 @@ export default function AddUserModal({ open, onClose, onSave, user = null }) {
             }
             onSave();
         } catch (err) {
+            // LOG TEMPORAL - borrar después
+            console.log('STATUS:', err.response?.status);
+            console.log('DATA:', JSON.stringify(err.response?.data));
+
             const raw = err.response?.data?.message;
             const msg = Array.isArray(raw)
                 ? raw.join(', ')
