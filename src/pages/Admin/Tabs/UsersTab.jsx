@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import api from '@/services/api';
 import { Button } from '@/components/ui/button';
-import { FaUserPlus, FaTrashAlt } from 'react-icons/fa';
+import { FaUserPlus, FaTrashAlt, FaEdit } from 'react-icons/fa';
 import AddUserModal from '@/components/AddUserModal';
 
 export default function UsersTab() {
@@ -11,15 +11,23 @@ export default function UsersTab() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [selectedUser, setSelectedUser] = useState(null);
 
     const fetchUsers = async () => {
         setLoading(true);
+        setError('');
         try {
             const response = await api.get('/users');
             setUsers(response.data);
         } catch (err) {
-            setError('No se pudieron cargar los usuarios.');
-            console.error("Error fetching users:", err);
+            const raw = err?.response?.data?.message;
+            const msg = Array.isArray(raw)
+                ? raw.join(', ')
+                : typeof raw === 'string'
+                    ? raw
+                    : err.message || 'No se pudieron cargar los usuarios.';
+            setError(msg);
+            console.error('Error fetching users:', err);
         } finally {
             setLoading(false);
         }
@@ -27,14 +35,35 @@ export default function UsersTab() {
 
     useEffect(() => { fetchUsers(); }, []);
 
+    const handleOpenCreate = () => {
+        setSelectedUser(null);
+        setIsModalOpen(true);
+    };
+
+    const handleOpenEdit = (user) => {
+        setSelectedUser(user);
+        setIsModalOpen(true);
+    };
+
+    const handleCloseModal = () => {
+        setIsModalOpen(false);
+        setSelectedUser(null);
+    };
+
     const handleDelete = async (userId) => {
         if (!window.confirm('¿Estás seguro de que quieres eliminar este usuario? No se podrá recuperar.')) return;
         try {
             await api.delete(`/users/${userId}`);
             fetchUsers();
         } catch (err) {
-            alert('Error al eliminar el usuario.');
-            console.error("Error deleting user:", err);
+            const raw = err?.response?.data?.message;
+            const msg = Array.isArray(raw)
+                ? raw.join(', ')
+                : typeof raw === 'string'
+                    ? raw
+                    : err.message || 'Error al eliminar el usuario.';
+            alert(msg);
+            console.error('Error deleting user:', err);
         }
     };
 
@@ -46,7 +75,7 @@ export default function UsersTab() {
                     Gestionar Usuarios del Sistema
                 </h2>
                 <Button
-                    onClick={() => setIsModalOpen(true)}
+                    onClick={handleOpenCreate}
                     className="flex-shrink-0 flex items-center gap-2 text-sm"
                 >
                     <FaUserPlus />
@@ -85,13 +114,22 @@ export default function UsersTab() {
                                             </span>
                                         </td>
                                         <td className="py-3 px-4">
-                                            <button
-                                                onClick={() => handleDelete(user.id)}
-                                                className="text-red-500 hover:text-red-700 transition-colors"
-                                                title="Eliminar Usuario"
-                                            >
-                                                <FaTrashAlt size={14} />
-                                            </button>
+                                            <div className="flex items-center gap-3">
+                                                <button
+                                                    onClick={() => handleOpenEdit(user)}
+                                                    className="text-blue-500 hover:text-blue-700 transition-colors"
+                                                    title="Editar Usuario"
+                                                >
+                                                    <FaEdit size={14} />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDelete(user.id)}
+                                                    className="text-red-500 hover:text-red-700 transition-colors"
+                                                    title="Eliminar Usuario"
+                                                >
+                                                    <FaTrashAlt size={14} />
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -119,6 +157,13 @@ export default function UsersTab() {
                                                 {user.role}
                                             </span>
                                             <button
+                                                onClick={() => handleOpenEdit(user)}
+                                                className="text-blue-400 p-1.5 rounded-lg border border-blue-100 active:bg-blue-50"
+                                                title="Editar Usuario"
+                                            >
+                                                <FaEdit size={12} />
+                                            </button>
+                                            <button
                                                 onClick={() => handleDelete(user.id)}
                                                 className="text-red-400 p-1.5 rounded-lg border border-red-100 active:bg-red-50"
                                                 title="Eliminar Usuario"
@@ -134,16 +179,15 @@ export default function UsersTab() {
                 </>
             )}
 
-            {isModalOpen && (
-                <AddUserModal
-                    open={isModalOpen}
-                    onClose={() => setIsModalOpen(false)}
-                    onSave={() => {
-                        setIsModalOpen(false);
-                        fetchUsers();
-                    }}
-                />
-            )}
+            <AddUserModal
+                open={isModalOpen}
+                onClose={handleCloseModal}
+                onSave={() => {
+                    handleCloseModal();
+                    fetchUsers();
+                }}
+                user={selectedUser}
+            />
         </div>
     );
 }
