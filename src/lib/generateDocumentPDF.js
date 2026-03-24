@@ -59,13 +59,16 @@ const companyDetails = {
  */
 export const generateDocumentPDF = async (data, mode = 'quotation') => {
   const toastId = toast.loading('Generando PDF...');
-  // Cede el hilo para que el toast se renderice antes
   await new Promise(resolve => setTimeout(resolve, 50));
   try {
-    // Cargar imágenes comprimidas en paralelo
+    // Cargar imágenes con fallback — si no existen, el PDF se genera igual sin ellas
+    const loadSafe = async (url, opts) => {
+      try { return await loadImageAsBase64(url, opts); } catch { return null; }
+    };
+
     const [logoBase64, backgroundImageBase64] = await Promise.all([
-      loadImageAsBase64('/assets/logo-pdf.png', { quality: 0.6 }),
-      loadImageAsBase64('/assets/background-pdf.png', { maxWidth: 800, quality: 0.5 }),
+      loadSafe('/assets/logo-pdf.png', { quality: 0.6 }),
+      loadSafe('/assets/background-pdf.png', { maxWidth: 800, quality: 0.5 }),
     ]);
 
     const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4', compress: true });
@@ -83,7 +86,9 @@ export const generateDocumentPDF = async (data, mode = 'quotation') => {
     };
 
     const addBackground = () => {
-      doc.addImage(backgroundImageBase64, 'JPEG', 0, 0, pageWidth, pageHeight);
+      if (backgroundImageBase64) {
+        doc.addImage(backgroundImageBase64, 'JPEG', 0, 0, pageWidth, pageHeight);
+      }
     };
 
     addBackground();
@@ -94,7 +99,18 @@ export const generateDocumentPDF = async (data, mode = 'quotation') => {
     // ======================================================
     // 1. CABECERA DINÁMICA
     // ======================================================
-    doc.addImage(logoBase64, 'JPEG', margin.left, 18, 45, 25);
+    if (logoBase64) {
+      doc.addImage(logoBase64, 'JPEG', margin.left, 18, 45, 25);
+    } else {
+      // Fallback texto si no hay logo
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(14);
+      doc.setTextColor(themeColor[0], themeColor[1], themeColor[2]);
+      doc.text(companyDetails.name, margin.left, 28);
+      doc.setFontSize(8);
+      doc.setTextColor(100);
+      doc.text(companyDetails.slogan, margin.left, 34);
+    }
     doc.setFont("helvetica", "bold");
     doc.setFontSize(20);
     doc.setTextColor(themeColor[0], themeColor[1], themeColor[2]);

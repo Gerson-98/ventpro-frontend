@@ -73,11 +73,15 @@ export default function MyDashboard() {
     useEffect(() => {
         api.get('/quotations', { params: { page: 1, limit: 10 } })
             .then(r => setRecentQuotations(Array.isArray(r.data) ? r.data : []))
-            .catch(() => {})
+            .catch(() => { })
             .finally(() => setLoadingQ(false));
 
-        api.get('/orders')
-            .then(r => setOrders(r.data))
+        api.get('/orders', { params: { page: 1, limit: 20 } })
+            .then(r => {
+                // El endpoint puede devolver array directo o { data: [...], total, ... }
+                const list = Array.isArray(r.data) ? r.data : (r.data?.data || []);
+                setOrders(list);
+            })
             .catch(err => console.error('Error pedidos:', err))
             .finally(() => setLoadingO(false));
     }, []);
