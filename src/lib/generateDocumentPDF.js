@@ -120,35 +120,55 @@ export const generateDocumentPDF = async (data, mode = 'quotation') => {
     drawPageHeader();
 
     // ======================================================
-    // 2. SECCIÓN DE DATOS
+    // 2. SECCIÓN DE DATOS — compacta, pegada al header
     // ======================================================
-    let startY = 60;
+    // Línea separadora justo debajo del logo (logo termina en y=43)
+    const headerBottomY = 47;
+    doc.setDrawColor(220, 220, 220);
+    doc.setLineWidth(0.3);
+    doc.line(margin.left, headerBottomY, pageWidth - margin.right, headerBottomY);
+
+    // Bloque de datos: empieza a 5mm de la línea separadora
+    let startY = headerBottomY + 7;
+
+    // Fila 1: CLIENTE  |  COTIZACIÓN # / PEDIDO #
     doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
+    doc.setTextColor(130);
+    doc.text("CLIENTE", margin.left, startY);
+    doc.text(isOrder ? "PEDIDO #" : "COTIZACIÓN #", pageWidth / 2 + 10, startY);
+
+    doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
-    doc.setTextColor(150);
+    doc.setTextColor(30);
+    const clientName = data.client?.name ?? 'Sin cliente';
+    doc.text(clientName, margin.left, startY + 5.5);
+    doc.text(String(data.quotationNumber || data.id), pageWidth / 2 + 10, startY + 5.5);
 
-    doc.text("CLIENTE:", margin.left, startY);
-    doc.text(isOrder ? "PEDIDO #:" : "COTIZACIÓN #:", pageWidth / 2 + 15, startY);
-
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(40);
-
-    const clientName = data.client?.name ?? 'N/A';
-    doc.text(clientName || "N/A", margin.left, startY + 5);
-    doc.text(String(data.quotationNumber || data.id), pageWidth / 2 + 15, startY + 5);
-
-    startY += 12;
+    // Fila 2: PROYECTO  |  FECHA
+    startY += 13;
     doc.setFont("helvetica", "bold");
-    doc.setTextColor(150);
-    doc.text("PROYECTO:", margin.left, startY);
-    doc.text("FECHA:", pageWidth / 2 + 15, startY);
+    doc.setFontSize(7.5);
+    doc.setTextColor(130);
+    doc.text("PROYECTO", margin.left, startY);
+    doc.text("FECHA", pageWidth / 2 + 10, startY);
 
     doc.setFont("helvetica", "normal");
-    doc.setTextColor(40);
-    doc.text(data.project || "N/A", margin.left, startY + 5);
-    doc.text(formatDate(data.createdAt), pageWidth / 2 + 15, startY + 5);
+    doc.setFontSize(10);
+    doc.setTextColor(30);
+    // Proyecto puede ser largo — truncar si pasa del centro
+    const projectText = data.project || "N/A";
+    const maxProjectWidth = pageWidth / 2 - margin.left - 5;
+    doc.text(projectText, margin.left, startY + 5.5, { maxWidth: maxProjectWidth });
+    doc.text(formatDate(data.createdAt), pageWidth / 2 + 10, startY + 5.5);
 
+    // Segunda línea separadora antes de la tabla
     startY += 12;
+    doc.setDrawColor(220, 220, 220);
+    doc.setLineWidth(0.3);
+    doc.line(margin.left, startY, pageWidth - margin.right, startY);
+
+    startY += 3;
 
     // ======================================================
     // 3. TABLA DE PRODUCTOS
@@ -176,7 +196,7 @@ export const generateDocumentPDF = async (data, mode = 'quotation') => {
     autoTable(doc, {
         head: [tableColumn],
         body: tableRows,
-        startY: startY + 15,
+        startY: startY + 4,
         theme: 'striped',
         margin: { left: margin.left, right: margin.right },
         headStyles: {
