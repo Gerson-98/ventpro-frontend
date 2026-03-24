@@ -182,11 +182,11 @@ export const generateDocumentPDF = async (data, mode = 'quotation') => {
             6: { halign: 'right' },
             7: { halign: 'right' }
         },
-        didDrawPage: (pageData) => {
-          if (pageData.pageNumber > 1) {
-            addBackground();
-          }
-        }
+        willDrawPage: () => {
+          // willDrawPage se ejecuta ANTES de dibujar el contenido de la página
+          // así el background queda detrás y no tapa el contenido
+          addBackground();
+        },
     });
 
     // ======================================================

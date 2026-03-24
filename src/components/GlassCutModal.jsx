@@ -31,6 +31,7 @@ function pieceColor(label) {
 function SheetLayout({ sheetIndex, sheet, sheetWidth, sheetHeight, scale }) {
     const W = sheetWidth * scale;
     const H = sheetHeight * scale;
+    const COTA = 18;
 
     return (
         <div className="mb-6">
@@ -43,68 +44,82 @@ function SheetLayout({ sheetIndex, sheet, sheetWidth, sheetHeight, scale }) {
                 </span>
             </div>
 
-            <div className="relative border-2 border-red-400 bg-gray-50 overflow-hidden"
-                style={{ width: W, height: H }}>
+            <div className="flex items-stretch gap-0">
+                {/* Cota alto exterior izquierdo */}
+                <div className="flex flex-col items-center mr-1" style={{ width: COTA, height: H }}>
+                    <div className="flex-1 w-px bg-red-400" />
+                    <span className="text-[9px] font-bold text-red-500 my-0.5 select-none"
+                        style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
+                        {sheetHeight}
+                    </span>
+                    <div className="flex-1 w-px bg-red-400" />
+                </div>
 
-                {/* Piezas */}
-                {sheet.pieces.map((piece, pi) => {
-                    const color = pieceColor(piece.label);
-                    const pw = piece.width * scale;
-                    const ph = piece.height * scale;
-                    const px = piece.x * scale;
-                    const py = piece.y * scale;
-                    return (
-                        <div
-                            key={pi}
-                            className="absolute border flex flex-col items-center justify-center overflow-hidden"
-                            style={{
-                                left: px, top: py, width: pw, height: ph,
-                                background: color.bg,
-                                borderColor: color.border,
-                                borderWidth: 1.5,
-                            }}
-                            title={`${piece.label} — ${piece.width}×${piece.height} cm`}
-                        >
-                            {/* Medida ancho (top) */}
-                            {pw > 35 && ph > 18 && (
-                                <span className="text-[9px] font-bold leading-none select-none"
-                                    style={{ color: color.text }}>
-                                    {piece.width}
-                                </span>
-                            )}
-                            {/* Etiqueta ventana (centro) */}
-                            {pw > 25 && ph > 30 && (
-                                <span className="text-[11px] font-black leading-none mt-0.5 select-none"
-                                    style={{ color: color.text }}>
-                                    {piece.label}
-                                </span>
-                            )}
-                            {/* Medida alto (lado izquierdo vertical) */}
-                            {pw > 20 && ph > 25 && (
-                                <span
-                                    className="absolute left-0.5 top-1/2 text-[8px] font-semibold select-none"
-                                    style={{
-                                        color: color.text,
-                                        writingMode: 'vertical-rl',
-                                        transform: 'translateY(-50%) rotate(180deg)',
-                                        lineHeight: 1,
-                                    }}
-                                >
-                                    {piece.height}
-                                </span>
-                            )}
-                        </div>
-                    );
-                })}
-            </div>
+                <div className="relative border-2 border-red-400 bg-gray-50 overflow-hidden"
+                    style={{ width: W, height: H }}>
 
-            {/* Dimensión ancho (debajo, roja) */}
-            <div className="flex items-center mt-0.5" style={{ width: W }}>
-                <div className="flex-1 h-px bg-red-400" />
-                <span className="text-[10px] font-bold text-red-500 px-1">{sheetWidth}</span>
-                <div className="flex-1 h-px bg-red-400" />
-            </div>
+                    {/* Piezas */}
+                    {sheet.pieces.map((piece, pi) => {
+                        const color = pieceColor(piece.label);
+                        const pw = piece.width * scale;
+                        const ph = piece.height * scale;
+                        const px = piece.x * scale;
+                        const py = piece.y * scale;
+                        return (
+                            <div
+                                key={pi}
+                                className="absolute border flex flex-col items-center justify-center overflow-hidden"
+                                style={{
+                                    left: px, top: py, width: pw, height: ph,
+                                    background: color.bg,
+                                    borderColor: color.border,
+                                    borderWidth: 1.5,
+                                }}
+                                title={`${piece.label} — ${piece.width}×${piece.height} cm`}
+                            >
+                                {/* Medida ancho (top) */}
+                                {pw > 35 && ph > 18 && (
+                                    <span className="text-[9px] font-bold leading-none select-none"
+                                        style={{ color: color.text }}>
+                                        {piece.width}
+                                    </span>
+                                )}
+                                {/* Etiqueta ventana (centro) */}
+                                {pw > 25 && ph > 30 && (
+                                    <span className="text-[11px] font-black leading-none mt-0.5 select-none"
+                                        style={{ color: color.text }}>
+                                        {piece.label}
+                                    </span>
+                                )}
+                                {/* Medida alto (lado izquierdo vertical) */}
+                                {pw > 20 && ph > 25 && (
+                                    <span
+                                        className="absolute left-0.5 top-1/2 text-[8px] font-semibold select-none"
+                                        style={{
+                                            color: color.text,
+                                            writingMode: 'vertical-rl',
+                                            transform: 'translateY(-50%) rotate(180deg)',
+                                            lineHeight: 1,
+                                        }}
+                                    >
+                                        {piece.height}
+                                    </span>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+
+            </div>{/* fin cota-alto wrapper */}
         </div>
+
+            {/* Dimensión ancho (debajo, con offset del cota lateral) */ }
+    <div className="flex items-center mt-0.5" style={{ width: W, marginLeft: COTA + 4 }}>
+        <div className="flex-1 h-px bg-red-400" />
+        <span className="text-[10px] font-bold text-red-500 px-1">{sheetWidth}</span>
+        <div className="flex-1 h-px bg-red-400" />
+    </div>
+        </div >
     );
 }
 
@@ -231,6 +246,12 @@ export default function GlassCutModal({ glassCutData = {}, isLoading, onClose, p
             data.sheets.forEach((sheet, si) => {
                 bodyHtml += `<div>
                     <div style="font-size:9px;font-weight:700;color:#666;margin-bottom:3px">PLANCHA ${si + 1}</div>
+                    <div style="display:flex;align-items:stretch;gap:0">
+                    <div style="display:flex;flex-direction:column;align-items:center;width:16px;margin-right:3px">
+                        <div style="flex:1;width:1px;background:#e53935"></div>
+                        <span style="font-size:8px;font-weight:700;color:#e53935;padding:2px 0;writing-mode:vertical-rl;transform:rotate(180deg)">${sh}</span>
+                        <div style="flex:1;width:1px;background:#e53935"></div>
+                    </div>
                     <svg width="${W}" height="${H}" style="border:2px solid #e53935;background:#fafafa">`;
 
                 sheet.pieces.forEach((piece, pi) => {
@@ -249,8 +270,8 @@ export default function GlassCutModal({ glassCutData = {}, isLoading, onClose, p
                     }
                 });
 
-                bodyHtml += `</svg>
-                    <div style="display:flex;align-items:center;margin-top:2px">
+                bodyHtml += `</svg></div>
+                    <div style="display:flex;align-items:center;margin-top:2px;margin-left:19px">
                         <div style="flex:1;height:1px;background:#e53935"></div>
                         <span style="font-size:9px;font-weight:700;color:#e53935;padding:0 4px">${sw}</span>
                         <div style="flex:1;height:1px;background:#e53935"></div>
@@ -284,7 +305,7 @@ body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;padd
   <span>Piezas totales<b>${totalPieces}</b></span>
 </div>
 ${bodyHtml}
-<script>window.onload=()=>{window.print();setTimeout(()=>window.close(),900)}<\/script>
+<script>window.onload=()=>{window.print()}<\/script>
 </body></html>`;
 
         const w = window.open('', '_blank', 'width=1100,height=800');

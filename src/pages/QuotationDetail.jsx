@@ -207,10 +207,10 @@ export default function QuotationDetail() {
                                 #{quotation.quotationNumber}
                             </span>
                             <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg border capitalize ${isConfirmado
-                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                    : isReopenada
-                                        ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                        : 'bg-amber-50 text-amber-700 border-amber-100'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                : isReopenada
+                                    ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                    : 'bg-amber-50 text-amber-700 border-amber-100'
                                 }`}>
                                 {isConfirmado ? 'Confirmada' : isReopenada ? 'Reabierta — En Edición' : 'En Proceso'}
                             </span>
@@ -268,13 +268,15 @@ export default function QuotationDetail() {
                             <span>Editar</span>
                         </button>
 
-                        <button
-                            onClick={handleCalculateMaterial}
-                            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium rounded-xl border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-all"
-                        >
-                            <FaCalculator size={12} />
-                            <span>Materiales</span>
-                        </button>
+                        {isAdmin && (
+                            <button
+                                onClick={handleCalculateMaterial}
+                                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium rounded-xl border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-all"
+                            >
+                                <FaCalculator size={12} />
+                                <span>Materiales</span>
+                            </button>
+                        )}
 
                         <button
                             onClick={async () => { try { await generateDocumentPDF(quotation); } catch { alert('Error al generar PDF. Intenta de nuevo.'); } }}
