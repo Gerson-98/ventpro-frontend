@@ -66,10 +66,6 @@ export default function AddUserModal({ open, onClose, onSave, user = null }) {
             }
             onSave();
         } catch (err) {
-            // LOG TEMPORAL - borrar después
-            console.log('STATUS:', err.response?.status);
-            console.log('DATA:', JSON.stringify(err.response?.data));
-
             const raw = err.response?.data?.message;
             const msg = Array.isArray(raw)
                 ? raw.join(', ')
@@ -144,7 +140,7 @@ export default function AddUserModal({ open, onClose, onSave, user = null }) {
                             className="w-full h-10 border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 border rounded-md"
                         >
                             <option value="VENDEDOR">Vendedor</option>
-                            <option value="ADMINISTRADOR">Administrador</option>
+                            <option value="ADMIN">Administrador</option>
                         </select>
                     </div>
 
