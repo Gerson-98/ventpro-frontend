@@ -219,10 +219,12 @@ export const generateDocumentPDF = async (data, mode = 'quotation') => {
             6: { halign: 'right' },
             7: { halign: 'right' }
         },
-        willDrawPage: () => {
-          // En páginas nuevas (overflow de tabla) redibujamos background + header
-          // willDrawPage garantiza que quede detrás del contenido de la tabla
-          drawPageHeader();
+        willDrawPage: (data) => {
+          // Solo redibujar en páginas 2+ (overflow de tabla)
+          // En página 1 el header ya fue dibujado antes de autoTable
+          if (data.pageNumber > 1) {
+            drawPageHeader();
+          }
         },
     });
 
