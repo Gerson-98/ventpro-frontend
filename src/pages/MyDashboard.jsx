@@ -72,7 +72,11 @@ export default function MyDashboard() {
 
     useEffect(() => {
         api.get('/quotations', { params: { page: 1, limit: 10 } })
-            .then(r => setRecentQuotations(Array.isArray(r.data) ? r.data : []))
+            .then(r => {
+                // El endpoint devuelve { data: [...], total, page, totalPages }
+                const list = Array.isArray(r.data) ? r.data : (r.data?.data || []);
+                setRecentQuotations(list);
+            })
             .catch(() => { })
             .finally(() => setLoadingQ(false));
 

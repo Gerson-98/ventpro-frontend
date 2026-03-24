@@ -85,38 +85,39 @@ export const generateDocumentPDF = async (data, mode = 'quotation') => {
       right: 20
     };
 
-    const addBackground = () => {
-      if (backgroundImageBase64) {
-        doc.addImage(backgroundImageBase64, 'JPEG', 0, 0, pageWidth, pageHeight);
-      }
-    };
-
-    addBackground();
-
     const formatDate = (dateString) => dateString ? new Date(dateString).toLocaleDateString('es-GT', { day: '2-digit', month: '2-digit', year: 'numeric' }) : "N/A";
     const formatCurrency = (amount) => `Q ${Number(amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-    // ======================================================
-    // 1. CABECERA DINÁMICA
-    // ======================================================
-    if (logoBase64) {
-      doc.addImage(logoBase64, 'JPEG', margin.left, 18, 45, 25);
-    } else {
-      // Fallback texto si no hay logo
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(14);
-      doc.setTextColor(themeColor[0], themeColor[1], themeColor[2]);
-      doc.text(companyDetails.name, margin.left, 28);
-      doc.setFontSize(8);
-      doc.setTextColor(100);
-      doc.text(companyDetails.slogan, margin.left, 34);
-    }
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(20);
-    doc.setTextColor(themeColor[0], themeColor[1], themeColor[2]);
-
     const headerTitle = isOrder ? "COMPROBANTE DE PEDIDO" : "COTIZACIÓN";
-    doc.text(headerTitle, pageWidth - margin.right, 35, { align: 'right' });
+
+    // ── Dibuja background + header completo en la página actual ─────────────
+    // Orden crítico: background primero → logo/texto encima.
+    // Se usa tanto en la primera página como en cada página nueva de autoTable.
+    const drawPageHeader = () => {
+      if (backgroundImageBase64) {
+        doc.addImage(backgroundImageBase64, 'JPEG', 0, 0, pageWidth, pageHeight);
+      }
+      if (logoBase64) {
+        doc.addImage(logoBase64, 'JPEG', margin.left, 18, 45, 25);
+      } else {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(14);
+        doc.setTextColor(themeColor[0], themeColor[1], themeColor[2]);
+        doc.text(companyDetails.name, margin.left, 28);
+        doc.setFontSize(8);
+        doc.setTextColor(100);
+        doc.text(companyDetails.slogan, margin.left, 34);
+      }
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(20);
+      doc.setTextColor(themeColor[0], themeColor[1], themeColor[2]);
+      doc.text(headerTitle, pageWidth - margin.right, 35, { align: 'right' });
+    };
+
+    // ======================================================
+    // 1. CABECERA PRIMERA PÁGINA
+    // ======================================================
+    drawPageHeader();
 
     // ======================================================
     // 2. SECCIÓN DE DATOS
@@ -199,9 +200,9 @@ export const generateDocumentPDF = async (data, mode = 'quotation') => {
             7: { halign: 'right' }
         },
         willDrawPage: () => {
-          // willDrawPage se ejecuta ANTES de dibujar el contenido de la página
-          // así el background queda detrás y no tapa el contenido
-          addBackground();
+          // En páginas nuevas (overflow de tabla) redibujamos background + header
+          // willDrawPage garantiza que quede detrás del contenido de la tabla
+          drawPageHeader();
         },
     });
 
