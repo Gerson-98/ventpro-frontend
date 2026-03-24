@@ -7,7 +7,8 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import api from '@/services/api';
 import { useNavigate } from 'react-router-dom';
-import { FaCalendarAlt, FaUser, FaTimes } from 'react-icons/fa';
+import { useAuth } from '@/context/AuthContext';
+import { FaCalendarAlt, FaUser, FaTimes, FaEye } from 'react-icons/fa';
 
 const STATUS_CONFIG = {
     en_proceso: { label: 'En Proceso', color: '#3b82f6', bg: 'bg-blue-500', light: 'bg-blue-50 text-blue-700 border-blue-200' },
@@ -63,13 +64,14 @@ const CALENDAR_CSS = `
   }
   .calendar-wrapper .fc-event:hover { opacity: 0.9; transform: translateY(-1px); }
   .calendar-wrapper .fc-event.fc-event-dimmed { opacity: 0.15 !important; }
+  .calendar-wrapper.readonly .fc-event { cursor: default !important; }
+  .calendar-wrapper.readonly .fc-event:hover { transform: none !important; }
   .calendar-wrapper .fc-scrollgrid { border-color: #f3f4f6 !important; border-radius: 8px; }
   .calendar-wrapper .fc-scrollgrid td,
   .calendar-wrapper .fc-scrollgrid th { border-color: #f3f4f6 !important; }
   .calendar-wrapper .fc-timegrid-slot { height: 2.2rem !important; }
 `;
 
-// ── Tooltip flotante ──────────────────────────────────────────────────────────
 function EventTooltip({ info }) {
     const { event, el } = info;
     const rect = el.getBoundingClientRect();
@@ -95,13 +97,17 @@ function EventTooltip({ info }) {
                 </span>
             )}
             <div className="mt-2 pt-2 border-t border-gray-100 text-[10px] text-gray-400">
-                Click para ver el pedido →
+                {/* Texto dinámico según rol — se pasa como prop */}
+                {info.isVendedor ? 'Solo lectura' : 'Click para ver el pedido →'}
             </div>
         </div>
     );
 }
 
 export default function CalendarPage() {
+    const { user } = useAuth();
+    const isVendedor = user?.role === 'VENDEDOR';
+
     const [events, setEvents] = useState([]);
     const [allOrders, setAllOrders] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -144,7 +150,6 @@ export default function CalendarPage() {
         fetchScheduledOrders();
     }, []);
 
-    // Eventos con dimming al filtrar
     const filteredEvents = activeStatusFilter
         ? events.map(e => ({
             ...e,
@@ -152,149 +157,58 @@ export default function CalendarPage() {
         }))
         : events;
 
-    // Tooltip handlers
+    // Vendedor: no navega al pedido, solo ve el calendario
+    const handleEventClick = useCallback((info) => {
+        if (isVendedor) return;
+        navigate(`/orders/${info.event.id}`);
+    }, [navigate, isVendedor]);
+
     const handleEventMouseEnter = useCallback((info) => {
         clearTimeout(tooltipTimeout.current);
-        setTooltip({ info });
-    }, []);
+        setTooltip({ info: { ...info, isVendedor } });
+    }, [isVendedor]);
+
     const handleEventMouseLeave = useCallback(() => {
-        tooltipTimeout.current = setTimeout(() => setTooltip(null), 150);
+        tooltipTimeout.current = setTimeout(() => setTooltip(null), 200);
     }, []);
-    const handleEventClick = (clickInfo) => {
-        setTooltip(null);
-        navigate(`/orders/${clickInfo.event.id}`);
-    };
-
-    // Agrupación temporal
-    const groupedOrders = (() => {
-        const today = new Date(); today.setHours(0, 0, 0, 0);
-        const weekEnd = new Date(today); weekEnd.setDate(today.getDate() + 7);
-        const sorted = [...allOrders].sort(
-            (a, b) => new Date(a.installationStartDate) - new Date(b.installationStartDate)
-        );
-        const todayList = [], weekList = [], futureList = [], pastList = [];
-        for (const o of sorted) {
-            const d = new Date(o.installationStartDate); d.setHours(0, 0, 0, 0);
-            if (d < today) pastList.push(o);
-            else if (d.getTime() === today.getTime()) todayList.push(o);
-            else if (d <= weekEnd) weekList.push(o);
-            else futureList.push(o);
-        }
-        return { todayList, weekList, futureList, pastList };
-    })();
-
-    const formatDate = (d) => !d ? '—' : new Date(d).toLocaleDateString('es-GT', { day: 'numeric', month: 'short' });
-    const formatDateLong = (d) => !d ? '—' : new Date(d).toLocaleDateString('es-GT', { weekday: 'short', day: 'numeric', month: 'short' });
-
-    // Grupo del sidebar
-    const SidebarGroup = ({ title, orders, accent }) => {
-        if (orders.length === 0) return null;
-        return (
-            <div>
-                <div className="px-5 py-1.5 flex items-center gap-2 bg-gray-50/60">
-                    <span className={`text-[10px] font-bold uppercase tracking-wider ${accent}`}>{title}</span>
-                    <span className="text-[10px] font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">{orders.length}</span>
-                </div>
-                {orders.map(order => {
-                    const cfg = STATUS_CONFIG[order.status];
-                    return (
-                        <button
-                            key={order.id}
-                            onClick={() => { navigate(`/orders/${order.id}`); setShowSidebar(false); }}
-                            className="w-full px-5 py-3 text-left hover:bg-blue-50/40 transition-colors group border-b border-gray-50 last:border-0"
-                        >
-                            <div className="flex items-start gap-3">
-                                <div className="w-1 min-h-[38px] rounded-full flex-shrink-0 mt-0.5" style={{ backgroundColor: cfg?.color || DEFAULT_COLOR }} />
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-semibold text-gray-800 truncate group-hover:text-blue-600 transition-colors">
-                                        {order.project}
-                                    </p>
-                                    {order.client?.name && (
-                                        <p className="text-[11px] text-gray-400 flex items-center gap-1 mt-0.5">
-                                            <FaUser size={8} />{order.client.name}
-                                        </p>
-                                    )}
-                                    <p className="text-xs text-gray-400 mt-0.5">
-                                        {formatDateLong(order.installationStartDate)}
-                                        {order.installationEndDate && order.installationEndDate !== order.installationStartDate && (
-                                            <span className="text-gray-300"> → {formatDate(order.installationEndDate)}</span>
-                                        )}
-                                    </p>
-                                </div>
-                                {cfg && (
-                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border flex-shrink-0 mt-0.5 ${cfg.light}`}>
-                                        {cfg.label}
-                                    </span>
-                                )}
-                            </div>
-                        </button>
-                    );
-                })}
-            </div>
-        );
-    };
 
     const SidebarContent = () => (
-        <div className="space-y-3">
-            {/* Lista de instalaciones agrupada */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
-                    <FaCalendarAlt size={13} className="text-blue-500" />
-                    <p className="text-sm font-semibold text-gray-800">Instalaciones</p>
-                    <span className="ml-auto text-xs font-bold text-gray-400">{allOrders.length} total</span>
-                </div>
-                {allOrders.length === 0 ? (
-                    <div className="px-5 py-8 text-center text-gray-400">
-                        <FaCalendarAlt size={24} className="mx-auto mb-2 opacity-30" />
-                        <p className="text-xs">No hay instalaciones agendadas</p>
-                    </div>
-                ) : (
-                    <div className="divide-y divide-gray-50 max-h-[440px] overflow-y-auto">
-                        <SidebarGroup title="Hoy" orders={groupedOrders.todayList} accent="text-rose-500" />
-                        <SidebarGroup title="Esta semana" orders={groupedOrders.weekList} accent="text-amber-500" />
-                        <SidebarGroup title="Próximamente" orders={groupedOrders.futureList} accent="text-blue-500" />
-                        <SidebarGroup title="Pasados" orders={groupedOrders.pastList} accent="text-gray-400" />
-                    </div>
-                )}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                <p className="text-sm font-bold text-gray-800">Instalaciones agendadas</p>
+                <span className="text-xs text-gray-400 font-medium">{allOrders.length} total</span>
             </div>
-
-            {/* Filtro por estado */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-                    <p className="text-sm font-semibold text-gray-800">Filtrar por estado</p>
-                    {activeStatusFilter && (
-                        <button
-                            onClick={() => setActiveStatusFilter(null)}
-                            className="text-[10px] text-blue-600 hover:underline flex items-center gap-1"
-                        >
-                            <FaTimes size={8} /> Quitar
-                        </button>
-                    )}
-                </div>
-                <div className="p-3 space-y-1">
-                    {Object.entries(STATUS_CONFIG).map(([key, { label, bg, light }]) => {
-                        const count = events.filter(e => e.extendedProps?.status === key).length;
-                        if (count === 0) return null;
-                        const isActive = activeStatusFilter === key;
+            <div className="divide-y divide-gray-50 max-h-[420px] overflow-y-auto">
+                {allOrders.length === 0 ? (
+                    <p className="text-xs text-gray-400 text-center py-6">Sin proyectos agendados</p>
+                ) : (
+                    allOrders.map((order) => {
+                        const cfg = STATUS_CONFIG[order.status];
                         return (
-                            <button
-                                key={key}
-                                onClick={() => setActiveStatusFilter(isActive ? null : key)}
-                                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl transition-all border text-left ${isActive ? `${light} border-current` : 'bg-gray-50 border-transparent hover:bg-gray-100'
-                                    }`}
+                            <div
+                                key={order.id}
+                                onClick={() => !isVendedor && navigate(`/orders/${order.id}`)}
+                                className={`px-4 py-3 transition-colors ${!isVendedor ? 'hover:bg-gray-50 cursor-pointer' : 'cursor-default'}`}
                             >
-                                <div className="flex items-center gap-2">
-                                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${bg}`} />
-                                    <span className="text-xs text-gray-600">{label}</span>
+                                <div className="flex items-start justify-between gap-2">
+                                    <div className="min-w-0">
+                                        <p className="text-xs font-semibold text-gray-800 truncate">{order.project}</p>
+                                        {order.client?.name && (
+                                            <p className="text-[10px] text-gray-400 mt-0.5 flex items-center gap-1">
+                                                <FaUser size={8} />{order.client.name}
+                                            </p>
+                                        )}
+                                    </div>
+                                    {cfg && (
+                                        <span className={`flex-shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${cfg.light}`}>
+                                            {cfg.label}
+                                        </span>
+                                    )}
                                 </div>
-                                <span className="text-xs font-bold text-gray-700">{count}</span>
-                            </button>
+                            </div>
                         );
-                    })}
-                    {events.length === 0 && (
-                        <p className="text-xs text-gray-400 text-center py-2">Sin proyectos agendados</p>
-                    )}
-                </div>
+                    })
+                )}
             </div>
         </div>
     );
@@ -315,22 +229,27 @@ export default function CalendarPage() {
         <div className="min-h-screen bg-gray-50">
             <style>{CALENDAR_CSS}</style>
 
-            {/* Tooltip flotante */}
             {tooltip && <EventTooltip info={tooltip.info} />}
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 sm:py-8">
 
-                {/* ── Header ── */}
+                {/* Header */}
                 <div className="flex items-center justify-between mb-5 sm:mb-6">
                     <div>
                         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
                             Calendario de Instalaciones
                         </h1>
-                        <p className="text-gray-500 text-xs sm:text-sm mt-1">
+                        <p className="text-gray-500 text-xs sm:text-sm mt-1 flex items-center gap-2">
                             {events.length} proyecto{events.length !== 1 ? 's' : ''} agendado{events.length !== 1 ? 's' : ''}
                             {activeStatusFilter && (
-                                <span className="ml-2 text-blue-600 font-medium">
+                                <span className="text-blue-600 font-medium">
                                     · {STATUS_CONFIG[activeStatusFilter]?.label}
+                                </span>
+                            )}
+                            {/* Badge solo lectura para vendedor */}
+                            {isVendedor && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200">
+                                    <FaEye size={8} /> Solo lectura
                                 </span>
                             )}
                         </p>
@@ -349,7 +268,7 @@ export default function CalendarPage() {
                     </button>
                 </div>
 
-                {/* ── Drawer móvil ── */}
+                {/* Drawer móvil */}
                 {showSidebar && (
                     <div className="lg:hidden fixed inset-0 z-50 flex justify-end">
                         <div className="absolute inset-0 bg-black/40" onClick={() => setShowSidebar(false)} />
@@ -365,22 +284,21 @@ export default function CalendarPage() {
                     </div>
                 )}
 
-                {/* ── Layout principal ── */}
+                {/* Layout principal */}
                 <div className="flex flex-col lg:flex-row gap-6 items-start">
 
                     {/* Calendario */}
                     <div className="flex-1 min-w-0 w-full">
                         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
 
-                            {/* Leyenda clickeable */}
+                            {/* Leyenda */}
                             <div className="px-4 sm:px-5 py-3 border-b border-gray-100">
                                 <div className="flex flex-wrap gap-x-4 gap-y-1.5 items-center">
                                     {Object.entries(STATUS_CONFIG).map(([key, { label, bg }]) => (
                                         <button
                                             key={key}
                                             onClick={() => setActiveStatusFilter(activeStatusFilter === key ? null : key)}
-                                            className={`flex items-center gap-1.5 transition-opacity rounded px-1 py-0.5 ${activeStatusFilter && activeStatusFilter !== key ? 'opacity-25' : 'opacity-100'
-                                                }`}
+                                            className={`flex items-center gap-1.5 transition-opacity rounded px-1 py-0.5 ${activeStatusFilter && activeStatusFilter !== key ? 'opacity-25' : 'opacity-100'}`}
                                         >
                                             <span className={`w-2 h-2 rounded-full flex-shrink-0 ${bg}`} />
                                             <span className="text-[11px] text-gray-500 whitespace-nowrap">{label}</span>
@@ -397,7 +315,8 @@ export default function CalendarPage() {
                                 </div>
                             </div>
 
-                            <div className="p-2 sm:p-4 calendar-wrapper">
+                            {/* readonly class para vendedor → cursor default en CSS */}
+                            <div className={`p-2 sm:p-4 calendar-wrapper ${isVendedor ? 'readonly' : ''}`}>
                                 <FullCalendar
                                     plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
                                     initialView="dayGridMonth"
