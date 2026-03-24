@@ -209,6 +209,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
     const [windowCosts, setWindowCosts] = useState({});
     const [calculatingCost, setCalculatingCost] = useState({});
     const [quotationPrecioSugerido, setQuotationPrecioSugerido] = useState(0);
+    const [quotationCostoTotal, setQuotationCostoTotal] = useState(0);
     const [validationErrors, setValidationErrors] = useState([]);
     const [useCm, setUseCm] = useState(false);
     const [totalOverride, setTotalOverride] = useState(''); // total editable por el usuario
@@ -338,11 +339,15 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                             quantity: Number(w.quantity) || 1,
                         }));
                         api.post('/cost-calculator/quotation', { windows: batchPayload })
-                            .then(res => setQuotationPrecioSugerido(res.data?.precio_sugerido_minimo || 0))
+                            .then(res => {
+                                setQuotationPrecioSugerido(res.data?.precio_sugerido_minimo || 0);
+                                setQuotationCostoTotal(res.data?.costo_total_proyecto || 0);
+                            })
                             .catch(() => { /* si falla el batch, el fallback suma individuales */ });
                     } else {
                         // Con 1 ventana limpiar para usar el precio individual como fallback
                         setQuotationPrecioSugerido(0);
+                        setQuotationCostoTotal(0);
                     }
                     return prev; // no mutar el estado de windows
                 });
@@ -448,6 +453,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             setWindowCosts({});
             setCalculatingCost({});
             setQuotationPrecioSugerido(0);
+            setQuotationCostoTotal(0);
             optionGroupsCache.current = {};
             return;
         }
@@ -572,6 +578,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                         const resultados = res.data?.por_ventana || [];
                         // Capturar el precio global optimizado (bin-packing de todas las ventanas juntas)
                         setQuotationPrecioSugerido(res.data?.precio_sugerido_minimo || 0);
+                        setQuotationCostoTotal(res.data?.costo_total_proyecto || 0);
                         const newCosts = {};
                         windowsParaCalculo.forEach((w, i) => {
                             const key = w.tempId || w.id;
@@ -595,6 +602,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             setWindowCosts({});
             setCalculatingCost({});
             setQuotationPrecioSugerido(0);
+            setQuotationCostoTotal(0);
             setQuotation({
                 project: '',
                 clientId: '',
@@ -831,7 +839,9 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
     };
 
     const totalsInRealTime = calculateGrandTotal();
-    const totalMaterialCost = Object.values(windowCosts).reduce((s, c) => s + (c?.costo_total || 0), 0);
+    const totalMaterialCost = quotationCostoTotal > 0
+        ? quotationCostoTotal
+        : Object.values(windowCosts).reduce((s, c) => s + (c?.costo_total || 0), 0);
     // Usar precio global optimizado (bin-packing de todas las ventanas juntas) cuando esté disponible.
     // Fallback: suma de individuales (cuando hay 1 sola ventana o el batch aún no respondió).
     const totalPrecioSugerido = quotationPrecioSugerido > 0
