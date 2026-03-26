@@ -278,10 +278,10 @@ export default function GlassCutModal({ glassCutData = {}, isLoading, onClose, p
                         ${data.planchaSize} · ${data.totalPieces} piezas · ${data.minPlanchas} plancha${data.minPlanchas !== 1 ? 's' : ''}
                     </span>
                 </div>
-                <div style="display:flex;flex-wrap:wrap;gap:16px">`;
+                <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start">`;
 
             data.sheets.forEach((sheet, si) => {
-                bodyHtml += `<div>
+                bodyHtml += `<div class="plancha">
                     <div style="font-size:9px;font-weight:700;color:#666;margin-bottom:3px">PLANCHA ${si + 1}</div>
                     <div style="display:flex;align-items:stretch;gap:0">
                     <div style="display:flex;flex-direction:column;align-items:center;width:16px;margin-right:3px">
@@ -350,9 +350,10 @@ body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;padd
 .hsub{font-size:10px;color:#666;margin-top:2px}
 .smry{display:flex;gap:22px;margin-bottom:16px;padding:6px 10px;background:#f5f5f5;border-radius:3px;width:fit-content}
 .smry span{font-size:10px;color:#555} .smry b{font-size:12px;font-weight:900;color:#111;display:block}
-.gblock{margin-bottom:24px;page-break-inside:avoid}
+.gblock{margin-bottom:24px}
 .gtit{font-size:13px;font-weight:900;text-transform:uppercase;margin-bottom:8px;border-left:4px solid #e53935;padding-left:8px}
-@media print{.gblock{page-break-inside:avoid}}
+.plancha{display:inline-block;page-break-inside:avoid;break-inside:avoid;margin-bottom:16px}
+@media print{.plancha{page-break-inside:avoid;break-inside:avoid}}
 </style></head><body>
 <div class="hdr">
   <div class="htit">CORTE DE VIDRIO — OPTIMIZADO</div>
