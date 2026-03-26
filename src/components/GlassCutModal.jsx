@@ -140,7 +140,7 @@ function SheetLayout({ sheetIndex, sheet, sheetWidth, sheetHeight, scale }) {
                             >
                                 {ww > 40 && wh > 20 && (
                                     <span className="text-[8px] text-gray-400 select-none leading-none text-center px-0.5">
-                                        {wr.width}×{wr.height}
+                                        {Math.round(wr.width * 10) / 10}×{Math.round(wr.height * 10) / 10}
                                     </span>
                                 )}
                             </div>
@@ -324,8 +324,8 @@ export default function GlassCutModal({ glassCutData = {}, isLoading, onClose, p
                     const wx = wr.x * pscale, wy = wr.y * pscale, ww = wr.width * pscale, wh = wr.height * pscale;
                     if (ww < 6 || wh < 6) return;
                     bodyHtml += `<rect x="${wx}" y="${wy}" width="${ww}" height="${wh}" fill="none" stroke="#9ca3af" stroke-width="1" stroke-dasharray="4,4"/>`;
-                    if (ww > 40 && wh > 20)
-                        bodyHtml += `<text x="${wx + ww / 2}" y="${wy + wh / 2 + 3}" text-anchor="middle" font-size="7" fill="#9ca3af">${wr.width}×${wr.height}</text>`;
+                    if (ww >= 60 && wh >= 20)
+                        bodyHtml += `<text x="${wx + ww / 2}" y="${wy + wh / 2 + 3}" text-anchor="middle" font-size="7" fill="#9ca3af">${Math.round(wr.width * 10) / 10}×${Math.round(wr.height * 10) / 10}</text>`;
                 });
 
                 bodyHtml += `</svg></div>
