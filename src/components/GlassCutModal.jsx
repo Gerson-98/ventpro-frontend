@@ -3,16 +3,16 @@
 import { useState } from 'react';
 import { FaPrint, FaTimes, FaThLarge, FaList } from 'react-icons/fa';
 
-// ─── Colores pastel por ventana ───────────────────────────────────────────────
+// ─── Fills sólidos apagados, texto siempre negro — optimizados para impresión ─
 const PIECE_COLORS = [
-    { bg: '#fce4ec', border: '#f48fb1', text: '#880e4f' }, // rosa
-    { bg: '#fff9c4', border: '#fff176', text: '#f57f17' }, // amarillo
-    { bg: '#e8f5e9', border: '#a5d6a7', text: '#1b5e20' }, // verde
-    { bg: '#e3f2fd', border: '#90caf9', text: '#0d47a1' }, // azul
-    { bg: '#f3e5f5', border: '#ce93d8', text: '#4a148c' }, // violeta
-    { bg: '#fff3e0', border: '#ffcc80', text: '#e65100' }, // naranja
-    { bg: '#e0f7fa', border: '#80deea', text: '#006064' }, // cyan
-    { bg: '#fbe9e7', border: '#ffab91', text: '#bf360c' }, // rojo claro
+    { bg: '#C8E6C9', border: '#81C784', text: '#000000' }, // verde
+    { bg: '#FFF9C4', border: '#F9A825', text: '#000000' }, // amarillo
+    { bg: '#B3E5FC', border: '#4FC3F7', text: '#000000' }, // azul claro
+    { bg: '#F8BBD9', border: '#F06292', text: '#000000' }, // rosa
+    { bg: '#D1C4E9', border: '#9575CD', text: '#000000' }, // violeta
+    { bg: '#FFE0B2', border: '#FF9800', text: '#000000' }, // naranja
+    { bg: '#B2EBF2', border: '#26C6DA', text: '#000000' }, // cyan
+    { bg: '#DCEDC8', border: '#AED581', text: '#000000' }, // verde claro
 ];
 
 // Asignar color por etiqueta de ventana (V1, V2, etc.)
@@ -64,6 +64,7 @@ function SheetLayout({ sheetIndex, sheet, sheetWidth, sheetHeight, scale }) {
                     className="relative border-2 border-red-400 bg-gray-50 overflow-hidden flex-shrink-0"
                     style={{ width: W, height: H }}
                 >
+                    {/* Piezas */}
                     {sheet.pieces.map((piece, pi) => {
                         const color = pieceColor(piece.label);
                         const pw = piece.width * scale;
@@ -73,7 +74,7 @@ function SheetLayout({ sheetIndex, sheet, sheetWidth, sheetHeight, scale }) {
                         return (
                             <div
                                 key={pi}
-                                className="absolute border flex flex-col items-center justify-center overflow-hidden"
+                                className="absolute border overflow-hidden"
                                 style={{
                                     left: px, top: py, width: pw, height: ph,
                                     background: color.bg,
@@ -82,32 +83,64 @@ function SheetLayout({ sheetIndex, sheet, sheetWidth, sheetHeight, scale }) {
                                 }}
                                 title={`${piece.label} — ${piece.width}×${piece.height} cm`}
                             >
-                                {/* Medida ancho arriba */}
+                                {/* Ancho arriba, centrado horizontalmente */}
                                 {pw > 35 && ph > 18 && (
-                                    <span className="text-[9px] font-bold leading-none select-none"
-                                        style={{ color: color.text }}>
+                                    <span
+                                        className="absolute text-[9px] font-bold leading-none select-none"
+                                        style={{ color: color.text, top: 2, left: '50%', transform: 'translateX(-50%)' }}
+                                    >
                                         {piece.width}
                                     </span>
                                 )}
-                                {/* Etiqueta ventana centro */}
+                                {/* Etiqueta en el centro absoluto */}
                                 {pw > 25 && ph > 30 && (
-                                    <span className="text-[11px] font-black leading-none mt-0.5 select-none"
-                                        style={{ color: color.text }}>
+                                    <span
+                                        className="absolute text-[11px] font-black leading-none select-none"
+                                        style={{ color: color.text, top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}
+                                    >
                                         {piece.label}
                                     </span>
                                 )}
-                                {/* Medida alto lado izquierdo */}
+                                {/* Alto en la izquierda, vertical */}
                                 {pw > 20 && ph > 25 && (
                                     <span
-                                        className="absolute left-0.5 top-1/2 text-[8px] font-semibold select-none"
+                                        className="absolute text-[8px] font-semibold select-none"
                                         style={{
                                             color: color.text,
+                                            left: 2,
+                                            top: '50%',
                                             writingMode: 'vertical-rl',
                                             transform: 'translateY(-50%) rotate(180deg)',
                                             lineHeight: 1,
                                         }}
                                     >
                                         {piece.height}
+                                    </span>
+                                )}
+                            </div>
+                        );
+                    })}
+                    {/* Desperdicios (wasteRects) */}
+                    {(sheet.wasteRects || []).map((wr, wi) => {
+                        const ww = wr.width * scale;
+                        const wh = wr.height * scale;
+                        if (ww < 8 || wh < 8) return null;
+                        return (
+                            <div
+                                key={`w${wi}`}
+                                className="absolute overflow-hidden flex items-center justify-center"
+                                style={{
+                                    left: wr.x * scale,
+                                    top: wr.y * scale,
+                                    width: ww,
+                                    height: wh,
+                                    border: '1px dashed #9ca3af',
+                                    background: 'rgba(243,244,246,0.5)',
+                                }}
+                            >
+                                {ww > 40 && wh > 20 && (
+                                    <span className="text-[8px] text-gray-400 select-none leading-none text-center px-0.5">
+                                        {wr.width}×{wr.height}
                                     </span>
                                 )}
                             </div>
@@ -258,20 +291,41 @@ export default function GlassCutModal({ glassCutData = {}, isLoading, onClose, p
                     </div>
                     <svg width="${W}" height="${H}" style="border:2px solid #e53935;background:#fafafa">`;
 
-                sheet.pieces.forEach((piece, pi) => {
-                    const COLORS = ['#fce4ec', '#fff9c4', '#e8f5e9', '#e3f2fd', '#f3e5f5', '#fff3e0', '#e0f7fa', '#fbe9e7'];
-                    const BORDERS = ['#f48fb1', '#fff176', '#a5d6a7', '#90caf9', '#ce93d8', '#ffcc80', '#80deea', '#ffab91'];
-                    const TEXTS = ['#880e4f', '#f57f17', '#1b5e20', '#0d47a1', '#4a148c', '#e65100', '#006064', '#bf360c'];
-                    const ci = pi % COLORS.length;
+                const SVG_COLORS  = ['#C8E6C9','#FFF9C4','#B3E5FC','#F8BBD9','#D1C4E9','#FFE0B2','#B2EBF2','#DCEDC8'];
+                const SVG_BORDERS = ['#81C784','#F9A825','#4FC3F7','#F06292','#9575CD','#FF9800','#26C6DA','#AED581'];
+
+                // Mapa etiqueta→índice de color para consistencia entre piezas
+                const svgColorMap = new Map();
+                let svgColorIdx = 0;
+
+                sheet.pieces.forEach((piece) => {
+                    const base = (piece.label || '').match(/V\d+/)?.[0] || piece.label;
+                    if (!svgColorMap.has(base)) { svgColorMap.set(base, svgColorIdx % SVG_COLORS.length); svgColorIdx++; }
+                    const ci = svgColorMap.get(base);
                     const px = piece.x * pscale;
                     const py = piece.y * pscale;
                     const pw = piece.width * pscale;
                     const ph = piece.height * pscale;
-                    bodyHtml += `<rect x="${px}" y="${py}" width="${pw}" height="${ph}" fill="${COLORS[ci]}" stroke="${BORDERS[ci]}" stroke-width="1.5"/>`;
+                    bodyHtml += `<rect x="${px}" y="${py}" width="${pw}" height="${ph}" fill="${SVG_COLORS[ci]}" stroke="${SVG_BORDERS[ci]}" stroke-width="1.5"/>`;
                     if (pw > 30 && ph > 20) {
-                        bodyHtml += `<text x="${px + pw / 2}" y="${py + ph / 2 - 5}" text-anchor="middle" font-size="10" font-weight="900" fill="${TEXTS[ci]}">${piece.label}</text>`;
-                        bodyHtml += `<text x="${px + pw / 2}" y="${py + ph / 2 + 8}" text-anchor="middle" font-size="8" fill="${TEXTS[ci]}">${piece.width}×${piece.height}</text>`;
+                        // Ancho centrado arriba
+                        if (pw > 35 && ph > 18)
+                            bodyHtml += `<text x="${px + pw / 2}" y="${py + 10}" text-anchor="middle" font-size="8" font-weight="700" fill="#000000">${piece.width}</text>`;
+                        // Etiqueta centrada
+                        bodyHtml += `<text x="${px + pw / 2}" y="${py + ph / 2 + 4}" text-anchor="middle" font-size="10" font-weight="900" fill="#000000">${piece.label}</text>`;
+                        // Alto en la izquierda, rotado
+                        if (pw > 20 && ph > 25)
+                            bodyHtml += `<text x="${px + 8}" y="${py + ph / 2}" text-anchor="middle" font-size="8" font-weight="600" fill="#000000" transform="rotate(-90,${px + 8},${py + ph / 2})">${piece.height}</text>`;
                     }
+                });
+
+                // Desperdicios (wasteRects)
+                (sheet.wasteRects || []).forEach((wr) => {
+                    const wx = wr.x * pscale, wy = wr.y * pscale, ww = wr.width * pscale, wh = wr.height * pscale;
+                    if (ww < 6 || wh < 6) return;
+                    bodyHtml += `<rect x="${wx}" y="${wy}" width="${ww}" height="${wh}" fill="none" stroke="#9ca3af" stroke-width="1" stroke-dasharray="4,4"/>`;
+                    if (ww > 40 && wh > 20)
+                        bodyHtml += `<text x="${wx + ww / 2}" y="${wy + wh / 2 + 3}" text-anchor="middle" font-size="7" fill="#9ca3af">${wr.width}×${wr.height}</text>`;
                 });
 
                 bodyHtml += `</svg></div>
