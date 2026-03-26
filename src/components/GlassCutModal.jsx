@@ -120,31 +120,21 @@ function SheetLayout({ sheetIndex, sheet, sheetWidth, sheetHeight, scale }) {
                             </div>
                         );
                     })}
-                    {/* Desperdicios (wasteRects) — solo si ambas dimensiones > 5 cm */}
+                    {/* Desperdicios — solo texto de dimensiones, sin bordes punteados */}
                     {(sheet.wasteRects || []).map((wr, wi) => {
                         if (wr.width < 5 || wr.height < 5) return null;
-                        const inset = 2;
-                        const ww = wr.width * scale - inset * 2;
-                        const wh = wr.height * scale - inset * 2;
-                        if (ww < 8 || wh < 8) return null;
+                        const ww = wr.width * scale;
+                        const wh = wr.height * scale;
+                        if (ww < 30 || wh < 16) return null;
                         return (
                             <div
                                 key={`w${wi}`}
-                                className="absolute overflow-hidden flex items-center justify-center"
-                                style={{
-                                    left: wr.x * scale + inset,
-                                    top: wr.y * scale + inset,
-                                    width: ww,
-                                    height: wh,
-                                    border: '1px dashed #bdbdbd',
-                                    background: 'rgba(245,245,245,0.3)',
-                                }}
+                                className="absolute flex items-center justify-center pointer-events-none"
+                                style={{ left: wr.x * scale, top: wr.y * scale, width: ww, height: wh }}
                             >
-                                {ww > 50 && wh > 22 && (
-                                    <span className="text-[8px] text-gray-400 select-none leading-none text-center px-0.5">
-                                        {Math.round(wr.width * 10) / 10}×{Math.round(wr.height * 10) / 10}
-                                    </span>
-                                )}
+                                <span className="text-[8px] text-gray-400 select-none leading-none text-center">
+                                    {Math.round(wr.width * 10) / 10}×{Math.round(wr.height * 10) / 10}
+                                </span>
                             </div>
                         );
                     })}
@@ -321,16 +311,13 @@ export default function GlassCutModal({ glassCutData = {}, isLoading, onClose, p
                     }
                 });
 
-                // Desperdicios (wasteRects) — solo mostrar si ambas dimensiones > 5 cm
+                // Desperdicios — solo texto de dimensiones, sin bordes punteados
                 (sheet.wasteRects || []).forEach((wr) => {
                     if (wr.width < 5 || wr.height < 5) return;
-                    const inset = 3; // indentar para no solapar con bordes de piezas/plancha
-                    const wx = wr.x * pscale + inset, wy = wr.y * pscale + inset;
-                    const ww = wr.width * pscale - inset * 2, wh = wr.height * pscale - inset * 2;
-                    if (ww < 8 || wh < 8) return;
-                    bodyHtml += `<rect x="${wx}" y="${wy}" width="${ww}" height="${wh}" fill="none" stroke="#bdbdbd" stroke-width="0.8" stroke-dasharray="5,3"/>`;
-                    if (ww >= 60 && wh >= 24)
-                        bodyHtml += `<text x="${wx + ww / 2}" y="${wy + wh / 2 + 3}" text-anchor="middle" font-size="7" fill="#9e9e9e">${Math.round(wr.width * 10) / 10}×${Math.round(wr.height * 10) / 10}</text>`;
+                    const wx = wr.x * pscale, wy = wr.y * pscale;
+                    const ww = wr.width * pscale, wh = wr.height * pscale;
+                    if (ww < 40 || wh < 18) return;
+                    bodyHtml += `<text x="${wx + ww / 2}" y="${wy + wh / 2 + 3}" text-anchor="middle" font-size="8" fill="#9e9e9e">${Math.round(wr.width * 10) / 10}×${Math.round(wr.height * 10) / 10}</text>`;
                 });
 
                 bodyHtml += `</svg></div>
