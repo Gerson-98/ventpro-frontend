@@ -120,25 +120,27 @@ function SheetLayout({ sheetIndex, sheet, sheetWidth, sheetHeight, scale }) {
                             </div>
                         );
                     })}
-                    {/* Desperdicios (wasteRects) */}
+                    {/* Desperdicios (wasteRects) — solo si ambas dimensiones > 5 cm */}
                     {(sheet.wasteRects || []).map((wr, wi) => {
-                        const ww = wr.width * scale;
-                        const wh = wr.height * scale;
+                        if (wr.width < 5 || wr.height < 5) return null;
+                        const inset = 2;
+                        const ww = wr.width * scale - inset * 2;
+                        const wh = wr.height * scale - inset * 2;
                         if (ww < 8 || wh < 8) return null;
                         return (
                             <div
                                 key={`w${wi}`}
                                 className="absolute overflow-hidden flex items-center justify-center"
                                 style={{
-                                    left: wr.x * scale,
-                                    top: wr.y * scale,
+                                    left: wr.x * scale + inset,
+                                    top: wr.y * scale + inset,
                                     width: ww,
                                     height: wh,
-                                    border: '1px dashed #9ca3af',
-                                    background: 'rgba(243,244,246,0.5)',
+                                    border: '1px dashed #bdbdbd',
+                                    background: 'rgba(245,245,245,0.3)',
                                 }}
                             >
-                                {ww > 40 && wh > 20 && (
+                                {ww > 50 && wh > 22 && (
                                     <span className="text-[8px] text-gray-400 select-none leading-none text-center px-0.5">
                                         {Math.round(wr.width * 10) / 10}×{Math.round(wr.height * 10) / 10}
                                     </span>
@@ -278,7 +280,7 @@ export default function GlassCutModal({ glassCutData = {}, isLoading, onClose, p
                         ${data.planchaSize} · ${data.totalPieces} piezas · ${data.minPlanchas} plancha${data.minPlanchas !== 1 ? 's' : ''}
                     </span>
                 </div>
-                <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start">`;
+                <div>`;
 
             data.sheets.forEach((sheet, si) => {
                 bodyHtml += `<div class="plancha">
@@ -319,13 +321,16 @@ export default function GlassCutModal({ glassCutData = {}, isLoading, onClose, p
                     }
                 });
 
-                // Desperdicios (wasteRects)
+                // Desperdicios (wasteRects) — solo mostrar si ambas dimensiones > 5 cm
                 (sheet.wasteRects || []).forEach((wr) => {
-                    const wx = wr.x * pscale, wy = wr.y * pscale, ww = wr.width * pscale, wh = wr.height * pscale;
-                    if (ww < 6 || wh < 6) return;
-                    bodyHtml += `<rect x="${wx}" y="${wy}" width="${ww}" height="${wh}" fill="none" stroke="#9ca3af" stroke-width="1" stroke-dasharray="4,4"/>`;
-                    if (ww >= 60 && wh >= 20)
-                        bodyHtml += `<text x="${wx + ww / 2}" y="${wy + wh / 2 + 3}" text-anchor="middle" font-size="7" fill="#9ca3af">${Math.round(wr.width * 10) / 10}×${Math.round(wr.height * 10) / 10}</text>`;
+                    if (wr.width < 5 || wr.height < 5) return;
+                    const inset = 3; // indentar para no solapar con bordes de piezas/plancha
+                    const wx = wr.x * pscale + inset, wy = wr.y * pscale + inset;
+                    const ww = wr.width * pscale - inset * 2, wh = wr.height * pscale - inset * 2;
+                    if (ww < 8 || wh < 8) return;
+                    bodyHtml += `<rect x="${wx}" y="${wy}" width="${ww}" height="${wh}" fill="none" stroke="#bdbdbd" stroke-width="0.8" stroke-dasharray="5,3"/>`;
+                    if (ww >= 60 && wh >= 24)
+                        bodyHtml += `<text x="${wx + ww / 2}" y="${wy + wh / 2 + 3}" text-anchor="middle" font-size="7" fill="#9e9e9e">${Math.round(wr.width * 10) / 10}×${Math.round(wr.height * 10) / 10}</text>`;
                 });
 
                 bodyHtml += `</svg></div>
@@ -352,8 +357,7 @@ body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;padd
 .smry span{font-size:10px;color:#555} .smry b{font-size:12px;font-weight:900;color:#111;display:block}
 .gblock{margin-bottom:24px}
 .gtit{font-size:13px;font-weight:900;text-transform:uppercase;margin-bottom:8px;border-left:4px solid #e53935;padding-left:8px}
-.plancha{display:inline-block;page-break-inside:avoid;break-inside:avoid;margin-bottom:16px}
-@media print{.plancha{page-break-inside:avoid;break-inside:avoid}}
+.plancha{margin-bottom:20px;page-break-inside:avoid;break-inside:avoid}
 </style></head><body>
 <div class="hdr">
   <div class="htit">CORTE DE VIDRIO — OPTIMIZADO</div>
