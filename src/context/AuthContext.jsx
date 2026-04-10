@@ -39,14 +39,13 @@ export function AuthProvider({ children }) {
 
     const logout = async () => {
         try {
-            const refreshToken = localStorage.getItem('refreshToken');
-            await api.post('/auth/logout', { refresh_token: refreshToken });
+            // withCredentials: true envía la cookie automáticamente; el backend la revoca
+            await api.post('/auth/logout');
         } catch {
             // Si falla el logout del servidor, igual limpiamos local
         } finally {
             setUser(null);
             localStorage.removeItem('authToken');
-            localStorage.removeItem('refreshToken');
             window.location.href = '/login';
         }
     };

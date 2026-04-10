@@ -159,7 +159,10 @@ export default function QuotationDetail() {
 
     const isConfirmado = quotation.status === 'confirmado';
     const isReopenada = !isConfirmado && !!quotation.generatedOrder;
+    // windowCount = número de ítems (filas) en la tabla
     const windowCount = quotation.quotation_windows?.length || 0;
+    // totalUnits = suma real de unidades (quantity) para mostrar "X ventanas"
+    const totalUnits = quotation.quotation_windows?.reduce((sum, w) => sum + (w.quantity || 1), 0) || 0;
     const API_BASE = import.meta.env.VITE_API_URL?.replace(/\/+$/, '') || 'http://localhost:3000';
 
     const resolveImageUrl = (url) => {
@@ -252,7 +255,7 @@ export default function QuotationDetail() {
                         </div>
 
                         <p className="text-xs text-gray-400 mt-3">
-                            Creada el {formatDate(quotation.createdAt)} · {windowCount} ventana{windowCount !== 1 ? 's' : ''}
+                            Creada el {formatDate(quotation.createdAt)} · {totalUnits} ventana{totalUnits !== 1 ? 's' : ''}
                         </p>
                     </div>
 

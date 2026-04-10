@@ -173,7 +173,9 @@ export const generateDocumentPDF = async (data, mode = 'quotation') => {
     // ======================================================
     // 3. TABLA DE PRODUCTOS
     // ======================================================
-    const tableColumn = ["#", "Cant.", "Descripción", "Color PVC", "Color Vidrio", "Dimensiones", "P. Unitario", "Subtotal"];
+    // Orden: # | Descripción | Color PVC | Color Vidrio | Dimensiones | Cant. | P. Unitario | Subtotal
+    // Separar Cant. del # mejora la lectura para el cliente.
+    const tableColumn = ["#", "Descripción", "Color PVC", "Color Vidrio", "Dimensiones", "Cant.", "P. Unitario", "Subtotal"];
 
     // Origen de datos dinámico: 'windows' para pedidos, 'quotation_windows' para cotizaciones
     const items = isOrder ? (data.windows || []) : (data.quotation_windows || []);
@@ -181,13 +183,15 @@ export const generateDocumentPDF = async (data, mode = 'quotation') => {
     const tableRows = items.map((win, index) => {
       const quantity = win.quantity || 1;
       const unitPrice = (win.price || 0) / quantity;
+      // Nombre: displayName propio del ítem → displayName del tipo → name del tipo → fallback
+      const windowName = win.displayName || win.windowType?.displayName || win.windowType?.name || "Ventana";
       return [
         index + 1,
-        String(quantity),
-        win.displayName || "Ventana",
+        windowName,
         win.pvcColor?.name || "N/A",
         win.glassColor?.name || "N/A",
         `${(win.width_cm / 100).toFixed(2)} x ${(win.height_cm / 100).toFixed(2)}m`,
+        String(quantity),
         formatCurrency(unitPrice),
         formatCurrency(win.price),
       ];
@@ -213,9 +217,11 @@ export const generateDocumentPDF = async (data, mode = 'quotation') => {
         },
         columnStyles: {
             0: { halign: 'center', cellWidth: 8 },
-            1: { halign: 'center', cellWidth: 10 },
-            2: { cellWidth: 45 },
-            5: { halign: 'center' },
+            1: { cellWidth: 50 },
+            2: { cellWidth: 22 },
+            3: { cellWidth: 22 },
+            4: { halign: 'center', cellWidth: 28 },
+            5: { halign: 'center', cellWidth: 10 },
             6: { halign: 'right' },
             7: { halign: 'right' }
         },

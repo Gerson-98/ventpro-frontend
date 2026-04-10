@@ -8,7 +8,9 @@ const BASE_URL =
 export const api = axios.create({
   baseURL: BASE_URL,
   headers: { "Content-Type": "application/json" },
-  withCredentials: false,
+  // withCredentials: true envía la httpOnly cookie del refresh_token en cada petición cross-origin.
+  // El backend ya tiene CORS configurado con credentials: true y origins específicos.
+  withCredentials: true,
   timeout: 15000,
 });
 
@@ -25,7 +27,8 @@ api.interceptors.request.use(
 );
 
 // ✨ INTERCEPTOR: Refresh silencioso de access_token con cola de requests
-// Si el access_token expiró (401), intenta renovarlo con el refresh_token (httpOnly cookie).
+// Si el access_token expiró (401), renueva usando la httpOnly cookie del refresh_token.
+// La cookie se envía automáticamente gracias a withCredentials: true.
 // Si el refresh también falla → logout y redirect a /login.
 
 let isRefreshing = false;
@@ -70,21 +73,12 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const refreshToken = localStorage.getItem('refreshToken');
-        if (!refreshToken) throw new Error('No refresh token');
-
-        const { data } = await api.post(
-          '/auth/refresh',
-          { refresh_token: refreshToken },
-          { withCredentials: false },
-        );
+        // La httpOnly cookie refresh_token se envía automáticamente (withCredentials: true).
+        // No hay que leer ni enviar el token manualmente.
+        const { data } = await api.post('/auth/refresh');
         const newToken = data.access_token;
 
         localStorage.setItem('authToken', newToken);
-        // Rotar el refresh token si el backend devuelve uno nuevo
-        if (data.refresh_token) {
-          localStorage.setItem('refreshToken', data.refresh_token);
-        }
         api.defaults.headers.common.Authorization = `Bearer ${newToken}`;
         originalRequest.headers.Authorization = `Bearer ${newToken}`;
 
@@ -93,7 +87,6 @@ api.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError, null);
         localStorage.removeItem('authToken');
-        localStorage.removeItem('refreshToken');
         window.location.href = '/login';
         return Promise.reject(refreshError);
       } finally {

@@ -338,6 +338,8 @@ export default function CutOptimizationModal({
     isLoading,
     onClose,
     projectName,
+    orderId,
+    clientName,
 }) {
     // Construir lista de series y totales
     const { items, combos } = buildSeries(optimizationData);
@@ -418,14 +420,18 @@ export default function CutOptimizationModal({
             seriesHtml += `</div><div style="height:10px"></div>`;
         }
 
+        const orderLabel = orderId ? `Pedido #${orderId}` : '';
+        const titleParts = [orderLabel, projectName, clientName].filter(Boolean);
+
         const html = `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
-<title>Plan de Corte — ${projectName || 'Pedido'}</title>
+<title>Plan de Corte — ${titleParts.join(' · ') || 'Pedido'}</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;padding:18px 22px;max-width:1100px;margin:0 auto;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .pc{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .hdr{border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:12px}
 .htit{font-size:17px;font-weight:900}
+.hid{font-size:12px;font-weight:700;color:#333;margin-top:3px}
 .hsub{font-size:10px;color:#666;margin-top:2px}
 .smry{display:flex;gap:22px;margin-bottom:14px;padding:6px 10px;background:#f5f5f5;border-radius:3px;width:fit-content}
 .smry span{font-size:10px;color:#555} .smry b{font-size:12px;font-weight:900;color:#111;display:block}
@@ -448,7 +454,8 @@ body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;padd
 </style></head><body>
 <div class="hdr">
   <div class="htit">✂ PLAN DE CORTE</div>
-  <div class="hsub">${projectName || 'Pedido'} · Barra: 580 cm · ${date}</div>
+  ${orderLabel ? `<div class="hid">${orderLabel}${clientName ? ' — ' + clientName : ''}</div>` : ''}
+  <div class="hsub">${projectName || ''} · Barra: 580 cm · ${date}</div>
 </div>
 <div class="smry">
   <span>Barras totales<b>${totalBars}</b></span>
@@ -477,11 +484,11 @@ body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;padd
                         </div>
                         <div>
                             <h2 className="text-sm font-black text-gray-900 uppercase tracking-wide leading-none">
-                                Plan de Corte
+                                Plan de Corte{orderId ? ` — Pedido #${orderId}` : ''}
                             </h2>
-                            {projectName && (
-                                <p className="text-xs text-gray-400 leading-tight mt-0.5">{projectName}</p>
-                            )}
+                            <p className="text-xs text-gray-400 leading-tight mt-0.5">
+                                {[projectName, clientName].filter(Boolean).join(' · ') || 'Sin identificar'}
+                            </p>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">

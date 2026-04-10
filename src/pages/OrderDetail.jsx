@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import {
   FaMoneyBillWave, FaFilePdf, FaArrowLeft, FaFileAlt, FaChartBar,
   FaMagic, FaCalendarAlt,
-  FaCamera, FaFileInvoice, FaPhoneAlt, FaUser, FaExternalLinkAlt,
+  FaCamera, FaFileInvoice, FaPhoneAlt, FaUser, FaExternalLinkAlt, FaStickyNote,
 } from 'react-icons/fa';
 import AddWindowModal from '@/components/AddWindowModal';
 import ProfilesReportModal from '@/components/ProfilesReportModal';
@@ -254,6 +254,17 @@ export default function OrderDetail() {
                     {clientData.phone}
                   </span>
                 )}
+              </div>
+            )}
+
+            {/* Notas de la cotización */}
+            {order.notes && (
+              <div className="mb-4 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <FaStickyNote size={12} className="text-amber-500" />
+                  <span className="text-xs font-semibold text-amber-700 uppercase tracking-wide">Notas</span>
+                </div>
+                <p className="text-sm text-amber-900 whitespace-pre-wrap leading-relaxed">{order.notes}</p>
               </div>
             )}
 
@@ -601,6 +612,8 @@ export default function OrderDetail() {
           optimizationData={optimizationData}
           onClose={() => setShowOptimizationModal(false)}
           projectName={order?.project}
+          orderId={order?.id}
+          clientName={order?.client?.name}
         />
       )}
 
