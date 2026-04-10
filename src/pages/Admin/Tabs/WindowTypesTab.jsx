@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { FaPlus, FaTrashAlt, FaEdit, FaSearch, FaExclamationTriangle } from "react-icons/fa";
 import api from "@/services/api";
 
-const EMPTY_FORM = { name: "", description: "", pvcColorIds: [] };
+const EMPTY_FORM = { name: "", displayName: "", description: "", pvcColorIds: [] };
 
 export default function WindowTypesTab() {
   const [windowTypes, setWindowTypes] = useState([]);
@@ -41,6 +41,7 @@ export default function WindowTypesTab() {
   const filtered = useMemo(() =>
     windowTypes.filter(t =>
       t.name.toLowerCase().includes(search.toLowerCase()) ||
+      (t.displayName || "").toLowerCase().includes(search.toLowerCase()) ||
       (t.description || "").toLowerCase().includes(search.toLowerCase())
     ), [windowTypes, search]);
 
@@ -49,7 +50,7 @@ export default function WindowTypesTab() {
     setFormError("");
 
     if (!formData.name.trim()) {
-      setFormError("El nombre es obligatorio.");
+      setFormError("El nombre interno es obligatorio.");
       return;
     }
     if (!editingType && formData.pvcColorIds.length === 0) {
@@ -59,6 +60,7 @@ export default function WindowTypesTab() {
 
     const payload = {
       name: formData.name.trim(),
+      displayName: formData.displayName.trim() || null,
       description: formData.description.trim() || null,
       pvcColorIds: formData.pvcColorIds.map(Number),
     };
@@ -68,6 +70,7 @@ export default function WindowTypesTab() {
       if (editingType) {
         await api.patch(`/window-types/${editingType.id}`, {
           name: payload.name,
+          displayName: payload.displayName,
           description: payload.description,
         });
       } else {
@@ -99,6 +102,7 @@ export default function WindowTypesTab() {
     setEditingType(type);
     setFormData({
       name: type.name,
+      displayName: type.displayName || "",
       description: type.description || "",
       pvcColorIds: (type.pvcColors || []).map(c => String(c.id)),
     });
@@ -133,7 +137,7 @@ export default function WindowTypesTab() {
         <div>
           <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">Tipos de Ventana</h2>
           <p className="text-gray-500 text-xs sm:text-sm mt-0.5">
-            Administra los diferentes tipos de ventanas y sus asociaciones de color PVC.
+            Administra los tipos de ventana. El <span className="font-medium text-gray-700">Nombre Comercial</span> es el que aparece en cotizaciones y PDFs para el cliente.
           </p>
         </div>
         <button
@@ -151,7 +155,7 @@ export default function WindowTypesTab() {
         <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={13} />
         <input
           type="text"
-          placeholder="Buscar por nombre..."
+          placeholder="Buscar por nombre o nombre comercial..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-full sm:max-w-sm pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
@@ -185,8 +189,11 @@ export default function WindowTypesTab() {
             <table className="min-w-full text-sm">
               <thead className="bg-gray-50 text-gray-600 text-xs uppercase tracking-wide">
                 <tr>
-                  <th className="py-3 px-4 text-left">Nombre</th>
-                  <th className="py-3 px-4 text-left">Descripción</th>
+                  <th className="py-3 px-4 text-left">Nombre interno</th>
+                  <th className="py-3 px-4 text-left">
+                    Nombre comercial
+                    <span className="ml-1 text-gray-400 font-normal normal-case tracking-normal">(para clientes)</span>
+                  </th>
                   <th className="py-3 px-4 text-left">Colores PVC asociados</th>
                   <th className="py-3 px-4 text-center">Acciones</th>
                 </tr>
@@ -194,8 +201,14 @@ export default function WindowTypesTab() {
               <tbody className="divide-y divide-gray-100">
                 {filtered.map((t) => (
                   <tr key={t.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="py-2.5 px-4 font-medium text-gray-900">{t.name}</td>
-                    <td className="py-2.5 px-4 text-gray-500 text-xs">{t.description || "—"}</td>
+                    <td className="py-2.5 px-4 font-medium text-gray-900 text-xs">{t.name}</td>
+                    <td className="py-2.5 px-4">
+                      {t.displayName ? (
+                        <span className="text-gray-800 font-medium">{t.displayName}</span>
+                      ) : (
+                        <span className="text-xs text-amber-600 italic">Sin nombre comercial</span>
+                      )}
+                    </td>
                     <td className="py-2.5 px-4">
                       {t.pvcColors && t.pvcColors.length > 0 ? (
                         <div className="flex flex-wrap gap-1">
@@ -230,7 +243,7 @@ export default function WindowTypesTab() {
             {filtered.map((t) => (
               <div key={t.id} className="p-4">
                 {/* Fila 1: nombre + acciones */}
-                <div className="flex items-start justify-between gap-2 mb-2">
+                <div className="flex items-start justify-between gap-2 mb-1">
                   <p className="font-semibold text-sm text-gray-900 leading-tight">{t.name}</p>
                   <div className="flex items-center gap-1.5 flex-shrink-0">
                     <button
@@ -250,9 +263,11 @@ export default function WindowTypesTab() {
                   </div>
                 </div>
 
-                {/* Descripción */}
-                {t.description && (
-                  <p className="text-xs text-gray-500 mb-2">{t.description}</p>
+                {/* Nombre comercial */}
+                {t.displayName ? (
+                  <p className="text-xs text-blue-700 font-medium mb-2">📋 {t.displayName}</p>
+                ) : (
+                  <p className="text-xs text-amber-500 italic mb-2">Sin nombre comercial</p>
                 )}
 
                 {/* Chips de colores PVC */}
@@ -303,10 +318,10 @@ export default function WindowTypesTab() {
             {/* Body scrollable */}
             <form onSubmit={handleSave} className="overflow-y-auto flex-1 px-5 py-4 sm:px-6 sm:py-5 space-y-4">
 
-              {/* Nombre */}
+              {/* Nombre interno */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nombre <span className="text-red-500">*</span>
+                  Nombre interno <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -316,6 +331,25 @@ export default function WindowTypesTab() {
                   onChange={(e) => setFormData(p => ({ ...p, name: e.target.value }))}
                   className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
+                <p className="text-xs text-gray-400 mt-1">Nombre técnico usado en producción y cálculos.</p>
+              </div>
+
+              {/* Nombre comercial */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nombre comercial{" "}
+                  <span className="text-gray-400 font-normal">(opcional)</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej: VENTANA CORREDIZA DE 2 HOJAS S80"
+                  value={formData.displayName}
+                  onChange={(e) => setFormData(p => ({ ...p, displayName: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Este nombre aparece en cotizaciones y PDFs para el cliente. Si se deja vacío, se usa el nombre interno.
+                </p>
               </div>
 
               {/* Descripción */}

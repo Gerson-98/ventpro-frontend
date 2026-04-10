@@ -253,7 +253,7 @@ export const generateDocumentPDF = async (data, mode = 'quotation') => {
     const neededSpace = isIvaIncluded ? 45 : 30;
     if (finalY > pageHeight - margin.bottom - neededSpace) {
         doc.addPage();
-        addBackground();
+        drawPageHeader();
         finalY = margin.top;
     }
 
