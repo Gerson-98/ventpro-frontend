@@ -614,6 +614,7 @@ export default function OrderDetail() {
           projectName={order?.project}
           orderId={order?.id}
           clientName={order?.client?.name}
+          windows={order?.windows || []}
         />
       )}
 

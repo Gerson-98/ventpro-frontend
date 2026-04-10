@@ -41,6 +41,11 @@ function winBg(label) {
     return WIN_BG[m ? (parseInt(m[1]) - 1) % WIN_BG.length : 0];
 }
 
+// Color de chip de ventana (igual que winBg pero para la lista)
+function chipBg(idx) {
+    return WIN_BG[idx % WIN_BG.length];
+}
+
 // Parsea "V1 H - 1.20x1.79m|HOJA" → { vNum:'V1', dim:'H' }
 function parseLabel(raw) {
     const base = (raw || '').split('|')[0];
@@ -82,8 +87,6 @@ function shortName(name) {
 }
 
 // ─── FFD bin-packing con labels ───────────────────────────────────────────────
-// Igual que el service, para re-calcular series en el frontend cuando
-// el backend todavía no envía machineSeries:true
 function ffd(cuts, barLen = 580) {
     const sorted = [...cuts].sort((a, b) => b.length - a.length);
     const bins = [];
@@ -99,16 +102,15 @@ function ffd(cuts, barLen = 580) {
         }
         if (!placed) bins.push({ cuts: [cut], rem: barLen - cut.length });
     }
-    return bins; // [{ cuts:[{length,windowLabel}], rem }]
+    return bins;
 }
 
 // ─── Transforma los datos del backend en la lista plana de series ─────────────
 function buildSeries(optimizationData) {
-    const items = []; // items a renderizar
-    const combos = []; // totales HOJA/MOSQUITERO para mostrar aparte
+    const items = [];
+    const combos = [];
     let idx = 0;
 
-    // Orden: primero perfiles individuales (MARCO, etc.), luego combos (HOJA+MOSQUITERO)
     const names = Object.keys(optimizationData);
     const ordered = [
         ...names.filter(n => !n.includes(' + ')),
@@ -119,8 +121,6 @@ function buildSeries(optimizationData) {
         const groups = optimizationData[pName];
         const isCombo = pName.includes(' + ');
 
-        // Para combos: extraer nombre corto de cada parte del perfil
-        // "HOJA CORREDIZA S60 6,6 CM + HOJA CEDAZO" → hojaLbl="HOJA 6,6 CM", cedazoLbl="MOSQUITERO"
         const [hojaFullName = '', cedazoFullName = ''] = pName.split(' + ');
         const hojaLbl = isCombo ? shortName(hojaFullName) : '';
         const cedazoLbl = isCombo
@@ -129,23 +129,15 @@ function buildSeries(optimizationData) {
                 : shortName(cedazoFullName))
             : '';
 
-        // Reiniciar contador de serie para cada grupo de perfil
         let groupIdx = 0;
 
         for (const group of groups) {
-
             if (isCombo) {
-                // ── Modo combo: 3 filas (HOJA / HOJA / MOSQUITERO) ───────────
                 let series = [];
 
                 if (group.machineSeries && group.series?.length > 0) {
-                    // ✅ Nuevo service: ya viene con series limpias del backend
-                    series = group.series.map(s => ({
-                        cuts: s.cuts,
-                        waste: s.waste,
-                    }));
+                    series = group.series.map(s => ({ cuts: s.cuts, waste: s.waste }));
                 } else if (group.bars?.length > 0) {
-                    // 🔄 Viejo service: re-calcular series en el frontend con FFD
                     const hojaCuts = [];
                     for (const bar of group.bars) {
                         for (const cut of bar.cuts) {
@@ -187,9 +179,7 @@ function buildSeries(optimizationData) {
                         cedazoLbl,
                     });
                 }
-
             } else {
-                // ── Modo individual: 1 fila por barra ────────────────────────
                 const rowLbl = shortName(pName);
                 for (const bar of (group.bars ?? [])) {
                     idx++;
@@ -227,12 +217,8 @@ function Piece({ cut, bg, minW = 42 }) {
             className="flex flex-col items-center justify-center border-r border-white/60 overflow-hidden flex-shrink-0"
             style={{ width: `${pct}%`, minWidth: minW, height: '100%', background: bg }}
         >
-            <span className="text-[12px] font-black text-gray-800 leading-none select-none">
-                {len}
-            </span>
-            <span className="text-[10px] font-semibold text-gray-600 leading-none mt-0.5 select-none">
-                {dc}V{num}
-            </span>
+            <span className="text-[12px] font-black text-gray-800 leading-none select-none">{len}</span>
+            <span className="text-[10px] font-semibold text-gray-600 leading-none mt-0.5 select-none">{dc}V{num}</span>
         </div>
     );
 }
@@ -247,45 +233,30 @@ function BarRow({ rowLabel, cuts, waste, palette, singleMode = false }) {
     return (
         <div className="mb-1">
             <div className="flex items-center" style={{ minHeight: BAR_H }}>
-                {/* Etiqueta izquierda */}
                 <div className="flex-shrink-0 pr-2" style={{ width: 120 }}>
-                    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide leading-tight">
-                        {rowLabel}
-                    </span>
+                    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide leading-tight">{rowLabel}</span>
                 </div>
-
-                {/* Barra proporcional */}
-                <div
-                    className="flex overflow-hidden border border-gray-300"
-                    style={{ flex: 1, height: BAR_H }}
-                >
+                <div className="flex overflow-hidden border border-gray-300" style={{ flex: 1, height: BAR_H }}>
                     {cuts.map((cut, ci) => {
                         const bg = singleMode
                             ? winBg(cut.windowLabel)
                             : ci % 2 === 0 ? palette.bg : palette.alt;
                         return <Piece key={ci} cut={cut} bg={bg} />;
                     })}
-                    {/* Zona de sobra */}
                     {wastePct > 0.5 && (
                         <div
                             className="flex items-center justify-center border-l border-dashed border-gray-400 bg-white flex-shrink-0"
                             style={{ width: `${wastePct}%`, height: '100%' }}
                         >
                             {wasteLabel && (
-                                <span
-                                    className="text-[10px] font-semibold text-gray-400 select-none"
-                                    style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
-                                >
+                                <span className="text-[10px] font-semibold text-gray-400 select-none" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
                                     {wasteLabel}
                                 </span>
                             )}
                         </div>
                     )}
                 </div>
-
             </div>
-
-            {/* Línea roja simple */}
             <div className="flex items-center ml-[120px] mt-0.5">
                 <div className="flex-1 h-px bg-red-400" />
             </div>
@@ -293,9 +264,8 @@ function BarRow({ rowLabel, cuts, waste, palette, singleMode = false }) {
     );
 }
 
-// ─── Un bloque de serie (título + filas) ──────────────────────────────────────
+// ─── Un bloque de serie ───────────────────────────────────────────────────────
 function SerieBlock({ item, showGroupHeader }) {
-    // Para combos (machine): 3 filas con el nombre real del perfil en cada una
     const rows = item.type === 'machine'
         ? [
             { lbl: item.hojaLbl || 'HOJA 6,6 CM', cuts: item.cuts, waste: item.waste },
@@ -308,27 +278,72 @@ function SerieBlock({ item, showGroupHeader }) {
         <>
             {showGroupHeader && (
                 <div className="mt-6 mb-3 pb-2 border-b-2 border-gray-800 first:mt-0">
-                    <span className="text-[11px] font-black text-gray-800 uppercase tracking-widest">
-                        {item.groupName}
-                    </span>
+                    <span className="text-[11px] font-black text-gray-800 uppercase tracking-widest">{item.groupName}</span>
                 </div>
             )}
             <div className="mb-5">
-                <h4 className="text-[15px] font-black text-gray-900 uppercase tracking-wide mb-2 leading-none">
-                    {ordinal(item.groupIdx)}
-                </h4>
+                <h4 className="text-[15px] font-black text-gray-900 uppercase tracking-wide mb-2 leading-none">{ordinal(item.groupIdx)}</h4>
                 {rows.map((row, ri) => (
-                    <BarRow
-                        key={ri}
-                        rowLabel={row.lbl}
-                        cuts={row.cuts}
-                        waste={row.waste}
-                        palette={item.palette}
-                        singleMode={item.type === 'single'}
-                    />
+                    <BarRow key={ri} rowLabel={row.lbl} cuts={row.cuts} waste={row.waste} palette={item.palette} singleMode={item.type === 'single'} />
                 ))}
             </div>
         </>
+    );
+}
+
+// ─── Lista de ventanas a fabricar ─────────────────────────────────────────────
+function WindowsList({ windows }) {
+    if (!windows || windows.length === 0) return null;
+    return (
+        <div className="mb-6 rounded-xl border border-gray-200 overflow-hidden">
+            <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+                <span className="text-[11px] font-black text-gray-700 uppercase tracking-widest">
+                    Ventanas a fabricar — {windows.reduce((s, w) => s + (w.quantity || 1), 0)} unidades
+                </span>
+            </div>
+            <div className="overflow-x-auto">
+                <table className="min-w-full text-xs">
+                    <thead>
+                        <tr className="bg-gray-50/60 border-b border-gray-100">
+                            <th className="py-2 px-3 text-left font-semibold text-gray-500 uppercase tracking-wide w-10">#</th>
+                            <th className="py-2 px-3 text-left font-semibold text-gray-500 uppercase tracking-wide">Tipo de ventana</th>
+                            <th className="py-2 px-3 text-center font-semibold text-gray-500 uppercase tracking-wide w-28">Dimensiones</th>
+                            <th className="py-2 px-3 text-left font-semibold text-gray-500 uppercase tracking-wide">Color PVC</th>
+                            <th className="py-2 px-3 text-left font-semibold text-gray-500 uppercase tracking-wide">Color vidrio</th>
+                            <th className="py-2 px-3 text-center font-semibold text-gray-500 uppercase tracking-wide w-12">Cant.</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                        {windows.map((win, i) => {
+                            const bg = chipBg(i);
+                            const label = `V${i + 1}`;
+                            const name = win.displayName || win.windowType?.displayName || win.windowType?.name || '—';
+                            const dims = `${(win.width_cm / 100).toFixed(2)} × ${(win.height_cm / 100).toFixed(2)} m`;
+                            return (
+                                <tr key={win.id} className="hover:bg-gray-50/60 transition-colors">
+                                    <td className="py-2 px-3">
+                                        <span className="inline-flex items-center justify-center w-7 h-6 rounded font-black text-[11px] text-gray-800" style={{ background: bg }}>
+                                            {label}
+                                        </span>
+                                    </td>
+                                    <td className="py-2 px-3 font-medium text-gray-800 max-w-[240px]">
+                                        <span className="line-clamp-2 leading-snug">{name}</span>
+                                    </td>
+                                    <td className="py-2 px-3 text-center font-mono text-gray-600">{dims}</td>
+                                    <td className="py-2 px-3 text-gray-600">{win.pvcColor?.name || '—'}</td>
+                                    <td className="py-2 px-3 text-gray-600">{win.glassColor?.name || '—'}</td>
+                                    <td className="py-2 px-3 text-center">
+                                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-100 font-bold text-gray-700">
+                                            {win.quantity || 1}
+                                        </span>
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     );
 }
 
@@ -340,13 +355,10 @@ export default function CutOptimizationModal({
     projectName,
     orderId,
     clientName,
+    windows = [],
 }) {
-    // Construir lista de series y totales
     const { items, combos } = buildSeries(optimizationData);
 
-    // Métricas globales
-    // totalBars = barras físicas únicas (1 por serie individual, 3 por serie de máquina)
-    // Para el resumen: mostramos solo barras individuales y usamos combos[] para el desglose
     let totalBarsSingle = 0, totalWaste = 0, totalUsed = 0;
     for (const it of items) {
         const rows = it.type === 'machine' ? 3 : 1;
@@ -354,26 +366,54 @@ export default function CutOptimizationModal({
         totalUsed += (580 - it.waste) * rows;
         if (it.type === 'single') totalBarsSingle++;
     }
-    // Barras de combo: suma de totalHoja + totalCedazo de cada combo
     const totalBarsCombo = combos.reduce((s, c) => s + c.totalHoja + c.totalCedazo, 0);
     const totalBars = totalBarsSingle + totalBarsCombo;
     const eff = totalUsed > 0
         ? ((totalUsed / (totalUsed + totalWaste)) * 100).toFixed(1)
         : '0';
 
-    // ── PDF ───────────────────────────────────────────────────────────────────
+    // ── Imprimir / PDF ────────────────────────────────────────────────────────
     const handlePrint = () => {
-        const date = new Date().toLocaleDateString('es-GT',
-            { day: 'numeric', month: 'long', year: 'numeric' });
+        const date = new Date().toLocaleDateString('es-GT', { day: 'numeric', month: 'long', year: 'numeric' });
 
-        // Construir HTML de series con separadores de grupo
+        // ── Tabla de ventanas HTML ────────────────────────────────────────────
+        let windowsHtml = '';
+        if (windows.length > 0) {
+            const totalUnits = windows.reduce((s, w) => s + (w.quantity || 1), 0);
+            const rows = windows.map((win, i) => {
+                const bg = chipBg(i);
+                const label = `V${i + 1}`;
+                const name = win.displayName || win.windowType?.displayName || win.windowType?.name || '—';
+                const dims = `${(win.width_cm / 100).toFixed(2)} × ${(win.height_cm / 100).toFixed(2)} m`;
+                return `<tr>
+                  <td><span class="vchip" style="background:${bg}">${label}</span></td>
+                  <td class="wname">${name}</td>
+                  <td class="wmono">${dims}</td>
+                  <td>${win.pvcColor?.name || '—'}</td>
+                  <td>${win.glassColor?.name || '—'}</td>
+                  <td class="wcenter">${win.quantity || 1}</td>
+                </tr>`;
+            }).join('');
+            windowsHtml = `
+              <div class="sec-title">Ventanas a fabricar — ${totalUnits} unidades</div>
+              <table class="win-tbl">
+                <thead><tr>
+                  <th>#</th><th>Tipo de ventana</th><th>Dimensiones</th>
+                  <th>Color PVC</th><th>Color vidrio</th><th>Cant.</th>
+                </tr></thead>
+                <tbody>${rows}</tbody>
+              </table>
+              <div style="height:18px"></div>
+              <div class="sec-title">Plan de corte de perfiles — Barra: 580 cm</div>`;
+        }
+
+        // ── HTML de series ────────────────────────────────────────────────────
         let seriesHtml = '';
         let prevGroup = null;
         for (const it of items) {
-            // Separador de grupo
             if (it.groupName !== prevGroup) {
                 if (prevGroup !== null) seriesHtml += `<div style="height:6px"></div>`;
-                seriesHtml += `<div style="margin-top:12px;margin-bottom:8px;padding-bottom:4px;border-bottom:2px solid #222;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:1.5px;color:#222">${it.groupName}</div>`;
+                seriesHtml += `<div class="grp-hdr">${it.groupName}</div>`;
                 prevGroup = it.groupName;
             }
 
@@ -385,14 +425,11 @@ export default function CutOptimizationModal({
                 ]
                 : [{ lbl: it.rowLbl, cuts: it.cuts, waste: it.waste }];
 
-            seriesHtml += `<div class="sblk">
-                <div class="stit">${ordinal(it.groupIdx)}</div>`;
+            seriesHtml += `<div class="sblk"><div class="stit">${ordinal(it.groupIdx)}</div>`;
 
             for (const row of rows) {
                 const wastePct = ((row.waste || 0) / 580 * 100).toFixed(2);
-                seriesHtml += `<div class="brow">
-                    <div class="rlbl">${row.lbl}</div>
-                    <div class="bwrp">`;
+                seriesHtml += `<div class="brow"><div class="rlbl">${row.lbl}</div><div class="bwrp">`;
                 row.cuts.forEach((cut, ci) => {
                     const { vNum, dim } = parseLabel(cut.windowLabel);
                     const num = vNum.replace('V', '');
@@ -403,38 +440,54 @@ export default function CutOptimizationModal({
                     const bg = it.type === 'single'
                         ? winBg(cut.windowLabel)
                         : ci % 2 === 0 ? it.palette.bg : it.palette.alt;
-                    seriesHtml += `<div class="pc" style="width:${pct}%;background:${bg}">
-                        <span class="top">${len}</span>
-                        <span class="bot">${dc}V${num}</span></div>`;
+                    seriesHtml += `<div class="pc" style="width:${pct}%;background:${bg}"><span class="top">${len}</span><span class="bot">${dc}V${num}</span></div>`;
                 });
-                // Zona de sobra
                 if (parseFloat(wastePct) > 0.5) {
                     const wt = fmtWaste(row.waste);
                     seriesHtml += `<div class="pc waste" style="width:${wastePct}%"><span>${wt || ''}</span></div>`;
                 }
-                seriesHtml += `</div>
-                </div>
-                <div class="ruler"><div class="ruler-line"></div></div>`;
+                seriesHtml += `</div></div><div class="ruler"><div class="ruler-line"></div></div>`;
                 seriesHtml += `</div>`;
             }
             seriesHtml += `</div><div style="height:10px"></div>`;
         }
 
         const orderLabel = orderId ? `Pedido #${orderId}` : '';
-        const titleParts = [orderLabel, projectName, clientName].filter(Boolean);
 
         const html = `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
-<title>Plan de Corte — ${titleParts.join(' · ') || 'Pedido'}</title>
+<title>Plan de Corte — ${[orderLabel, projectName].filter(Boolean).join(' · ')}</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;padding:18px 22px;max-width:1100px;margin:0 auto;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;padding:16px 20px;max-width:1100px;margin:0 auto;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .pc{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.hdr{border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:12px}
-.htit{font-size:17px;font-weight:900}
-.hid{font-size:12px;font-weight:700;color:#333;margin-top:3px}
-.hsub{font-size:10px;color:#666;margin-top:2px}
-.smry{display:flex;gap:22px;margin-bottom:14px;padding:6px 10px;background:#f5f5f5;border-radius:3px;width:fit-content}
-.smry span{font-size:10px;color:#555} .smry b{font-size:12px;font-weight:900;color:#111;display:block}
+
+/* ── Cabecera ── */
+.hdr{border-bottom:3px solid #111;padding-bottom:10px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:flex-end}
+.hdr-left{}
+.htit{font-size:20px;font-weight:900;color:#111;letter-spacing:-0.5px}
+.hproj{font-size:14px;font-weight:900;color:#1d4ed8;margin-top:4px;letter-spacing:-0.3px}
+.hid{font-size:11px;font-weight:700;color:#444;margin-top:3px}
+.hdate{font-size:10px;color:#888;text-align:right;white-space:nowrap}
+
+/* ── Métricas ── */
+.smry{display:flex;gap:20px;margin-bottom:16px;padding:7px 12px;background:#f5f5f5;border-radius:4px;width:fit-content}
+.smry span{font-size:10px;color:#666} .smry b{font-size:13px;font-weight:900;color:#111;display:block}
+
+/* ── Sección títulos ── */
+.sec-title{font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:1.5px;color:#111;border-bottom:2px solid #111;padding-bottom:4px;margin-bottom:8px}
+
+/* ── Tabla de ventanas ── */
+.win-tbl{width:100%;border-collapse:collapse;margin-bottom:4px;font-size:10px}
+.win-tbl th{background:#f0f0f0;text-align:left;padding:4px 6px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#555;border-bottom:1px solid #ccc}
+.win-tbl td{padding:4px 6px;border-bottom:1px solid #f0f0f0;vertical-align:middle}
+.win-tbl tr:last-child td{border-bottom:none}
+.vchip{display:inline-flex;align-items:center;justify-content:center;width:26px;height:20px;border-radius:3px;font-weight:900;font-size:10px;color:#222;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.wname{max-width:220px;font-weight:600;color:#111}
+.wmono{font-family:monospace;color:#444;white-space:nowrap}
+.wcenter{text-align:center;font-weight:700}
+
+/* ── Grupos y series ── */
+.grp-hdr{margin-top:12px;margin-bottom:8px;padding-bottom:4px;border-bottom:2px solid #222;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:1.5px;color:#222}
 .sblk{page-break-inside:avoid}
 .stit{font-size:13px;font-weight:900;text-transform:uppercase;color:#111;margin-bottom:6px}
 .brow{display:flex;align-items:stretch;margin-bottom:2px}
@@ -445,24 +498,32 @@ body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;padd
 .pc .bot{font-size:10px;font-weight:600;color:#555;line-height:1;margin-top:2px}
 .pc.waste{background:#fff!important;border-left:1px dashed #aaa;flex:1}
 .pc.waste span{font-size:9px;color:#aaa;writing-mode:vertical-rl;transform:rotate(180deg)}
-.dim{width:36px;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding-left:4px}
-.dim span{font-size:10px;font-weight:700;color:#e53935;writing-mode:vertical-rl;transform:rotate(180deg)}
-.ruler{display:flex;align-items:center;margin-left:90px;margin-right:36px;margin-top:2px;margin-bottom:8px}
+.ruler{display:flex;align-items:center;margin-left:90px;margin-top:2px;margin-bottom:8px}
 .ruler-line{flex:1;height:1px;background:#e53935}
-.ruler-lbl{font-size:10px;font-weight:700;color:#e53935;padding:0 5px}
-@media print{.sblk{page-break-inside:avoid}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}}
+@media print{
+  .sblk{page-break-inside:avoid}
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+}
 </style></head><body>
+
 <div class="hdr">
-  <div class="htit">✂ PLAN DE CORTE</div>
-  ${orderLabel ? `<div class="hid">${orderLabel}${clientName ? ' — ' + clientName : ''}</div>` : ''}
-  <div class="hsub">${projectName || ''} · Barra: 580 cm · ${date}</div>
+  <div class="hdr-left">
+    <div class="htit">✂ PLAN DE CORTE</div>
+    <div class="hproj">${projectName || ''}</div>
+    <div class="hid">${[orderLabel, clientName].filter(Boolean).join(' — ')}</div>
+  </div>
+  <div class="hdate">${date}</div>
 </div>
+
 <div class="smry">
   <span>Barras totales<b>${totalBars}</b></span>
   <span>Eficiencia<b>${eff}%</b></span>
   <span>Desperdicio<b>${totalWaste.toFixed(0)} cm</b></span>
 </div>
+
+${windowsHtml || `<div class="sec-title">Plan de corte de perfiles — Barra: 580 cm</div>`}
 <div>${seriesHtml}</div>
+
 <script>window.onload=()=>{window.print();setTimeout(()=>window.close(),900)}<\/script>
 </body></html>`;
 
@@ -476,40 +537,53 @@ body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;padd
         <div className="fixed inset-0 bg-black/50 flex justify-center items-start z-50 overflow-y-auto p-4 sm:p-8">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl flex flex-col my-4 overflow-hidden">
 
-                {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-gray-900 flex items-center justify-center flex-shrink-0">
-                            <FaRuler size={12} className="text-white" />
+                {/* ── Header — proyecto prominente ── */}
+                <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-gray-200 flex-shrink-0 bg-gray-950">
+                    <div className="flex items-start gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <FaRuler size={14} className="text-white" />
                         </div>
-                        <div>
-                            <h2 className="text-sm font-black text-gray-900 uppercase tracking-wide leading-none">
-                                Plan de Corte{orderId ? ` — Pedido #${orderId}` : ''}
+                        <div className="min-w-0">
+                            {/* Nombre del proyecto — el más importante */}
+                            <h2 className="text-lg font-black text-white leading-tight truncate">
+                                {projectName || 'Sin proyecto'}
                             </h2>
-                            <p className="text-xs text-gray-400 leading-tight mt-0.5">
-                                {[projectName, clientName].filter(Boolean).join(' · ') || 'Sin identificar'}
+                            {/* Pedido # + cliente */}
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                {orderId && (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-white/15 text-white text-[11px] font-bold tracking-wide">
+                                        Pedido #{orderId}
+                                    </span>
+                                )}
+                                {clientName && (
+                                    <span className="text-gray-400 text-[11px] font-medium truncate">{clientName}</span>
+                                )}
+                            </div>
+                            {/* Subtítulo técnico */}
+                            <p className="text-[10px] text-gray-500 mt-1.5 uppercase tracking-widest font-semibold">
+                                Plan de corte · Barra 580 cm
                             </p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-shrink-0">
                         {!isLoading && items.length > 0 && (
                             <button
                                 onClick={handlePrint}
-                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-gray-900 hover:bg-gray-700 rounded-lg transition-colors"
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-gray-900 bg-white hover:bg-gray-100 rounded-lg transition-colors"
                             >
                                 <FaPrint size={10} /> Imprimir PDF
                             </button>
                         )}
                         <button
                             onClick={onClose}
-                            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 transition-colors"
+                            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:bg-white/10 transition-colors"
                         >
                             <FaTimes size={13} />
                         </button>
                     </div>
                 </div>
 
-                {/* Body */}
+                {/* ── Body ── */}
                 <div className="overflow-y-auto max-h-[80vh] min-h-[300px]">
                     {isLoading ? (
                         <div className="flex flex-col items-center justify-center py-24 gap-4 text-gray-400">
@@ -527,7 +601,7 @@ body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;padd
                     ) : (
                         <div className="px-6 pt-5 pb-8">
 
-                            {/* Resumen global */}
+                            {/* ── Métricas globales ── */}
                             <div className="flex flex-wrap gap-8 mb-6 pb-5 border-b border-gray-100">
                                 {[
                                     ['Barras totales', totalBars],
@@ -541,17 +615,25 @@ body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;padd
                                 ))}
                             </div>
 
-                            {/* Series con separadores por grupo */}
+                            {/* ── Lista de ventanas a fabricar ── */}
+                            <WindowsList windows={windows} />
+
+                            {/* ── Separador de sección cortes ── */}
+                            {windows.length > 0 && (
+                                <div className="mb-5 pb-2 border-b-2 border-gray-800">
+                                    <span className="text-[11px] font-black text-gray-800 uppercase tracking-widest">
+                                        Plan de corte de perfiles
+                                    </span>
+                                </div>
+                            )}
+
+                            {/* ── Series con separadores por grupo ── */}
                             <div>
                                 {items.map((item, i) => {
                                     const prevGroup = i > 0 ? items[i - 1].groupName : null;
                                     const showGroupHeader = item.groupName !== prevGroup;
                                     return (
-                                        <SerieBlock
-                                            key={item.idx}
-                                            item={item}
-                                            showGroupHeader={showGroupHeader}
-                                        />
+                                        <SerieBlock key={item.idx} item={item} showGroupHeader={showGroupHeader} />
                                     );
                                 })}
                             </div>
@@ -559,7 +641,7 @@ body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;padd
                     )}
                 </div>
 
-                {/* Footer */}
+                {/* ── Footer ── */}
                 <div className="px-6 py-3 border-t border-gray-100 flex items-center justify-between flex-shrink-0">
                     <span className="text-[10px] text-gray-300 font-medium tracking-wide hidden sm:block">
                         BARRA 580 CM · 2 HOJAS + 1 MOSQUITERO POR SERIE
