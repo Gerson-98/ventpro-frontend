@@ -998,8 +998,13 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                 msg = 'Hubo un error al guardar la cotización.';
             } else if (Array.isArray(raw)) {
                 msg = raw.map((m) => (typeof m === 'string' ? m : JSON.stringify(m))).join(' · ');
-            } else if (typeof raw === 'object') {
-                msg = JSON.stringify(raw);
+            } else if (typeof raw === 'object' && raw !== null) {
+                // NestJS HttpException.getResponse() returns { statusCode, message, error }
+                msg = typeof raw.message === 'string'
+                    ? raw.message
+                    : Array.isArray(raw.message)
+                        ? raw.message.join(' · ')
+                        : JSON.stringify(raw);
             } else {
                 msg = String(raw);
             }
