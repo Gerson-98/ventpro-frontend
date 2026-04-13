@@ -257,7 +257,7 @@ export default function OrderDetail() {
               </div>
             )}
 
-            {/* Notas de la cotización */}
+            {/* Notas del pedido */}
             {order.notes && (
               <div className="mb-4 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
                 <div className="flex items-center gap-1.5 mb-1.5">
@@ -265,6 +265,17 @@ export default function OrderDetail() {
                   <span className="text-xs font-semibold text-amber-700 uppercase tracking-wide">Notas</span>
                 </div>
                 <p className="text-sm text-amber-900 whitespace-pre-wrap leading-relaxed">{order.notes}</p>
+              </div>
+            )}
+
+            {/* Notas de la cotización origen */}
+            {order.generatedFromQuotation?.notes && order.generatedFromQuotation.notes !== order.notes && (
+              <div className="mb-4 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <FaStickyNote size={12} className="text-amber-500" />
+                  <span className="text-xs font-semibold text-amber-700 uppercase tracking-wide">Notas de cotización</span>
+                </div>
+                <p className="text-sm text-amber-900 whitespace-pre-wrap leading-relaxed">{order.generatedFromQuotation.notes}</p>
               </div>
             )}
 
@@ -412,7 +423,7 @@ export default function OrderDetail() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {(order.windows || []).map((win, winIdx) => {
+                  {[...(order.windows || [])].sort((a, b) => a.id - b.id).map((win, winIdx) => {
                     const isVidrioYDuela = win.glassColor?.name?.toUpperCase() === 'VIDRIO Y DUELA';
                     const additionalGlass = isVidrioYDuela && win.options?.vidrio_adicional_id
                       ? glassColors.find(g => g.id === Number(win.options.vidrio_adicional_id))
@@ -497,7 +508,7 @@ export default function OrderDetail() {
 
             {/* ── CARDS — móvil (< md) ── */}
             <div className="md:hidden divide-y divide-gray-100">
-              {(order.windows || []).map((win, winIdx) => {
+              {[...(order.windows || [])].sort((a, b) => a.id - b.id).map((win, winIdx) => {
                 const isVidrioYDuela = win.glassColor?.name?.toUpperCase() === 'VIDRIO Y DUELA';
                 const additionalGlass = isVidrioYDuela && win.options?.vidrio_adicional_id
                   ? glassColors.find(g => g.id === Number(win.options.vidrio_adicional_id))

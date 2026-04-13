@@ -314,7 +314,7 @@ function WindowsList({ windows }) {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                        {windows.map((win, i) => {
+                        {[...windows].sort((a, b) => a.id - b.id).map((win, i) => {
                             const bg = chipBg(i);
                             const label = `V${i + 1}`;
                             const name = win.displayName || win.windowType?.displayName || win.windowType?.name || '—';
@@ -380,7 +380,7 @@ export default function CutOptimizationModal({
         let windowsHtml = '';
         if (windows.length > 0) {
             const totalUnits = windows.reduce((s, w) => s + (w.quantity || 1), 0);
-            const rows = windows.map((win, i) => {
+            const rows = [...windows].sort((a, b) => a.id - b.id).map((win, i) => {
                 const bg = chipBg(i);
                 const label = `V${i + 1}`;
                 const name = win.displayName || win.windowType?.displayName || win.windowType?.name || '—';
