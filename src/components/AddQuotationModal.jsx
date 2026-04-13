@@ -973,7 +973,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             for (let i = 0; i < windowsSnapshot.length; i++) {
                 const snap = windowsSnapshot[i];
                 if (!snap.fileToUpload) continue;
-                const savedId = snap.existingId ?? savedWindows[i]?.id;
+                const savedId = savedWindows[i]?.id ?? snap.existingId;
                 if (!savedId) {
                     console.warn(`Sin id para ventana #${i} — no se pudo subir el diseño`);
                     continue;
