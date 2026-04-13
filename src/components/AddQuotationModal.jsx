@@ -512,7 +512,9 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
     useEffect(() => {
         if (!open || !catalogsLoaded) return;
         if (quotationToEdit) {
-            setIsEditing(true);
+            // Si quotationToEdit tiene id → modo edición (PATCH).
+            // Si no tiene id (ej. prefill Estilo Madera) → modo creación (POST).
+            setIsEditing(!!quotationToEdit.id);
             setWindowCosts({});
             setCalculatingCost({});
             const buildEditWindows = async () => {
@@ -988,8 +990,20 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             onSave();
         } catch (error) {
             console.error("Error guardando cotización:", error);
-            const msg = error?.response?.data?.message || 'Hubo un error al guardar la cotización.';
-            setValidationErrors([Array.isArray(msg) ? msg.join(', ') : msg]);
+            // NestJS puede enviar message como string, string[] (class-validator)
+            // u objeto anidado. Convertir siempre a string para evitar React error #31.
+            const raw = error?.response?.data?.message;
+            let msg;
+            if (!raw) {
+                msg = 'Hubo un error al guardar la cotización.';
+            } else if (Array.isArray(raw)) {
+                msg = raw.map((m) => (typeof m === 'string' ? m : JSON.stringify(m))).join(' · ');
+            } else if (typeof raw === 'object') {
+                msg = JSON.stringify(raw);
+            } else {
+                msg = String(raw);
+            }
+            setValidationErrors([msg]);
         } finally {
             setLoading(false);
         }

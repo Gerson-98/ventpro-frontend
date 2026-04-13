@@ -6,13 +6,18 @@ import api from '@/services/api';
 import {
     FaFilePdf, FaCheckCircle, FaEdit, FaWhatsapp,
     FaPhone, FaCamera, FaCalculator, FaArrowLeft,
-    FaBoxOpen, FaStickyNote, FaUnlock, FaExclamationTriangle,
+    FaBoxOpen, FaStickyNote, FaUnlock, FaExclamationTriangle, FaLeaf,
 } from 'react-icons/fa';
 import AddQuotationModal from '@/components/AddQuotationModal';
 import { generateDocumentPDF } from '@/lib/generateDocumentPDF';
 import ConfirmQuotationModal from '@/components/ConfirmQuotationModal';
 import ProfilesReportModal from '../components/ProfilesReportModal';
 import { useAuth } from '@/context/AuthContext';
+import {
+    Dialog, DialogContent, DialogHeader, DialogTitle,
+    DialogFooter, DialogDescription,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 const statusLabels = {
     Potencial: 'Potencial',
@@ -51,6 +56,14 @@ export default function QuotationDetail() {
     const [reportData, setReportData] = useState([]);
     const [isReportLoading, setIsReportLoading] = useState(false);
     const [lightboxUrl, setLightboxUrl] = useState(null);
+
+    // ── Estilo Madera ─────────────────────────────────────────────────────────
+    const [maderaDialogOpen, setMaderaDialogOpen] = useState(false);
+    const [pvcMaderaColors, setPvcMaderaColors] = useState([]);
+    const [maderaColorSelected, setMaderaColorSelected] = useState(null);
+    const [maderaLoading, setMaderaLoading] = useState(false);
+    const [maderaPrefill, setMaderaPrefill] = useState(null);
+    const [maderaModalOpen, setMaderaModalOpen] = useState(false);
 
     const fetchQuotation = async () => {
         setLoading(true);
@@ -134,6 +147,94 @@ export default function QuotationDetail() {
             alert(msg);
         } finally {
             setIsReopening(false);
+        }
+    };
+
+    // ── Estilo Madera — Paso 1: abrir diálogo con colores PVC madera ──────────
+    const handleEstiloMadera = async () => {
+        setMaderaLoading(true);
+        try {
+            const res = await api.get('/pvc-colors');
+            const madera = (res.data || []).filter(c =>
+                /nogal|negro|roble/i.test(c.name)
+            );
+            if (madera.length === 0) {
+                alert('No se encontraron colores PVC de estilo madera (nogal, negro, roble) en el catálogo.');
+                return;
+            }
+            setPvcMaderaColors(madera);
+            setMaderaColorSelected(madera[0].id);
+            setMaderaDialogOpen(true);
+        } catch {
+            alert('No se pudieron cargar los colores PVC.');
+        } finally {
+            setMaderaLoading(false);
+        }
+    };
+
+    // ── Estilo Madera — Paso 2: construir prefill y abrir AddQuotationModal ───
+    const handleConfirmMadera = async () => {
+        if (!maderaColorSelected) return;
+        setMaderaLoading(true);
+        try {
+            const typesRes = await api.get('/window-types');
+            const allTypes = typesRes.data || [];
+            const selectedPvc = pvcMaderaColors.find(c => c.id === maderaColorSelected);
+
+            // Detectar tipos "5cm" por nombre (patrón de nomenclatura del catálogo)
+            const is5cm = (name) => /5\s*cm/i.test(name || '');
+            // Normalizar: quitar el marcador de tamaño para comparar base
+            const baseName = (name) => (name || '').toLowerCase()
+                .replace(/\s*[35]\s*cm\s*/gi, '')
+                .replace(/\s+/g, ' ')
+                .trim();
+
+            const maderaWindows = quotation.quotation_windows.map(win => {
+                const originalType = allTypes.find(t => t.id === win.window_type_id);
+                let newTypeId = win.window_type_id;
+
+                if (originalType && !is5cm(originalType.name)) {
+                    const base = baseName(originalType.name);
+                    const equiv = allTypes.find(t => is5cm(t.name) && baseName(t.name) === base);
+                    if (equiv) {
+                        newTypeId = equiv.id;
+                    } else {
+                        console.warn(`[EstiloMadera] Sin equivalente 5cm para "${originalType.name}" — se mantiene el tipo original`);
+                    }
+                }
+
+                const newType = allTypes.find(t => t.id === newTypeId) || originalType;
+                // Solo cambiar PVC si es distinto al seleccionado
+                const newColorId = win.color_id === maderaColorSelected ? win.color_id : maderaColorSelected;
+
+                return {
+                    ...win,
+                    window_type_id: newTypeId,
+                    color_id: newColorId,
+                    windowType: newType
+                        ? { id: newType.id, name: newType.name, displayName: newType.displayName }
+                        : win.windowType,
+                    pvcColor: selectedPvc,
+                };
+            });
+
+            setMaderaPrefill({
+                // Sin id → AddQuotationModal lo detecta como modo creación
+                project: `${quotation.project} - Estilo Madera`,
+                clientId: quotation.clientId,
+                price_per_m2: quotation.price_per_m2,
+                include_iva: quotation.include_iva,
+                notes: quotation.notes,
+                reference_image_url: quotation.reference_image_url,
+                client: quotation.client,
+                quotation_windows: maderaWindows,
+            });
+            setMaderaDialogOpen(false);
+            setMaderaModalOpen(true);
+        } catch {
+            alert('No se pudo preparar la cotización Estilo Madera.');
+        } finally {
+            setMaderaLoading(false);
         }
     };
 
@@ -296,6 +397,17 @@ export default function QuotationDetail() {
                             <FaWhatsapp size={12} />
                             <span className="hidden sm:inline">WhatsApp</span>
                             <span className="sm:hidden">WA</span>
+                        </button>
+
+                        <button
+                            onClick={handleEstiloMadera}
+                            disabled={maderaLoading}
+                            title="Crear copia de esta cotización con PVC estilo madera y marco 5cm"
+                            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium rounded-xl border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                        >
+                            <FaLeaf size={12} />
+                            <span className="hidden sm:inline">Estilo Madera</span>
+                            <span className="sm:hidden">Madera</span>
                         </button>
 
                         {isConfirmado ? (
@@ -609,6 +721,67 @@ export default function QuotationDetail() {
                     onClose={() => setIsEditModalOpen(false)}
                     quotationToEdit={quotation}
                     onSave={() => { setIsEditModalOpen(false); fetchQuotation(); }}
+                />
+            )}
+
+            {/* ── Diálogo selección PVC madera ── */}
+            <Dialog open={maderaDialogOpen} onOpenChange={(v) => { if (!maderaLoading) setMaderaDialogOpen(v); }}>
+                <DialogContent className="bg-white p-6 rounded-2xl shadow-lg max-w-sm mx-4 sm:mx-auto" aria-describedby="madera-desc">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-amber-800">
+                            <FaLeaf size={14} className="text-amber-600" />
+                            Estilo Madera
+                        </DialogTitle>
+                        <DialogDescription id="madera-desc" className="text-sm text-gray-500 mt-1">
+                            Selecciona el color PVC madera. Se creará una nueva cotización con marco 5cm donde aplique.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-2 my-4">
+                        {pvcMaderaColors.map(color => (
+                            <label
+                                key={color.id}
+                                className={`flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-colors ${
+                                    maderaColorSelected === color.id
+                                        ? 'border-amber-400 bg-amber-50'
+                                        : 'border-gray-200 hover:bg-gray-50'
+                                }`}
+                            >
+                                <input
+                                    type="radio"
+                                    name="madera-pvc"
+                                    value={color.id}
+                                    checked={maderaColorSelected === color.id}
+                                    onChange={() => setMaderaColorSelected(color.id)}
+                                    className="accent-amber-600"
+                                />
+                                <span className="text-sm font-medium text-gray-800">{color.name}</span>
+                            </label>
+                        ))}
+                    </div>
+
+                    <DialogFooter className="flex gap-2">
+                        <Button variant="ghost" onClick={() => setMaderaDialogOpen(false)} disabled={maderaLoading}>
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={handleConfirmMadera}
+                            disabled={maderaLoading || !maderaColorSelected}
+                            className="bg-amber-700 hover:bg-amber-800 text-white"
+                        >
+                            {maderaLoading ? 'Preparando...' : 'Continuar'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* ── Modal AddQuotation en modo creación con prefill madera ── */}
+            {maderaModalOpen && maderaPrefill && (
+                <AddQuotationModal
+                    open={maderaModalOpen}
+                    onClose={() => { setMaderaModalOpen(false); setMaderaPrefill(null); }}
+                    quotationToEdit={maderaPrefill}
+                    onSave={() => { setMaderaModalOpen(false); setMaderaPrefill(null); }}
                 />
             )}
 

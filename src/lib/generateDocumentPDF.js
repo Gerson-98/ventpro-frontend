@@ -173,9 +173,8 @@ export const generateDocumentPDF = async (data, mode = 'quotation') => {
     // ======================================================
     // 3. TABLA DE PRODUCTOS
     // ======================================================
-    // Orden: # | Descripción | Color PVC | Color Vidrio | Dimensiones | Cant. | P. Unitario | Subtotal
-    // Separar Cant. del # mejora la lectura para el cliente.
-    const tableColumn = ["#", "Descripción", "Color PVC", "Color Vidrio", "Dimensiones", "Cant.", "P. Unitario", "Subtotal"];
+    // Orden: # | Descripción | Color PVC | Color Vidrio | Mosquitero | Dimensiones | Cant. | P. Unitario | Subtotal
+    const tableColumn = ["#", "Descripción", "Color PVC", "Color Vidrio", "Mosquitero", "Dimensiones", "Cant.", "P. Unitario", "Subtotal"];
 
     // Origen de datos dinámico: 'windows' para pedidos, 'quotation_windows' para cotizaciones
     const items = isOrder ? (data.windows || []) : (data.quotation_windows || []);
@@ -189,13 +188,16 @@ export const generateDocumentPDF = async (data, mode = 'quotation') => {
       const _tech     = win.windowType?.name;
       const _commerce = win.windowType?.displayName;
       const windowName = (_stored && _stored !== _tech)
-          ? _stored                                           // nombre con opciones → respetarlo
-          : (_commerce || _stored || _tech || "Ventana");    // usar nombre comercial si existe
+          ? _stored
+          : (_commerce || _stored || _tech || "Ventana");
+      // Mosquitero: con_mosquitero → ✓, sin_mosquitero o ausente → ✗
+      const mosquiteroText = win.options?.mosquitero === 'con_mosquitero' ? '✓' : '✗';
       return [
         index + 1,
         windowName,
         win.pvcColor?.name || "N/A",
         win.glassColor?.name || "N/A",
+        mosquiteroText,
         `${(win.width_cm / 100).toFixed(2)} x ${(win.height_cm / 100).toFixed(2)}m`,
         String(quantity),
         formatCurrency(unitPrice),
@@ -223,17 +225,25 @@ export const generateDocumentPDF = async (data, mode = 'quotation') => {
         },
         columnStyles: {
             0: { halign: 'center', cellWidth: 8 },
-            1: { cellWidth: 50 },
-            2: { cellWidth: 22 },
-            3: { cellWidth: 22 },
-            4: { halign: 'center', cellWidth: 28 },
-            5: { halign: 'center', cellWidth: 10 },
-            6: { halign: 'right' },
-            7: { halign: 'right' }
+            1: { cellWidth: 44 },
+            2: { cellWidth: 20 },
+            3: { cellWidth: 20 },
+            4: { halign: 'center', cellWidth: 15 },  // Mosquitero
+            5: { halign: 'center', cellWidth: 26 },  // Dimensiones
+            6: { halign: 'center', cellWidth: 9 },   // Cant.
+            7: { halign: 'right' },                   // P. Unitario
+            8: { halign: 'right' }                    // Subtotal
+        },
+        // Colorear ✓ en verde y ✗ en rojo antes de dibujar cada celda
+        willDrawCell: (data) => {
+            if (data.section === 'body' && data.column.index === 4) {
+                const isConMosquitero = data.cell.text[0] === '✓';
+                data.cell.styles.textColor = isConMosquitero ? [22, 163, 74] : [220, 38, 38];
+                data.cell.styles.fontStyle = 'bold';
+            }
         },
         willDrawPage: (data) => {
           // Solo redibujar en páginas 2+ (overflow de tabla)
-          // En página 1 el header ya fue dibujado antes de autoTable
           if (data.pageNumber > 1) {
             drawPageHeader();
           }
