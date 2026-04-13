@@ -183,8 +183,14 @@ export const generateDocumentPDF = async (data, mode = 'quotation') => {
     const tableRows = items.map((win, index) => {
       const quantity = win.quantity || 1;
       const unitPrice = (win.price || 0) / quantity;
-      // Nombre: displayName propio del ítem → displayName del tipo → name del tipo → fallback
-      const windowName = win.displayName || win.windowType?.displayName || win.windowType?.name || "Ventana";
+      // Nombre: si el displayName guardado ES el nombre técnico (sin opciones añadidas),
+      // preferir el displayName comercial del tipo de ventana.
+      const _stored   = win.displayName;
+      const _tech     = win.windowType?.name;
+      const _commerce = win.windowType?.displayName;
+      const windowName = (_stored && _stored !== _tech)
+          ? _stored                                           // nombre con opciones → respetarlo
+          : (_commerce || _stored || _tech || "Ventana");    // usar nombre comercial si existe
       return [
         index + 1,
         windowName,

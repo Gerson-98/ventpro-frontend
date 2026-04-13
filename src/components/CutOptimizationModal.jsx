@@ -317,7 +317,8 @@ function WindowsList({ windows }) {
                         {[...windows].sort((a, b) => a.id - b.id).map((win, i) => {
                             const bg = chipBg(i);
                             const label = `V${i + 1}`;
-                            const name = win.displayName || win.windowType?.displayName || win.windowType?.name || '—';
+                            const _s = win.displayName, _t = win.windowType?.name, _c = win.windowType?.displayName;
+                            const name = (_s && _s !== _t) ? _s : (_c || _s || _t || '—');
                             const dims = `${Math.round(win.width_cm)} × ${Math.round(win.height_cm)} cm`;
                             return (
                                 <tr key={win.id} className="hover:bg-gray-50/60 transition-colors">
@@ -383,7 +384,8 @@ export default function CutOptimizationModal({
             const rows = [...windows].sort((a, b) => a.id - b.id).map((win, i) => {
                 const bg = chipBg(i);
                 const label = `V${i + 1}`;
-                const name = win.displayName || win.windowType?.displayName || win.windowType?.name || '—';
+                const _s = win.displayName, _t = win.windowType?.name, _c = win.windowType?.displayName;
+                const name = (_s && _s !== _t) ? _s : (_c || _s || _t || '—');
                 const dims = `${Math.round(win.width_cm)} × ${Math.round(win.height_cm)} cm`;
                 return `<tr>
                   <td><span class="vchip" style="background:${bg}">${label}</span></td>

@@ -82,9 +82,11 @@ const emptyWindow = () => ({
     _optionGroups: [],
 });
 
-function buildDisplayName(typeName, options, optionGroups) {
-    if (!typeName) return '';
-    const parts = [typeName];
+function buildDisplayName(typeName, typeDisplayName, options, optionGroups) {
+    // Usa el nombre comercial (displayName) como base; cae al técnico si no está configurado
+    const baseName = typeDisplayName || typeName;
+    if (!baseName) return '';
+    const parts = [baseName];
     optionGroups.forEach(wto => {
         const groupKey = wto.group.key;
         if (CHECKBOX_GROUPS.has(groupKey)) return; // checkboxes no van en el nombre
@@ -530,7 +532,12 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                         const options = applyCheckboxDefaults(win.options || {}, optionGroups, win.window_type_id);
                         return {
                             id: win.id,
-                            displayName: win.displayName || win.windowType?.name || '',
+                            displayName: buildDisplayName(
+                                win.windowType?.name || '',
+                                win.windowType?.displayName || '',
+                                win.options || {},
+                                optionGroups,
+                            ),
                             width_m: win.width_cm / 100,
                             height_m: win.height_cm / 100,
                             quantity: win.quantity || 1,
@@ -638,7 +645,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                     return {
                         ...win,
                         window_type_id: wtId,
-                        displayName: wtName,
+                        displayName: newType?.displayName || wtName,
                         options: defaultOptions,
                         color_id: allowedIds.has(Number(win.color_id)) ? win.color_id : '',
                         _groupId: '',
@@ -679,7 +686,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                     ...w,
                     _variantValues: newVariants,
                     window_type_id: resolvedId || '',
-                    displayName: resolvedType?.name || '',
+                    displayName: resolvedType?.displayName || resolvedType?.name || '',
                     options: {},
                     color_id: (resolvedId && allowedIds.has(Number(w.color_id))) ? w.color_id : '',
                     _optionGroups: [],
@@ -775,7 +782,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             }
             const selectedType = windowTypes.find(wt => wt.id === Number(newWindow.window_type_id));
             const typeName = selectedType?.name || '';
-            newWindow.displayName = buildDisplayName(typeName, newWindow.options, newWindow._optionGroups);
+            newWindow.displayName = buildDisplayName(typeName, selectedType?.displayName || '', newWindow.options, newWindow._optionGroups);
             return newWindow;
         });
         setQuotation(prev => ({ ...prev, windows: updatedWindows }));
