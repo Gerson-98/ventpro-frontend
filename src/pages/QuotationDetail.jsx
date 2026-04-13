@@ -446,7 +446,7 @@ export default function QuotationDetail() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-50">
-                                    {quotation.quotation_windows?.map((win) => {
+                                    {[...(quotation.quotation_windows || [])].sort((a, b) => a.id - b.id).map((win) => {
                                         const isVidrioYDuela = win.glassColor?.name?.toUpperCase() === 'VIDRIO Y DUELA';
                                         const additionalGlass = isVidrioYDuela && win.options?.vidrio_adicional_id
                                             ? glassColors.find(g => g.id === Number(win.options.vidrio_adicional_id))
@@ -523,7 +523,7 @@ export default function QuotationDetail() {
 
                         {/* ── CARDS — móvil (< md) ── */}
                         <div className="md:hidden divide-y divide-gray-100">
-                            {quotation.quotation_windows?.map((win) => {
+                            {[...(quotation.quotation_windows || [])].sort((a, b) => a.id - b.id).map((win) => {
                                 const isVidrioYDuela = win.glassColor?.name?.toUpperCase() === 'VIDRIO Y DUELA';
                                 const additionalGlass = isVidrioYDuela && win.options?.vidrio_adicional_id
                                     ? glassColors.find(g => g.id === Number(win.options.vidrio_adicional_id))

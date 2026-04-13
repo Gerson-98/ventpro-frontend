@@ -24,6 +24,7 @@ import {
   FaPlus,
   FaChevronLeft,
   FaChevronRight,
+  FaTrash,
 } from "react-icons/fa";
 
 import {
@@ -66,6 +67,8 @@ export default function Orders() {
   });
   const [searchInput, setSearchInput] = useState('');
   const [filters, setFilters] = useState({ status: 'all', month: 'all', search: '' });
+  const [deleteModal, setDeleteModal] = useState({ open: false, order: null });
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // ── Debounce: actualiza filters.search 400ms después de que el usuario deja de escribir ──
   const debounceRef = useRef(null);
@@ -137,20 +140,24 @@ export default function Orders() {
     }
   };
 
-  const deleteOrder = async (id) => {
-    if (!confirm('¿Eliminar este pedido permanentemente?')) return;
-    // ── Actualización optimista ───────────────────────────────────────────
+  const deleteOrder = async () => {
+    const id = deleteModal.order?.id;
+    if (!id) return;
+    setIsDeleting(true);
     const previous = orders;
     setOrders(prev => prev.filter(o => o.id !== id));
     setPagination(prev => ({ ...prev, total: Math.max(0, prev.total - 1) }));
+    setDeleteModal({ open: false, order: null });
     try {
       await api.delete(`/orders/${id}`);
     } catch (err) {
-      // Revertir en caso de error
       setOrders(previous);
       setPagination(prev => ({ ...prev, total: prev.total + 1 }));
       console.error('❌ Error al eliminar pedido:', err);
-      alert('No se pudo eliminar el pedido.');
+      const msg = err.response?.data?.message || 'No se pudo eliminar el pedido.';
+      alert(msg);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -272,6 +279,7 @@ export default function Orders() {
                     <th className="py-3 px-5 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Estado</th>
                     <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Instalación</th>
                     <th className="py-3 px-5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Total</th>
+                    {isAdmin && <th className="py-3 px-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Acc.</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -323,6 +331,17 @@ export default function Orders() {
                         <td className="py-3.5 px-5 text-right font-mono font-semibold text-gray-800">
                           {formatCurrency(order.total)}
                         </td>
+                        {isAdmin && (
+                          <td className="py-3.5 px-3 text-center" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              onClick={() => setDeleteModal({ open: true, order })}
+                              className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Eliminar pedido"
+                            >
+                              <FaTrash size={12} />
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     );
                   })}
@@ -341,15 +360,25 @@ export default function Orders() {
                     className="p-4 hover:bg-blue-50/30 active:bg-blue-50 cursor-pointer transition-colors"
                     onClick={() => navigate(`/orders/${order.id}`)}
                   >
-                    {/* Fila 1: ID + estado */}
+                    {/* Fila 1: ID + estado + eliminar */}
                     <div className="flex items-center justify-between mb-2">
                       <span className="font-mono text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
                         #{order.id}
                       </span>
-                      <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border ${style.badge}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
-                        {getStatusLabel(order.status)}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border ${style.badge}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
+                          {getStatusLabel(order.status)}
+                        </span>
+                        {isAdmin && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setDeleteModal({ open: true, order }); }}
+                            className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          >
+                            <FaTrash size={11} />
+                          </button>
+                        )}
+                      </div>
                     </div>
                     {/* Proyecto */}
                     <p className="font-semibold text-gray-900 text-sm mb-1 truncate">{order.project}</p>
@@ -488,6 +517,30 @@ export default function Orders() {
           setShowAddClient(false);
         }}
       />
+
+      {/* ── Modal confirmar eliminación de pedido ── */}
+      <Dialog open={deleteModal.open} onOpenChange={(open) => !open && setDeleteModal({ open: false, order: null })}>
+        <DialogContent className="bg-white p-6 rounded-2xl shadow-lg max-w-sm mx-4 sm:mx-auto" aria-describedby="delete-order-desc">
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Eliminar pedido</DialogTitle>
+            <DialogDescription id="delete-order-desc" className="text-sm text-gray-500 mt-1">
+              ¿Seguro que deseas eliminar el pedido <strong>#{deleteModal.order?.id} — {deleteModal.order?.project}</strong>?
+              {deleteModal.order?.generatedFromQuotationId && (
+                <> La cotización asociada quedará disponible para editarse nuevamente.</>
+              )}
+              <br />Esta acción no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4 flex gap-2">
+            <Button variant="ghost" onClick={() => setDeleteModal({ open: false, order: null })} disabled={isDeleting}>
+              Cancelar
+            </Button>
+            <Button onClick={deleteOrder} disabled={isDeleting} className="bg-red-600 hover:bg-red-700 text-white">
+              {isDeleting ? 'Eliminando...' : 'Sí, eliminar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

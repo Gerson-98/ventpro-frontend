@@ -3,8 +3,18 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "@/services/api";
-import { FaPlus, FaSearch, FaChevronLeft, FaChevronRight } from "react-icons/fa";
+import { useAuth } from "@/context/AuthContext";
+import { FaPlus, FaSearch, FaChevronLeft, FaChevronRight, FaTrash } from "react-icons/fa";
 import AddQuotationModal from "@/components/AddQuotationModal";
+import { Button } from "@/components/ui/button";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+    DialogDescription,
+} from "@/components/ui/dialog";
 
 const clientStatusStyles = {
     Potencial: 'bg-slate-100 text-slate-600',
@@ -27,12 +37,16 @@ const clientStatusLabels = {
 };
 
 export default function Quotations() {
+    const { user } = useAuth();
+    const isAdmin = user?.role === 'ADMIN';
     const [quotations, setQuotations] = useState([]);
     const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [searchInput, setSearchInput] = useState("");
     const [filters, setFilters] = useState({ quotationStatus: 'all', clientStatus: 'all', search: '' });
+    const [deleteModal, setDeleteModal] = useState({ open: false, quotation: null });
+    const [isDeleting, setIsDeleting] = useState(false);
     const navigate = useNavigate();
 
     // ── Debounce: actualiza filters.search 400ms después de que el usuario deja de escribir ──
@@ -71,21 +85,23 @@ export default function Quotations() {
         year: 'numeric', month: 'short', day: 'numeric'
     });
 
-    const handleDelete = async (id) => {
-        if (!confirm("¿Seguro que deseas eliminar esta cotización?")) return;
-        // ── Actualización optimista — no re-descarga toda la página ──────────
+    const handleDelete = async () => {
+        const id = deleteModal.quotation?.id;
+        if (!id) return;
+        setIsDeleting(true);
         const previous = quotations;
         setQuotations(prev => prev.filter(q => q.id !== id));
+        setPagination(prev => ({ ...prev, total: Math.max(0, prev.total - 1) }));
+        setDeleteModal({ open: false, quotation: null });
         try {
             await api.delete(`/quotations/${id}`);
         } catch (error) {
-            // Revertir si falla
             setQuotations(previous);
-            if (error.response?.status === 400) {
-                alert(`Error: ${error.response.data.message}`);
-            } else {
-                alert("No se pudo eliminar la cotización.");
-            }
+            setPagination(prev => ({ ...prev, total: prev.total + 1 }));
+            const msg = error.response?.data?.message || "No se pudo eliminar la cotización.";
+            alert(msg);
+        } finally {
+            setIsDeleting(false);
         }
     };
 
@@ -187,6 +203,7 @@ export default function Quotations() {
                                             <th className="py-3 px-5 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Estado</th>
                                             <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Vendedor</th>
                                             <th className="py-3 px-5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Total</th>
+                                            {isAdmin && <th className="py-3 px-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Acc.</th>}
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-50">
@@ -224,6 +241,17 @@ export default function Quotations() {
                                                 <td className="py-3.5 px-5 text-right font-mono font-semibold text-gray-800">
                                                     Q {quote.total_price?.toFixed(2) || '0.00'}
                                                 </td>
+                                                {isAdmin && (
+                                                    <td className="py-3.5 px-3 text-center" onClick={(e) => e.stopPropagation()}>
+                                                        <button
+                                                            onClick={() => setDeleteModal({ open: true, quotation: quote })}
+                                                            className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                            title="Eliminar cotización"
+                                                        >
+                                                            <FaTrash size={12} />
+                                                        </button>
+                                                    </td>
+                                                )}
                                             </tr>
                                         ))}
                                     </tbody>
@@ -238,14 +266,24 @@ export default function Quotations() {
                                         className="p-4 hover:bg-blue-50/30 active:bg-blue-50 cursor-pointer transition-colors"
                                         onClick={() => navigate(`/quotations/${quote.id}`)}
                                     >
-                                        {/* Fila 1: número + estado cotización */}
+                                        {/* Fila 1: número + estado cotización + eliminar */}
                                         <div className="flex items-center justify-between mb-2">
                                             <span className="font-mono text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
                                                 {quote.quotationNumber}
                                             </span>
-                                            <span className={`inline-block px-2.5 py-0.5 text-xs font-semibold rounded-full capitalize ${quote.status === 'confirmado' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                                                {quote.status.replace('_', ' ')}
-                                            </span>
+                                            <div className="flex items-center gap-2">
+                                                <span className={`inline-block px-2.5 py-0.5 text-xs font-semibold rounded-full capitalize ${quote.status === 'confirmado' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                                                    {quote.status.replace('_', ' ')}
+                                                </span>
+                                                {isAdmin && (
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); setDeleteModal({ open: true, quotation: quote }); }}
+                                                        className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                    >
+                                                        <FaTrash size={11} />
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
                                         {/* Fila 2: proyecto */}
                                         <p className="font-semibold text-gray-900 text-sm mb-1 truncate">{quote.project}</p>
@@ -316,19 +354,38 @@ export default function Quotations() {
                     onClose={() => setShowModal(false)}
                     onSave={(newQuotation) => {
                         setShowModal(false);
-                        // ── Actualización optimista ───────────────────────────
-                        // Inserta la nueva cotización al inicio sin re-descargar
-                        // toda la página. El total del backend se incrementa en 1.
                         if (newQuotation) {
                             setQuotations(prev => [newQuotation, ...prev]);
                             setPagination(prev => ({ ...prev, total: prev.total + 1 }));
                         } else {
-                            // Fallback: si el modal no devuelve el objeto, refetch
                             fetchQuotations(1);
                         }
                     }}
                 />
             )}
+
+            {/* ── Modal confirmar eliminación ── */}
+            <Dialog open={deleteModal.open} onOpenChange={(open) => !open && setDeleteModal({ open: false, quotation: null })}>
+                <DialogContent className="bg-white p-6 rounded-2xl shadow-lg max-w-sm mx-4 sm:mx-auto" aria-describedby="delete-quote-desc">
+                    <DialogHeader>
+                        <DialogTitle className="text-red-600">Eliminar cotización</DialogTitle>
+                        <DialogDescription id="delete-quote-desc" className="text-sm text-gray-500 mt-1">
+                            {deleteModal.quotation?.generatedOrder
+                                ? <>Esta cotización tiene un <strong>pedido asociado (#{deleteModal.quotation.generatedOrder.id})</strong>. Al eliminarla se eliminará también el pedido y todas sus ventanas.</>
+                                : <>¿Seguro que deseas eliminar la cotización <strong>{deleteModal.quotation?.quotationNumber}</strong>? Esta acción no se puede deshacer.</>
+                            }
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="mt-4 flex gap-2">
+                        <Button variant="ghost" onClick={() => setDeleteModal({ open: false, quotation: null })} disabled={isDeleting}>
+                            Cancelar
+                        </Button>
+                        <Button onClick={handleDelete} disabled={isDeleting} className="bg-red-600 hover:bg-red-700 text-white">
+                            {isDeleting ? 'Eliminando...' : 'Sí, eliminar'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
