@@ -318,7 +318,7 @@ function WindowsList({ windows }) {
                             const bg = chipBg(i);
                             const label = `V${i + 1}`;
                             const name = win.displayName || win.windowType?.displayName || win.windowType?.name || '—';
-                            const dims = `${(win.width_cm / 100).toFixed(2)} × ${(win.height_cm / 100).toFixed(2)} m`;
+                            const dims = `${Math.round(win.width_cm)} × ${Math.round(win.height_cm)} cm`;
                             return (
                                 <tr key={win.id} className="hover:bg-gray-50/60 transition-colors">
                                     <td className="py-2 px-3">
@@ -384,7 +384,7 @@ export default function CutOptimizationModal({
                 const bg = chipBg(i);
                 const label = `V${i + 1}`;
                 const name = win.displayName || win.windowType?.displayName || win.windowType?.name || '—';
-                const dims = `${(win.width_cm / 100).toFixed(2)} × ${(win.height_cm / 100).toFixed(2)} m`;
+                const dims = `${Math.round(win.width_cm)} × ${Math.round(win.height_cm)} cm`;
                 return `<tr>
                   <td><span class="vchip" style="background:${bg}">${label}</span></td>
                   <td class="wname">${name}</td>

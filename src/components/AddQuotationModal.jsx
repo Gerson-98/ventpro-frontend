@@ -521,7 +521,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                 });
 
                 const windows = await Promise.all(
-                    (quotationToEdit.quotation_windows || []).map(async (win) => {
+                    [...(quotationToEdit.quotation_windows || [])].sort((a, b) => (a.id || 0) - (b.id || 0)).map(async (win) => {
                         const found = findGroupAndVariants(win.window_type_id, currentTypes);
                         const optionGroups = win.window_type_id
                             ? await loadOptionGroups(win.window_type_id)
