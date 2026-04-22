@@ -286,7 +286,7 @@ export const generateDocumentPDF = async (data, mode = 'quotation') => {
 
     if (isIvaIncluded) {
       subtotalExento = rawTotal;
-      ivaMonto = subtotalExento * 0.12;
+      ivaMonto = subtotalExento * 0.05;
       totalFinal = subtotalExento + ivaMonto;
     } else {
       subtotalExento = rawTotal;
@@ -321,7 +321,7 @@ export const generateDocumentPDF = async (data, mode = 'quotation') => {
     if (isIvaIncluded) {
       doc.setFont("helvetica", "bold");
       doc.setTextColor(40, 40, 40);
-      doc.text("*PRECIOS MÁS IVA (12%)", margin.left, bottomBlockY + 12);
+      doc.text("*PRECIOS MÁS IVA (5%)", margin.left, bottomBlockY + 12);
 
       doc.setFontSize(9);
       doc.setFont("helvetica", "normal");
@@ -329,7 +329,7 @@ export const generateDocumentPDF = async (data, mode = 'quotation') => {
       doc.text(formatCurrency(subtotalExento), tableEndX, currentY + 4, { align: 'right' });
 
       currentY += 6;
-      doc.text("IVA (12%):", totalBoxStartX, currentY + 4);
+      doc.text("IVA (5%):", totalBoxStartX, currentY + 4);
       doc.text(formatCurrency(ivaMonto), tableEndX, currentY + 4, { align: 'right' });
       currentY += 8;
     } else {
