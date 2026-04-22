@@ -6,7 +6,10 @@ import { toast } from 'sonner';
 
 const formatCurrency = (amount) => `Q${Number(amount || 0).toFixed(2)}`;
 
-export async function generateMaterialsPDF({ reportData, projectName, orderId, isConsolidated = false, showPrices = true }) {
+export async function generateMaterialsPDF({ reportData, projectName, orderId, isConsolidated = false, showPrices = true, perProjectBreakdown = null }) {
+  // perProjectBreakdown (opcional, solo cuando isConsolidated=true):
+  //   Array<{ project: string, items: Array<{ tipo, nombre, color?, cantidad, precioUnitario, precioTotal }> }>
+  //   Si se provee, se agrega una sección extra con el desglose por proyecto al final del documento.
   const toastId = toast.loading('Generando PDF...');
   // Cede el hilo para que el toast se renderice antes
   await new Promise(resolve => setTimeout(resolve, 50));
@@ -198,6 +201,104 @@ export async function generateMaterialsPDF({ reportData, projectName, orderId, i
     doc.text(formatCurrency(grandTotal), pageW - margin.right - 4, currentY + 11.5, { align: "right" });
 
     currentY += totalBoxH + 8;
+  }
+
+  // ── Desglose por proyecto (solo consolidado, si se proveyó) ──
+  if (isConsolidated && Array.isArray(perProjectBreakdown) && perProjectBreakdown.length > 0) {
+    doc.addPage();
+    currentY = 20;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(15, 23, 42);
+    doc.text('Desglose por Proyecto', margin.left, currentY);
+    currentY += 8;
+
+    perProjectBreakdown.forEach((proj) => {
+      if (!proj || !Array.isArray(proj.items) || proj.items.length === 0) return;
+
+      // Si el proyecto no cabe en la página actual, paginar
+      if (currentY > doc.internal.pageSize.getHeight() - 60) {
+        doc.addPage();
+        currentY = 20;
+      }
+
+      // Cabecera proyecto
+      doc.setFillColor(219, 234, 254);
+      doc.roundedRect(margin.left, currentY, pageW - margin.left - margin.right, 8, 1.5, 1.5, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(30, 64, 175);
+      doc.text(proj.project || '—', margin.left + 4, currentY + 5.5);
+      if (showPrices) {
+        const projTotal = proj.items.reduce((s, i) => s + (i.precioTotal || 0), 0);
+        doc.setFontSize(9);
+        doc.text(formatCurrency(projTotal), pageW - margin.right - 4, currentY + 5.5, { align: 'right' });
+      }
+      currentY += 11;
+
+      const projProfiles = proj.items.filter((i) => i.tipo?.trim().toUpperCase() === 'PERFIL');
+      const projAcc = proj.items.filter((i) => i.tipo?.trim().toUpperCase() === 'ACCESORIO');
+      const projGlass = proj.items.filter((i) => i.tipo?.trim().toUpperCase() === 'VIDRIO');
+
+      const drawMini = (title, accent, columns, rows) => {
+        if (!rows || rows.length === 0) return;
+        doc.setFillColor(...accent);
+        doc.rect(margin.left, currentY, 2, 5, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8.5);
+        doc.setTextColor(15, 23, 42);
+        doc.text(title, margin.left + 5, currentY + 4);
+        currentY += 6;
+        autoTable(doc, {
+          startY: currentY,
+          head: [columns.map((c) => c.header)],
+          body: rows,
+          margin: { left: margin.left, right: margin.right },
+          styles: { fontSize: 7.5, cellPadding: { top: 2, bottom: 2, left: 3, right: 3 }, textColor: [51, 65, 85], lineColor: [226, 232, 240], lineWidth: 0.1 },
+          headStyles: { fillColor: [241, 245, 249], textColor: [71, 85, 105], fontStyle: 'bold', fontSize: 7 },
+          alternateRowStyles: { fillColor: [248, 250, 252] },
+          columnStyles: columns.reduce((acc, col, i) => { acc[i] = { halign: col.align || 'left' }; return acc; }, {}),
+        });
+        currentY = doc.lastAutoTable.finalY + 4;
+      };
+
+      drawMini('Perfiles PVC', [59, 130, 246],
+        [
+          { header: 'Color', align: 'left' },
+          { header: 'Perfil', align: 'left' },
+          { header: 'Cant.', align: 'center' },
+          ...(showPrices ? [{ header: 'Total', align: 'right' }] : []),
+        ],
+        projProfiles.map((i) => [
+          i.color || '—', i.nombre, String(i.cantidad),
+          ...(showPrices ? [formatCurrency(i.precioTotal)] : []),
+        ]),
+      );
+      drawMini('Accesorios', [239, 68, 68],
+        [
+          { header: 'Accesorio', align: 'left' },
+          { header: 'Cant.', align: 'center' },
+          ...(showPrices ? [{ header: 'Total', align: 'right' }] : []),
+        ],
+        projAcc.map((i) => [
+          i.nombre, String(i.cantidad),
+          ...(showPrices ? [formatCurrency(i.precioTotal)] : []),
+        ]),
+      );
+      drawMini('Vidrios', [34, 197, 94],
+        [
+          { header: 'Tipo', align: 'left' },
+          { header: 'Planchas', align: 'center' },
+          ...(showPrices ? [{ header: 'Total', align: 'right' }] : []),
+        ],
+        projGlass.map((i) => [
+          i.nombre, String(i.cantidad),
+          ...(showPrices ? [formatCurrency(i.precioTotal)] : []),
+        ]),
+      );
+
+      currentY += 4;
+    });
   }
 
   // ── Nota al pie ──

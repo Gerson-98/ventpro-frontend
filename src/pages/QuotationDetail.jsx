@@ -181,11 +181,17 @@ export default function QuotationDetail() {
             const allTypes = typesRes.data || [];
             const selectedPvc = pvcMaderaColors.find(c => c.id === maderaColorSelected);
 
-            // Detectar tipos "5cm" por nombre (patrón de nomenclatura del catálogo)
-            const is5cm = (name) => /5\s*cm/i.test(name || '');
-            // Normalizar: quitar el marcador de tamaño para comparar base
+            // Detectar tipos "5cm" por nombre.
+            // IMPORTANTE: lookbehind negativo para no confundir "45cm" con "5cm"
+            // (sin él, /5\s*cm/.test("marco 45cm") === true, lo cual es incorrecto).
+            const is5cm = (name) => /(?<!\d)5\s*cm/i.test(name || '');
+
+            // Normalizar: quitar descriptor de color PVC ("PVC Blanco", "PVC Negro"…)
+            // y cualquier marcador de tamaño de marco ("marco 45cm", "marco 5cm"…)
+            // para poder comparar el tipo base sin importar color ni medida.
             const baseName = (name) => (name || '').toLowerCase()
-                .replace(/\s*[35]\s*cm\s*/gi, '')
+                .replace(/\bpvc\s+\w+/gi, '')        // quita "PVC Blanco", "PVC Negro", etc.
+                .replace(/marco\s+\d+\s*cm/gi, '')   // quita "marco 45cm", "marco 5cm", etc.
                 .replace(/\s+/g, ' ')
                 .trim();
 
@@ -195,11 +201,24 @@ export default function QuotationDetail() {
 
                 if (originalType && !is5cm(originalType.name)) {
                     const base = baseName(originalType.name);
-                    const equiv = allTypes.find(t => is5cm(t.name) && baseName(t.name) === base);
+
+                    // 1er intento: coincidencia exacta de nombres normalizados
+                    let equiv = allTypes.find(t => is5cm(t.name) && baseName(t.name) === base);
+
+                    // 2do intento (fallback): el nombre normalizado del tipo 5cm está
+                    // contenido en el del original (cubre casos con palabras extra residuales).
+                    // Se elige el candidato con la base más larga (más específico).
+                    if (!equiv) {
+                        const candidates = allTypes
+                            .filter(t => is5cm(t.name) && baseName(t.name).length > 0 && base.includes(baseName(t.name)))
+                            .sort((a, b) => baseName(b.name).length - baseName(a.name).length);
+                        equiv = candidates[0] ?? null;
+                    }
+
                     if (equiv) {
                         newTypeId = equiv.id;
                     } else {
-                        console.warn(`[EstiloMadera] Sin equivalente 5cm para "${originalType.name}" — se mantiene el tipo original`);
+                        console.warn(`[EstiloMadera] Sin equivalente 5cm para "${originalType.name}" (base: "${base}") — se mantiene el tipo original`);
                     }
                 }
 

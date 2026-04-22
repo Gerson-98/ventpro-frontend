@@ -1,31 +1,34 @@
 // RUTA: src/components/ProtectedRoute.jsx
 
 import { Navigate } from 'react-router-dom';
-import { jwtDecode } from 'jwt-decode';
+import { useAuth } from '@/context/AuthContext';
+
+// ─────────────────────────────────────────────────────────────
+// NOTA: antes este componente leía `authToken` de localStorage y
+// lo decodificaba con jwtDecode para redirigir a /login si el
+// access_token había expirado. Eso causaba un "auto-logout" en
+// cuanto el token de 15 min caducaba (p. ej. tras cambiar de
+// pestaña), aun cuando el refresh_token httpOnly (7 días) seguía
+// siendo válido.
+//
+// Ahora dependemos del estado `user` expuesto por AuthContext,
+// que ya intenta un refresh silencioso al inicializar. Mientras
+// exista sesión válida (access_token vigente o refresh_token que
+// renueve) el usuario permanece autenticado. Los 401 que ocurran
+// durante la sesión los maneja de forma silenciosa el interceptor
+// de axios en services/api.js.
+// ─────────────────────────────────────────────────────────────
 
 export default function ProtectedRoute({ children }) {
-    // 1. Buscamos el token en el almacenamiento local del navegador.
-    const token = localStorage.getItem('authToken');
+    const { user, loading } = useAuth();
 
-    // 2. Si NO hay token, redirigimos al usuario a la página de login.
-    if (!token) {
+    // AuthProvider ya muestra un spinner durante la inicialización
+    // antes de renderizar a sus hijos, pero por robustez cubrimos el caso.
+    if (loading) return null;
+
+    if (!user) {
         return <Navigate to="/login" replace />;
     }
 
-    // 3. Verificamos que el token no esté expirado.
-    try {
-        const decoded = jwtDecode(token);
-        const isExpired = decoded.exp * 1000 < Date.now();
-        if (isExpired) {
-            localStorage.removeItem('authToken');
-            return <Navigate to="/login" replace />;
-        }
-    } catch {
-        // Si el token es inválido o no se puede decodificar, lo eliminamos.
-        localStorage.removeItem('authToken');
-        return <Navigate to="/login" replace />;
-    }
-
-    // 4. Token válido y vigente — mostramos el contenido protegido.
     return children;
 }

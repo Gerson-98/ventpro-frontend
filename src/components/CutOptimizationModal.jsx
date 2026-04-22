@@ -310,6 +310,7 @@ function WindowsList({ windows }) {
                             <th className="py-2 px-3 text-center font-semibold text-gray-500 uppercase tracking-wide w-28">Dimensiones</th>
                             <th className="py-2 px-3 text-left font-semibold text-gray-500 uppercase tracking-wide">Color PVC</th>
                             <th className="py-2 px-3 text-left font-semibold text-gray-500 uppercase tracking-wide">Color vidrio</th>
+                            <th className="py-2 px-3 text-center font-semibold text-gray-500 uppercase tracking-wide w-20">Mosquitero</th>
                             <th className="py-2 px-3 text-center font-semibold text-gray-500 uppercase tracking-wide w-12">Cant.</th>
                         </tr>
                     </thead>
@@ -319,7 +320,10 @@ function WindowsList({ windows }) {
                             const label = `V${i + 1}`;
                             const _s = win.displayName, _t = win.windowType?.name, _c = win.windowType?.displayName;
                             const name = (_s && _s !== _t) ? _s : (_c || _s || _t || '—');
-                            const dims = `${Math.round(win.width_cm)} × ${Math.round(win.height_cm)} cm`;
+                            // Dimensiones con exactamente 1 decimal (p. ej. 88.5, 120.0) —
+                            // sin Math.round para que los fabricadores vean la medida exacta.
+                            const dims = `${Number(win.width_cm).toFixed(1)} × ${Number(win.height_cm).toFixed(1)} cm`;
+                            const hasMosquitero = win.options?.mosquitero === 'con_mosquitero';
                             return (
                                 <tr key={win.id} className="hover:bg-gray-50/60 transition-colors">
                                     <td className="py-2 px-3">
@@ -333,6 +337,11 @@ function WindowsList({ windows }) {
                                     <td className="py-2 px-3 text-center font-mono text-gray-600">{dims}</td>
                                     <td className="py-2 px-3 text-gray-600">{win.pvcColor?.name || '—'}</td>
                                     <td className="py-2 px-3 text-gray-600">{win.glassColor?.name || '—'}</td>
+                                    <td className="py-2 px-3 text-center">
+                                        <span className={`font-black text-base leading-none ${hasMosquitero ? 'text-green-600' : 'text-red-500'}`}>
+                                            {hasMosquitero ? '✓' : '✗'}
+                                        </span>
+                                    </td>
                                     <td className="py-2 px-3 text-center">
                                         <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-100 font-bold text-gray-700">
                                             {win.quantity || 1}
@@ -386,13 +395,20 @@ export default function CutOptimizationModal({
                 const label = `V${i + 1}`;
                 const _s = win.displayName, _t = win.windowType?.name, _c = win.windowType?.displayName;
                 const name = (_s && _s !== _t) ? _s : (_c || _s || _t || '—');
-                const dims = `${Math.round(win.width_cm)} × ${Math.round(win.height_cm)} cm`;
+                // Dimensiones con 1 decimal exacto (sin Math.round) para preservar
+                // la medida real (p. ej. 88.5 en lugar de 89).
+                const dims = `${Number(win.width_cm).toFixed(1)} × ${Number(win.height_cm).toFixed(1)} cm`;
+                const hasMosquitero = win.options?.mosquitero === 'con_mosquitero';
+                const mosqCell = hasMosquitero
+                    ? `<span class="mosq-yes">✓</span>`
+                    : `<span class="mosq-no">✗</span>`;
                 return `<tr>
                   <td><span class="vchip" style="background:${bg}">${label}</span></td>
                   <td class="wname">${name}</td>
                   <td class="wmono">${dims}</td>
                   <td>${win.pvcColor?.name || '—'}</td>
                   <td>${win.glassColor?.name || '—'}</td>
+                  <td class="wcenter">${mosqCell}</td>
                   <td class="wcenter">${win.quantity || 1}</td>
                 </tr>`;
             }).join('');
@@ -401,7 +417,7 @@ export default function CutOptimizationModal({
               <table class="win-tbl">
                 <thead><tr>
                   <th>#</th><th>Tipo de ventana</th><th>Dimensiones</th>
-                  <th>Color PVC</th><th>Color vidrio</th><th>Cant.</th>
+                  <th>Color PVC</th><th>Color vidrio</th><th>Mosquitero</th><th>Cant.</th>
                 </tr></thead>
                 <tbody>${rows}</tbody>
               </table>
@@ -487,6 +503,8 @@ body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;padd
 .wname{max-width:220px;font-weight:600;color:#111}
 .wmono{font-family:monospace;color:#444;white-space:nowrap}
 .wcenter{text-align:center;font-weight:700}
+.mosq-yes{color:#16a34a;font-weight:900;font-size:13px}
+.mosq-no{color:#dc2626;font-weight:900;font-size:13px}
 
 /* ── Grupos y series ── */
 .grp-hdr{margin-top:12px;margin-bottom:8px;padding-bottom:4px;border-bottom:2px solid #222;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:1.5px;color:#222}

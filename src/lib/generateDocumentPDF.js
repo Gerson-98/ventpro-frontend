@@ -190,8 +190,10 @@ export const generateDocumentPDF = async (data, mode = 'quotation') => {
       const windowName = (_stored && _stored !== _tech)
           ? _stored
           : (_commerce || _stored || _tech || "Ventana");
-      // Mosquitero: con_mosquitero → ✓, sin_mosquitero o ausente → ✗
-      const mosquiteroText = win.options?.mosquitero === 'con_mosquitero' ? '✓' : '✗';
+      // Mosquitero: usar ASCII ("SI" / "NO") porque Helvetica en jsPDF no
+      // puede renderizar ✓/✗ sin embeber una fuente Unicode (aparecían como
+      // apóstrofo ' o celda vacía). El color verde/rojo se aplica en willDrawCell.
+      const mosquiteroText = win.options?.mosquitero === 'con_mosquitero' ? 'SI' : 'NO';
       return [
         index + 1,
         windowName,
@@ -223,21 +225,28 @@ export const generateDocumentPDF = async (data, mode = 'quotation') => {
             cellPadding: 2.5,
             valign: 'middle'
         },
+        // Anchos explícitos y suma controlada para que los montos (P. Unitario /
+        // Subtotal) entren en UNA sola línea. Antes, columnas 7 y 8 no tenían
+        // cellWidth y autoTable les asignaba ~14mm cada una, cortando valores
+        // de 9+ caracteres como "Q 4,905.44". Total usable = 170mm, distribuido:
+        // 7 + 40 + 18 + 18 + 13 + 24 + 9 + 20 + 21 = 170mm.
         columnStyles: {
-            0: { halign: 'center', cellWidth: 8 },
-            1: { cellWidth: 44 },
-            2: { cellWidth: 20 },
-            3: { cellWidth: 20 },
-            4: { halign: 'center', cellWidth: 15 },  // Mosquitero
-            5: { halign: 'center', cellWidth: 26 },  // Dimensiones
+            0: { halign: 'center', cellWidth: 7 },
+            1: { cellWidth: 40 },
+            2: { cellWidth: 18 },
+            3: { cellWidth: 18 },
+            4: { halign: 'center', cellWidth: 13 },  // Mosquitero
+            5: { halign: 'center', cellWidth: 24 },  // Dimensiones
             6: { halign: 'center', cellWidth: 9 },   // Cant.
-            7: { halign: 'right' },                   // P. Unitario
-            8: { halign: 'right' }                    // Subtotal
+            // Fuente más pequeña + padding reducido en columnas numéricas para
+            // garantizar que ningún monto se parta entre dos líneas.
+            7: { halign: 'right', cellWidth: 20, fontSize: 8, cellPadding: { top: 2.5, right: 1.5, bottom: 2.5, left: 1.5 } },   // P. Unitario
+            8: { halign: 'right', cellWidth: 21, fontSize: 8, cellPadding: { top: 2.5, right: 1.5, bottom: 2.5, left: 1.5 } }    // Subtotal
         },
-        // Colorear ✓ en verde y ✗ en rojo antes de dibujar cada celda
+        // Colorear "SI" en verde y "NO" en rojo antes de dibujar cada celda
         willDrawCell: (data) => {
             if (data.section === 'body' && data.column.index === 4) {
-                const isConMosquitero = data.cell.text[0] === '✓';
+                const isConMosquitero = data.cell.text[0] === 'SI';
                 data.cell.styles.textColor = isConMosquitero ? [22, 163, 74] : [220, 38, 38];
                 data.cell.styles.fontStyle = 'bold';
             }

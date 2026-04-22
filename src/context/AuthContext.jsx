@@ -11,24 +11,58 @@ export function AuthProvider({ children }) {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Esta función se ejecuta solo una vez, cuando la aplicación carga por primera vez.
-        const initializeAuth = () => {
+        // ─────────────────────────────────────────────────────────────
+        // CAUSA RAÍZ del cierre de sesión automático (bug "~1 minuto"):
+        //
+        // La versión anterior leía `authToken` de localStorage y si el
+        // access_token estaba expirado simplemente lo borraba y dejaba al
+        // usuario sin sesión. Lo mismo hacía `ProtectedRoute` en cada
+        // render: decodificaba el JWT y redirigía a /login si `exp < now`,
+        // sin intentar usar el refresh_token (httpOnly cookie, 7 días).
+        //
+        // Resultado: cada vez que el usuario cambiaba de pestaña o dejaba
+        // la app inactiva lo suficiente para que el access_token (15 min)
+        // expirara, el siguiente re-render disparaba logout aunque el
+        // refresh_token siguiera siendo válido.
+        //
+        // Solución: en la inicialización, si el access_token falta o está
+        // expirado, intentar un refresh silencioso con POST /auth/refresh
+        // (la cookie httpOnly viaja automáticamente con withCredentials).
+        // Solo si el refresh falla se deja al usuario sin sesión.
+        // `ProtectedRoute` ya no revisa la expiración — depende de `user`.
+        // ─────────────────────────────────────────────────────────────
+        const initializeAuth = async () => {
             try {
                 const token = localStorage.getItem('authToken');
                 if (token) {
-                    // Si encontramos un token, lo decodificamos para obtener los datos del usuario.
-                    const decodedUser = jwtDecode(token);
-                    const isExpired = decodedUser.exp * 1000 < Date.now();
-                    if (isExpired) {
+                    try {
+                        const decoded = jwtDecode(token);
+                        const isExpired = decoded.exp * 1000 < Date.now();
+                        if (!isExpired) {
+                            setUser(decoded);
+                            return;
+                        }
+                        // Expirado: limpiamos y caemos al intento de refresh
                         localStorage.removeItem('authToken');
-                    } else {
-                        setUser(decodedUser);
+                    } catch {
+                        localStorage.removeItem('authToken');
                     }
                 }
-            } catch (error) {
-                console.error("Token inválido o expirado:", error);
-                // Si el token es inválido, lo borramos para evitar problemas.
-                localStorage.removeItem('authToken');
+
+                // Sin token válido. Intentamos refresh silencioso:
+                // el refresh_token viaja en la httpOnly cookie.
+                try {
+                    const { data } = await api.post('/auth/refresh');
+                    if (data?.access_token) {
+                        localStorage.setItem('authToken', data.access_token);
+                        const decoded = jwtDecode(data.access_token);
+                        setUser(decoded);
+                    }
+                } catch {
+                    // No hay refresh token válido: permanece sin sesión.
+                    localStorage.removeItem('authToken');
+                    setUser(null);
+                }
             } finally {
                 setLoading(false);
             }
