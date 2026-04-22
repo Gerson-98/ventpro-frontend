@@ -1093,7 +1093,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                             </div>
                                             {quotation.include_iva && (
                                                 <div className="flex items-center gap-2 text-xs text-green-600">
-                                                    <span>IVA (12%):</span>
+                                                    <span>IVA (5%):</span>
                                                     <span className="font-medium">
                                                         Q {totalsInRealTime.ivaTax.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                                                     </span>
@@ -1231,7 +1231,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                             className="w-4 h-4 text-blue-600 rounded cursor-pointer"
                                         />
                                         <label htmlFor="include_iva" className="text-sm font-bold text-blue-800 cursor-pointer select-none">
-                                            ¿Incluir IVA (12%) en esta cotización?
+                                            ¿Incluir IVA (5%) en esta cotización?
                                         </label>
                                     </div>
 
