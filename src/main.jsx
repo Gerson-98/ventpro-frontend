@@ -20,6 +20,7 @@ import MyDashboard from './pages/MyDashboard';
 import GananciasPage from './pages/GananciasPage';
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./context/AuthContext";
+import { CatalogProvider } from "./context/CatalogContext";
 import AdminRoute from "./components/AdminRoute";
 import { Toaster } from 'sonner';
 import MaterialesConsolidado from './pages/MaterialesConsolidado';
@@ -33,7 +34,9 @@ const router = createBrowserRouter([
     path: "/",
     element: (
       <ProtectedRoute>
-        <Layout />
+        <CatalogProvider>
+          <Layout />
+        </CatalogProvider>
       </ProtectedRoute>
     ),
     children: [

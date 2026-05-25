@@ -31,18 +31,28 @@ api.interceptors.request.use(
 // La cookie se envía automáticamente gracias a withCredentials: true.
 // Si el refresh también falla → logout y redirect a /login.
 
-let isRefreshing = false;
-let failedQueue = [];
+let refreshPromise = null;
 
-const processQueue = (error, token = null) => {
-  failedQueue.forEach((prom) => {
-    if (error) {
-      prom.reject(error);
-    } else {
-      prom.resolve(token);
-    }
-  });
-  failedQueue = [];
+// Refresh compartido: serializa todas las llamadas a /auth/refresh — sean del
+// interceptor (401) o del AuthContext en boot — bajo una única promesa.
+// Sin esto, dos refreshes en paralelo enviarían la misma cookie; el primero
+// rotaba el token y el segundo viajaba con el ya-revocado → 401 → logout.
+export const refreshAccessToken = () => {
+  if (!refreshPromise) {
+    refreshPromise = api
+      .post('/auth/refresh')
+      .then((res) => {
+        const token = res.data?.access_token;
+        if (!token) throw new Error('No access_token en respuesta de refresh');
+        localStorage.setItem('authToken', token);
+        api.defaults.headers.common.Authorization = `Bearer ${token}`;
+        return token;
+      })
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+  return refreshPromise;
 };
 
 api.interceptors.response.use(
@@ -50,47 +60,25 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // Si es 401, no es el endpoint de refresh ni de login, y no hemos reintentado ya
     if (
       error.response?.status === 401 &&
+      originalRequest &&
       !originalRequest._retry &&
-      !originalRequest.url.includes('/auth/refresh') &&
-      !originalRequest.url.includes('/auth/login')
+      !originalRequest.url?.includes('/auth/refresh') &&
+      !originalRequest.url?.includes('/auth/login')
     ) {
-      if (isRefreshing) {
-        // Ya hay un refresh en curso: encola este request y espera el nuevo token
-        return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject });
-        })
-          .then((token) => {
-            originalRequest.headers.Authorization = `Bearer ${token}`;
-            return api(originalRequest);
-          })
-          .catch((err) => Promise.reject(err));
-      }
-
       originalRequest._retry = true;
-      isRefreshing = true;
-
       try {
-        // La httpOnly cookie refresh_token se envía automáticamente (withCredentials: true).
-        // No hay que leer ni enviar el token manualmente.
-        const { data } = await api.post('/auth/refresh');
-        const newToken = data.access_token;
-
-        localStorage.setItem('authToken', newToken);
-        api.defaults.headers.common.Authorization = `Bearer ${newToken}`;
+        const newToken = await refreshAccessToken();
         originalRequest.headers.Authorization = `Bearer ${newToken}`;
-
-        processQueue(null, newToken);
         return api(originalRequest);
       } catch (refreshError) {
-        processQueue(refreshError, null);
         localStorage.removeItem('authToken');
-        window.location.href = '/login';
+        // Solo redirigir si no estamos ya en /login para evitar loops.
+        if (!window.location.pathname.startsWith('/login')) {
+          window.location.href = '/login';
+        }
         return Promise.reject(refreshError);
-      } finally {
-        isRefreshing = false;
       }
     }
 

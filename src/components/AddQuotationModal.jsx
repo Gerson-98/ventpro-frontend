@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo, Fragment } from 'react';
 import api from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
+import { useCatalog } from '@/context/CatalogContext';
 import { FaPlus, FaTrashAlt, FaClone, FaUpload, FaCamera } from 'react-icons/fa';
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -186,17 +187,24 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
     const { user } = useAuth();
     const isAdmin = user?.role === 'ADMIN';
 
-    const [clients, setClients] = useState([]);
-    const [windowTypes, setWindowTypes] = useState([]);
-    const [pvcColors, setPvcColors] = useState([]);
-    const [glassColors, setGlassColors] = useState([]);
-    const [realGlassTypes, setRealGlassTypes] = useState([]);
-    const [selectorList, setSelectorList] = useState([]);
+    // Catálogos consumidos desde el contexto compartido — un solo lugar carga
+    // y cachea (5 min TTL). Antes el modal recargaba en cada apertura,
+    // disparando 429 esporádicos. Ver CatalogContext.jsx.
+    const {
+        clients,
+        windowTypes,
+        pvcColors,
+        glassColors,
+        realGlassTypes,
+        loadingCatalogs,
+        addClient,
+    } = useCatalog();
+    const selectorList = useMemo(() => buildSelectorList(windowTypes), [windowTypes]);
+    const catalogsLoaded = !loadingCatalogs && windowTypes.length > 0;
     const [showAddClientModal, setShowAddClientModal] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [loading, setLoading] = useState(false);
     const [showExtras, setShowExtras] = useState(false);
-    const [catalogsLoaded, setCatalogsLoaded] = useState(false);
 
     const [quotation, setQuotation] = useState({
         project: '',
@@ -441,14 +449,10 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
         setDraftRestored(true);
     }, []);
 
-    // ── Cache de catálogos entre aperturas del modal ──────────────────────────
-    // Los catálogos no cambian durante la sesión — no tiene sentido recargarlos
-    // cada vez que el usuario abre el modal. Se invalidan solo al cerrar sesión.
-    const catalogsCache = useRef(null);
-
+    // Reset de estado local al cerrar el modal. Los catálogos viven en
+    // CatalogContext y no se tocan acá.
     useEffect(() => {
         if (!open) {
-            setCatalogsLoaded(false);
             setValidationErrors([]);
             setUseCm(false);
             setTotalOverride('');
@@ -457,56 +461,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             setQuotationPrecioSugerido(0);
             setQuotationCostoTotal(0);
             optionGroupsCache.current = {};
-            return;
         }
-        const fetchCatalogs = async () => {
-            // Si ya están en cache, usarlos directamente — 0ms
-            if (catalogsCache.current) {
-                const c = catalogsCache.current;
-                setClients(c.clients);
-                setWindowTypes(c.windowTypes);
-                setSelectorList(buildSelectorList(c.windowTypes));
-                setPvcColors(c.pvcColors);
-                setGlassColors(c.glassColors);
-                setRealGlassTypes(c.realGlassTypes);
-                setCatalogsLoaded(true);
-                return;
-            }
-            setCatalogsLoaded(false);
-            try {
-                const [clientsRes, typesRes, pvcRes, glassRes] = await Promise.all([
-                    api.get('/clients'),
-                    api.get('/window-types'),
-                    api.get('/pvc-colors'),
-                    api.get('/glass-colors'),
-                ]);
-                const types = typesRes.data;
-                const glassData = glassRes.data || [];
-                const realGlass = glassData.filter(g =>
-                    g.name.toUpperCase() !== 'DUELA' &&
-                    g.name.toUpperCase() !== 'VIDRIO Y DUELA'
-                );
-                // Guardar en cache para la próxima apertura
-                catalogsCache.current = {
-                    clients: clientsRes.data,
-                    windowTypes: types,
-                    pvcColors: pvcRes.data,
-                    glassColors: glassData,
-                    realGlassTypes: realGlass,
-                };
-                setClients(clientsRes.data);
-                setWindowTypes(types);
-                setSelectorList(buildSelectorList(types));
-                setPvcColors(pvcRes.data);
-                setGlassColors(glassData);
-                setRealGlassTypes(realGlass);
-            } catch (error) {
-                console.error("Error cargando catálogos:", error);
-            } finally {
-                setCatalogsLoaded(true);
-            }
-        };
-        fetchCatalogs();
     }, [open]);
 
     useEffect(() => {
@@ -518,15 +473,9 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             setWindowCosts({});
             setCalculatingCost({});
             const buildEditWindows = async () => {
-                // ── Leer windowTypes directamente del estado actual via función ──
-                // Evita el problema de closure con el valor viejo del estado
-                const currentTypes = await new Promise(resolve => {
-                    setWindowTypes(prev => { resolve(prev); return prev; });
-                });
-
                 const windows = await Promise.all(
                     [...(quotationToEdit.quotation_windows || [])].sort((a, b) => (a.id || 0) - (b.id || 0)).map(async (win) => {
-                        const found = findGroupAndVariants(win.window_type_id, currentTypes);
+                        const found = findGroupAndVariants(win.window_type_id, windowTypes);
                         const optionGroups = win.window_type_id
                             ? await loadOptionGroups(win.window_type_id)
                             : [];
@@ -1643,7 +1592,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                 onClose={() => setShowAddClientModal(false)}
                 onSave={(newClient) => {
                     setShowAddClientModal(false);
-                    setClients(prev => [...prev, newClient]);
+                    addClient(newClient);
                     setQuotation(prev => ({ ...prev, clientId: newClient.id }));
                 }}
             />
