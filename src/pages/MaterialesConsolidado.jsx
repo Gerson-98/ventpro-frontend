@@ -161,8 +161,17 @@ export default function MaterialesConsolidado() {
     const [showOrdersDrawer, setShowOrdersDrawer] = useState(false);
 
     useEffect(() => {
-        api.get('/orders')
-            .then((r) => setOrders(Array.isArray(r.data) ? r.data.filter((o) => o.status !== 'cancelado') : []))
+        // /orders devuelve respuesta paginada { data, total, page, limit, totalPages }
+        // — el wrapper anterior leía r.data como array (regresión silenciosa al
+        // migrar el endpoint a paginado), dejando la lista vacía y todo el
+        // módulo inutilizable. Solicitamos el máximo (100) y filtramos
+        // cancelados client-side. Si en el futuro se superan 100 pedidos
+        // activos, hay que pasar a UI paginada acá.
+        api.get('/orders', { params: { page: 1, limit: 100 } })
+            .then((r) => {
+                const list = Array.isArray(r.data) ? r.data : (r.data?.data || []);
+                setOrders(list.filter((o) => o.status !== 'cancelado'));
+            })
             .catch((err) => console.error('Error cargando pedidos:', err))
             .finally(() => setLoadingOrders(false));
     }, []);
