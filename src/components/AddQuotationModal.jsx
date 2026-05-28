@@ -19,32 +19,25 @@ import {
 // ─── Checkboxes: grupos que se renderizan como checkbox, NO como select ───────
 const CHECKBOX_GROUPS = new Set(['mosquitero', 'refuerzo_hojas', 'refuerzo_mosquitero']);
 
-// Valor guardado cuando el checkbox está ACTIVO
 const CHECKBOX_ACTIVE_VALUE = {
     mosquitero: 'con_mosquitero',
     refuerzo_hojas: 'con_refuerzo',
     refuerzo_mosquitero: 'con_refuerzo',
 };
 
-// Valor guardado cuando el checkbox está INACTIVO
-// Para mosquitero: valor explícito 'sin_mosquitero' — nunca eliminar la key —
-// así el backend siempre sabe el estado real sin ambigüedad.
-// Para refuerzos: null = eliminar la key (OFF es ausencia de valor)
 const CHECKBOX_INACTIVE_VALUE = {
     mosquitero: 'sin_mosquitero',
     refuerzo_hojas: null,
     refuerzo_mosquitero: null,
 };
 
-// Default al asignar el grupo por primera vez
 const CHECKBOX_DEFAULTS = {
-    mosquitero: 'con_mosquitero', // ON por defecto
-    refuerzo_hojas: null,             // OFF por defecto
-    refuerzo_mosquitero: null,             // OFF por defecto
+    mosquitero: 'con_mosquitero',
+    refuerzo_hojas: null,
+    refuerzo_mosquitero: null,
 };
 
-// IDs de tipos de ventana donde mosquitero debe estar OFF por default
-const MOSQUITERO_OFF_BY_DEFAULT = new Set([17]); // 17 = VENTANA PROYECTABLE
+const MOSQUITERO_OFF_BY_DEFAULT = new Set([17]);
 
 const applyCheckboxDefaults = (currentOptions, optionGroups, windowTypeId = null) => {
     const newOptions = { ...currentOptions };
@@ -52,7 +45,6 @@ const applyCheckboxDefaults = (currentOptions, optionGroups, windowTypeId = null
         const groupKey = wto.group?.key;
         if (!groupKey || !CHECKBOX_GROUPS.has(groupKey)) return;
         if (!(groupKey in newOptions)) {
-            // Para proyectable u otros tipos especiales, mosquitero OFF por default
             if (groupKey === 'mosquitero' && windowTypeId && MOSQUITERO_OFF_BY_DEFAULT.has(Number(windowTypeId))) {
                 newOptions[groupKey] = 'sin_mosquitero';
             } else {
@@ -64,7 +56,6 @@ const applyCheckboxDefaults = (currentOptions, optionGroups, windowTypeId = null
     return newOptions;
 };
 
-// ─── Ventana vacía ────────────────────────────────────────────────────────────
 const emptyWindow = () => ({
     displayName: '',
     width_m: '',
@@ -84,13 +75,12 @@ const emptyWindow = () => ({
 });
 
 function buildDisplayName(typeName, typeDisplayName, options, optionGroups) {
-    // Usa el nombre comercial (displayName) como base; cae al técnico si no está configurado
     const baseName = typeDisplayName || typeName;
     if (!baseName) return '';
     const parts = [baseName];
     optionGroups.forEach(wto => {
         const groupKey = wto.group.key;
-        if (CHECKBOX_GROUPS.has(groupKey)) return; // checkboxes no van en el nombre
+        if (CHECKBOX_GROUPS.has(groupKey)) return;
         const chosenKey = options[groupKey];
         if (chosenKey) {
             const value = wto.group.values.find(v => v.key === chosenKey);
@@ -151,7 +141,6 @@ function WindowTypeSelector({ win, selectorList, onGroupChange, onVariantChange 
     );
 }
 
-// ── Celda de precio con memo — evita recalcular en cada render global ─────────
 function WindowTotalCell({ win, globalPricePerM2, onChange }) {
     const total = useMemo(() => {
         const w = parseFloat(win.width_m) || 0;
@@ -187,9 +176,6 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
     const { user } = useAuth();
     const isAdmin = user?.role === 'ADMIN';
 
-    // Catálogos consumidos desde el contexto compartido — un solo lugar carga
-    // y cachea (5 min TTL). Antes el modal recargaba en cada apertura,
-    // disparando 429 esporádicos. Ver CatalogContext.jsx.
     const {
         clients,
         windowTypes,
@@ -222,19 +208,16 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
     const [quotationCostoTotal, setQuotationCostoTotal] = useState(0);
     const [validationErrors, setValidationErrors] = useState([]);
     const [useCm, setUseCm] = useState(false);
-    const [totalOverride, setTotalOverride] = useState(''); // total editable por el usuario
+    const [totalOverride, setTotalOverride] = useState('');
     const [hasDraft, setHasDraft] = useState(false);
     const [draftRestored, setDraftRestored] = useState(false);
     const [ivaToggleLocked, setIvaToggleLocked] = useState(false);
 
-    // ── Auto-guardado en localStorage ──────────────────────────────────────────
     const DRAFT_KEY = 'quotation_draft';
     const autoSaveTimer = useRef(null);
 
-    // Guardar borrador cada 3 segundos cuando hay cambios
     useEffect(() => {
         if (!open || isEditing || !catalogsLoaded) return;
-        // Solo guardar si hay al menos 1 ventana con datos
         const hasData = quotation.windows.length > 0 &&
             (quotation.project || quotation.windows.some(w => w.window_type_id));
         if (!hasData) return;
@@ -242,7 +225,6 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
         if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
         autoSaveTimer.current = setTimeout(() => {
             try {
-                // Excluir datos no serializables (fileToUpload, _optionGroups)
                 const draftWindows = quotation.windows.map(w => ({
                     ...w,
                     fileToUpload: null,
@@ -256,28 +238,25 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                     _totalOverride: totalOverride,
                 };
                 localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-            } catch { /* localStorage lleno o no disponible — ignorar */ }
+            } catch { }
         }, 3000);
 
         return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
     }, [quotation, useCm, totalOverride, open, isEditing, catalogsLoaded]);
 
-    // Verificar si existe un borrador al abrir (solo para cotización nueva)
     useEffect(() => {
         if (!open || quotationToEdit || !catalogsLoaded || draftRestored) return;
         try {
             const raw = localStorage.getItem(DRAFT_KEY);
             if (raw) {
                 const draft = JSON.parse(raw);
-                // Solo ofrecer restaurar si el draft tiene menos de 24h
                 if (draft._savedAt && Date.now() - draft._savedAt < 24 * 60 * 60 * 1000) {
                     setHasDraft(true);
                 }
             }
-        } catch { /* corrupto — ignorar */ }
+        } catch { }
     }, [open, quotationToEdit, catalogsLoaded, draftRestored]);
 
-    // Limpiar borrador al guardar exitosamente
     const clearDraft = () => {
         try { localStorage.removeItem(DRAFT_KEY); } catch { }
     };
@@ -296,14 +275,12 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             : parseFloat(displayValue);
     };
 
-    // Guarda el AbortController activo por ventana para cancelar requests anteriores
     const abortControllers = useRef({});
 
     const calculateWindowCost = useCallback(async (win) => {
         if (!win.window_type_id || !win.width_m || !win.height_m || !win.color_id) return;
         const key = win.tempId || win.id;
 
-        // Cancelar el request anterior de esta ventana si sigue en vuelo
         if (abortControllers.current[key]) {
             abortControllers.current[key].abort();
         }
@@ -321,7 +298,6 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                 options: win.options || {},
                 quantity: Number(win.quantity) || 1,
             }, { signal: controller.signal });
-            // Solo actualizar si este request no fue cancelado
             if (!controller.signal.aborted) {
                 setWindowCosts(prev => ({
                     ...prev,
@@ -331,9 +307,6 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                     },
                 }));
 
-                // Re-calcular precio sugerido global optimizado con TODAS las ventanas.
-                // Con 1 ventana el precio individual == global, no hace falta batch.
-                // Con N ventanas el bin-packing global puede ser menor que la suma individual.
                 setQuotation(prev => {
                     const windowsCompletas = prev.windows.filter(w =>
                         w.window_type_id && w.width_m && w.height_m && w.color_id
@@ -353,17 +326,15 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                 setQuotationPrecioSugerido(res.data?.precio_sugerido_minimo || 0);
                                 setQuotationCostoTotal(res.data?.costo_total_proyecto || 0);
                             })
-                            .catch(() => { /* si falla el batch, el fallback suma individuales */ });
+                            .catch(() => { });
                     } else {
-                        // Con 1 ventana limpiar para usar el precio individual como fallback
                         setQuotationPrecioSugerido(0);
                         setQuotationCostoTotal(0);
                     }
-                    return prev; // no mutar el estado de windows
+                    return prev;
                 });
             }
         } catch (error) {
-            // Ignorar errores de requests cancelados
             if (error?.code === 'ERR_CANCELED' || error?.name === 'AbortError' || error?.name === 'CanceledError') return;
             console.error('Error calculando costo:', error);
         } finally {
@@ -374,10 +345,6 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
         }
     }, []);
 
-    // ── Debounce del cálculo de costos ────────────────────────────────────────
-    // Sin debounce, cada pulsación en ancho/alto/cantidad dispara una llamada
-    // al backend. Con 80 ventanas y 3 vendedores = ~1,400 llamadas simultáneas.
-    // 700ms cubre la velocidad normal de escritura de números (ej: "1.20").
     const debounceTimers = useRef({});
     const debouncedCalculateCost = useCallback((win) => {
         const key = win.tempId || win.id;
@@ -390,12 +357,10 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
         }, 700);
     }, [calculateWindowCost]);
 
-    // Cache de option groups por window_type_id para evitar llamadas repetidas
     const optionGroupsCache = useRef({});
 
     const loadOptionGroups = useCallback(async (windowTypeId) => {
         if (!windowTypeId) return [];
-        // Retornar del cache si ya se cargó
         if (optionGroupsCache.current[windowTypeId]) {
             return optionGroupsCache.current[windowTypeId];
         }
@@ -414,7 +379,15 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             const raw = localStorage.getItem(DRAFT_KEY);
             if (!raw) return;
             const draft = JSON.parse(raw);
-            // Restaurar optionGroups para cada ventana
+
+            // Pre-cargar option groups secuencialmente para evitar ráfaga de requests
+            const uniqueTypeIds = [...new Set(
+                (draft.windows || []).map(w => w.window_type_id).filter(Boolean)
+            )];
+            for (const typeId of uniqueTypeIds) {
+                await loadOptionGroups(typeId);
+            }
+
             const restoredWindows = await Promise.all(
                 (draft.windows || []).map(async (win) => {
                     const optGroups = win.window_type_id
@@ -434,11 +407,10 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             });
             if (draft._useCm) setUseCm(draft._useCm);
             if (draft._totalOverride) setTotalOverride(draft._totalOverride);
-            // Calcular costos de cada ventana restaurada
             for (const win of restoredWindows) {
                 calculateWindowCost(win);
             }
-        } catch { /* corrupto — ignorar */ }
+        } catch { }
         setHasDraft(false);
         setDraftRestored(true);
     }, [loadOptionGroups, calculateWindowCost]);
@@ -449,8 +421,6 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
         setDraftRestored(true);
     }, []);
 
-    // Reset de estado local al cerrar el modal. Los catálogos viven en
-    // CatalogContext y no se tocan acá.
     useEffect(() => {
         if (!open) {
             setValidationErrors([]);
@@ -467,19 +437,34 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
     useEffect(() => {
         if (!open || !catalogsLoaded) return;
         if (quotationToEdit) {
-            // Si quotationToEdit tiene id → modo edición (PATCH).
-            // Si no tiene id (ej. prefill Estilo Madera) → modo creación (POST).
             setIsEditing(!!quotationToEdit.id);
             setWindowCosts({});
             setCalculatingCost({});
+
             const buildEditWindows = async () => {
+                const sortedWins = [...(quotationToEdit.quotation_windows || [])]
+                    .sort((a, b) => (a.id || 0) - (b.id || 0));
+
+                // ── FIX: Pre-cargar option groups secuencialmente por tipo único ──
+                // Sin esto, si hay N ventanas con tipos distintos y el cache está
+                // vacío, se disparan N llamadas simultáneas a /window-type-options
+                // → 429 en cascada cuando el backend recién despertó en Render.
+                // Con la carga secuencial, el cache se llena antes del Promise.all
+                // y las llamadas subsiguientes retornan instantáneamente del cache.
+                const uniqueTypeIds = [...new Set(
+                    sortedWins.map(w => w.window_type_id).filter(Boolean)
+                )];
+                for (const typeId of uniqueTypeIds) {
+                    await loadOptionGroups(typeId);
+                }
+
                 const windows = await Promise.all(
-                    [...(quotationToEdit.quotation_windows || [])].sort((a, b) => (a.id || 0) - (b.id || 0)).map(async (win) => {
+                    sortedWins.map(async (win) => {
                         const found = findGroupAndVariants(win.window_type_id, windowTypes);
+                        // Ahora viene del cache — sin llamada HTTP adicional
                         const optionGroups = win.window_type_id
                             ? await loadOptionGroups(win.window_type_id)
                             : [];
-                        // Aplicar defaults de checkboxes a las opciones guardadas
                         const options = applyCheckboxDefaults(win.options || {}, optionGroups, win.window_type_id);
                         return {
                             id: win.id,
@@ -506,6 +491,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                         };
                     })
                 );
+
                 setQuotation({
                     project: quotationToEdit.project,
                     clientId: quotationToEdit.clientId || '',
@@ -516,17 +502,6 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                     windows,
                 });
 
-                // ── Snapshot del precio sugerido al abrir cotización existente ──
-                // El precio sugerido global NO se recalcula al abrir: usamos el
-                // valor guardado en BD para que coincida con lo que el usuario
-                // vio al guardar (insensible a cambios posteriores en precios
-                // de materiales o margen). Recalculará automáticamente si el
-                // usuario modifica una ventana (calculateWindowCost dispara el
-                // batch global de nuevo).
-                //
-                // Sólo cuando la cotización es vieja y aún no tiene snapshot
-                // persistido (precio_sugerido_minimo == null) hacemos el
-                // recálculo único de retrocompatibilidad.
                 const hasStoredSnapshot =
                     quotationToEdit.id &&
                     quotationToEdit.precio_sugerido_minimo != null;
@@ -538,9 +513,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                 if (hasStoredSnapshot) {
                     setQuotationPrecioSugerido(Number(quotationToEdit.precio_sugerido_minimo) || 0);
                     setQuotationCostoTotal(Number(quotationToEdit.costo_total_proyecto) || 0);
-                    // Per-window costs: 1 sola llamada batch para llenar la
-                    // tabla de desglose, pero IGNORAMOS los totales globales
-                    // de la respuesta para no sobrescribir el snapshot.
+
                     if (windowsParaCalculo.length > 0) {
                         try {
                             const payload = windowsParaCalculo.map(w => ({
@@ -566,7 +539,12 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                             });
                             setWindowCosts(newCosts);
                         } catch {
-                            for (const win of windows) calculateWindowCost(win);
+                            // ── FIX: NO disparar calculateWindowCost individual por cada ventana ──
+                            // El catch anterior hacía: for (const win of windows) calculateWindowCost(win)
+                            // Eso causaba N llamadas simultáneas a /window-type-options cuando el
+                            // backend recién despertó → 429 en cascada.
+                            // Los costos se recalcularán cuando el usuario edite cualquier ventana.
+                            console.warn('Costos no calculados al abrir (backend ocupado) — se recalcularán al editar.');
                         }
                     }
                 } else if (windowsParaCalculo.length > 0) {
@@ -596,7 +574,10 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                         });
                         setWindowCosts(newCosts);
                     } catch {
-                        for (const win of windows) calculateWindowCost(win);
+                        // ── FIX: NO disparar calculateWindowCost individual por cada ventana ──
+                        // Mismo problema que el catch anterior — N llamadas → 429.
+                        // Los costos se recalcularán cuando el usuario edite cualquier ventana.
+                        console.warn('Costos no calculados al abrir (backend ocupado) — se recalcularán al editar.');
                     }
                 }
             };
@@ -637,7 +618,6 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                 if (isSimple) {
                     const newType = windowTypes.find(w => w.id === wtId);
                     const allowedIds = new Set((newType?.pvcLinks || []).map(l => l.pvcColor_id));
-                    // Aplicar defaults de checkboxes para los nuevos option groups
                     const defaultOptions = applyCheckboxDefaults({}, optionGroups, wtId);
                     return {
                         ...win,
@@ -721,8 +701,6 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
         });
         setQuotation(prev => ({ ...prev, windows: updatedWindows }));
         if (['width_m', 'height_m', 'color_id', 'glass_color_id', 'quantity'].includes(name)) {
-            // Campos numéricos se debouncean — el usuario puede estar escribiendo "1.20"
-            // color_id y glass_color_id son selects (cambio instantáneo), se calculan sin delay
             const isSelectField = ['color_id', 'glass_color_id'].includes(name);
             if (isSelectField) {
                 calculateWindowCost(updatedWindows[index]);
@@ -753,17 +731,13 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             let newOptions = { ...win.options };
 
             if (optionValue === null) {
-                // Checkbox desactivado
                 const inactiveVal = CHECKBOX_INACTIVE_VALUE[optionName];
                 if (inactiveVal !== null && inactiveVal !== undefined) {
-                    // Guardar valor explícito (ej: 'sin_mosquitero')
                     newOptions[optionName] = inactiveVal;
                 } else {
-                    // Eliminar la key (refuerzos OFF = ausencia)
                     const { [optionName]: _removed, ...rest } = newOptions;
                     newOptions = rest;
                 }
-                // ── Regla de dependencia: sin mosquitero → sin refuerzo mosquitero ──
                 if (optionName === 'mosquitero') {
                     const { refuerzo_mosquitero: _rm, ...rest } = newOptions;
                     newOptions = rest;
@@ -810,7 +784,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             ...src,
             width_m: '',
             height_m: '',
-            quantity: 1,   // siempre duplicar con cantidad 1
+            quantity: 1,
             options: { ...src.options },
             _variantValues: { ...src._variantValues },
             _optionGroups: [...(src._optionGroups || [])],
@@ -846,17 +820,13 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
     const totalMaterialCost = quotationCostoTotal > 0
         ? quotationCostoTotal
         : Object.values(windowCosts).reduce((s, c) => s + (c?.costo_total || 0), 0);
-    // Usar precio global optimizado (bin-packing de todas las ventanas juntas) cuando esté disponible.
-    // Fallback: suma de individuales (cuando hay 1 sola ventana o el batch aún no respondió).
     const totalPrecioSugerido = quotationPrecioSugerido > 0
         ? quotationPrecioSugerido
         : Object.values(windowCosts).reduce((s, c) => s + (c?.precio_sugerido_minimo || 0), 0);
     const isCalculatingAny = Object.values(calculatingCost).some(Boolean);
 
-    // Total efectivo: el que el usuario haya escrito, o el calculado automáticamente
     const effectiveTotal = totalOverride !== '' ? parseFloat(totalOverride) || 0 : totalsInRealTime.total;
 
-    // m² totales de todas las ventanas (para calcular precio/m² inverso)
     const totalM2 = quotation.windows.reduce((acc, win) => {
         const w = parseFloat(win.width_m) || 0;
         const h = parseFloat(win.height_m) || 0;
@@ -864,7 +834,6 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
         return acc + (w * h * q);
     }, 0);
 
-    // Cuando el usuario edita el total, recalculamos el precio global por m²
     const handleTotalChange = (e) => {
         const val = e.target.value;
         setTotalOverride(val);
@@ -874,14 +843,13 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
         }
     };
 
-    // Igualar al precio mínimo sugerido
     const handleIgualMinimo = () => {
         if (totalPrecioSugerido <= 0 || totalM2 <= 0) return;
         const newPricePerM2 = totalPrecioSugerido / totalM2;
         setQuotation(prev => ({
             ...prev,
             price_per_m2: parseFloat(newPricePerM2.toFixed(4)),
-            windows: prev.windows.map(win => ({ ...win, price_per_m2: '' })), // limpiar overrides individuales
+            windows: prev.windows.map(win => ({ ...win, price_per_m2: '' })),
         }));
         setTotalOverride('');
     };
@@ -908,7 +876,6 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             optionGroups.forEach((wto) => {
                 const groupKey = wto.group?.key;
                 const groupLabel = wto.group?.label || groupKey;
-                // Los checkboxes (mosquitero/refuerzo) son opcionales — no validar como obligatorios
                 if (groupKey && !CHECKBOX_GROUPS.has(groupKey) && !win.options?.[groupKey])
                     errors.push(`${label}: falta seleccionar "${groupLabel}".`);
             });
@@ -917,10 +884,10 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
     };
 
     const handleIvaToggle = (e) => {
-        if (ivaToggleLocked) return; // Ignora clicks dobles
+        if (ivaToggleLocked) return;
         setIvaToggleLocked(true);
         setQuotation(p => ({ ...p, include_iva: e.target.checked }));
-        setTimeout(() => setIvaToggleLocked(false), 500); // 500ms de bloqueo
+        setTimeout(() => setIvaToggleLocked(false), 500);
     };
 
     const handleSubmit = async (e) => {
@@ -985,8 +952,6 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             onSave();
         } catch (error) {
             console.error("Error guardando cotización:", error);
-            // NestJS puede enviar message como string, string[] (class-validator)
-            // u objeto anidado. Convertir siempre a string para evitar React error #31.
             const raw = error?.response?.data?.message;
             let msg;
             if (!raw) {
@@ -994,7 +959,6 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             } else if (Array.isArray(raw)) {
                 msg = raw.map((m) => (typeof m === 'string' ? m : JSON.stringify(m))).join(' · ');
             } else if (typeof raw === 'object' && raw !== null) {
-                // NestJS HttpException.getResponse() returns { statusCode, message, error }
                 msg = typeof raw.message === 'string'
                     ? raw.message
                     : Array.isArray(raw.message)
@@ -1022,11 +986,6 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             <DialogPrimitive.Root open={open} onOpenChange={onClose}>
                 <DialogPrimitive.Portal>
                     <DialogPrimitive.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40" />
-                    {/*
-                      ── Responsive modal container ──
-                      • Móvil (<sm): fullscreen con scroll
-                      • sm+: centrado, max-w-7xl, max-h-[90vh]
-                    */}
                     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
                         <DialogContent
                             aria-describedby={undefined}
@@ -1040,7 +999,6 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                             "
                         >
                             <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-2 border-b border-gray-100 flex-shrink-0">
-                                {/* Drag handle visual en móvil */}
                                 <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-3 sm:hidden" />
                                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                                     <div>
@@ -1050,9 +1008,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                         </DialogDescription>
                                     </div>
 
-                                    {/* ── Totales sticky en el header ── */}
                                     <div className="flex flex-wrap items-center gap-2 sm:gap-3 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 flex-shrink-0">
-                                        {/* Total m² del proyecto */}
                                         {totalM2 > 0 && (
                                             <div className="flex flex-col items-center">
                                                 <span className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide">Total m²</span>
@@ -1062,10 +1018,8 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                             </div>
                                         )}
 
-                                        {/* Separador */}
                                         {totalM2 > 0 && totalPrecioSugerido > 0 && <div className="w-px h-8 bg-gray-200" />}
 
-                                        {/* Precio sugerido mínimo */}
                                         {totalPrecioSugerido > 0 && (
                                             <div className="flex flex-col items-center">
                                                 <span className="text-[10px] text-amber-600 font-semibold uppercase tracking-wide">Mín. sugerido</span>
@@ -1075,10 +1029,8 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                             </div>
                                         )}
 
-                                        {/* Separador */}
                                         {totalPrecioSugerido > 0 && <div className="w-px h-8 bg-gray-200" />}
 
-                                        {/* Sub-total e IVA */}
                                         <div className="flex flex-col items-end gap-0.5">
                                             <div className="flex items-center gap-2 text-xs text-gray-500">
                                                 <span>Sub-total:</span>
@@ -1096,10 +1048,8 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                             )}
                                         </div>
 
-                                        {/* Separador */}
                                         <div className="w-px h-8 bg-gray-200" />
 
-                                        {/* TOTAL editable */}
                                         <div className="flex flex-col items-center">
                                             <span className="text-[10px] text-blue-600 font-semibold uppercase tracking-wide">Total</span>
                                             <div className="flex items-center gap-1">
@@ -1116,7 +1066,6 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                             </div>
                                         </div>
 
-                                        {/* Botón igualar */}
                                         {totalPrecioSugerido > 0 && totalM2 > 0 && (
                                             <button
                                                 type="button"
@@ -1128,7 +1077,6 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                             </button>
                                         )}
 
-                                        {/* Indicador de override activo */}
                                         {totalOverride !== '' && (
                                             <button
                                                 type="button"
@@ -1146,7 +1094,6 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                             <form onSubmit={handleSubmit} className="flex-grow flex flex-col overflow-hidden">
                                 <div className="flex-grow overflow-y-auto px-4 sm:px-6 py-4 space-y-5">
 
-                                    {/* ── Banner de borrador recuperable ── */}
                                     {hasDraft && !isEditing && (
                                         <div className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                                             <span className="text-sm text-blue-700">
@@ -1171,7 +1118,6 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                         </div>
                                     )}
 
-                                    {/* ── Cabecera ── */}
                                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del Proyecto</label>
@@ -1215,7 +1161,6 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                         </div>
                                     </div>
 
-                                    {/* ── IVA ── */}
                                     <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg border border-blue-100">
                                         <input
                                             type="checkbox"
@@ -1230,7 +1175,6 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                         </label>
                                     </div>
 
-                                    {/* ── Notas y foto — colapsables ── */}
                                     <div>
                                         <button
                                             type="button"
@@ -1303,13 +1247,10 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                         )}
                                     </div>
 
-                                    {/* ── Título ventanas + toggle CM/M ── */}
                                     <div className="flex items-center justify-between">
                                         <h3 className="text-base sm:text-lg font-semibold text-gray-700">Ventanas</h3>
-
                                     </div>
 
-                                    {/* ── Tabla de ventanas — scroll horizontal en todos los tamaños ── */}
                                     <div className="w-full border rounded-lg shadow-sm bg-white overflow-x-auto -mx-0">
                                         <table className="w-full text-sm table-auto border-collapse min-w-[920px]">
                                             <thead className="bg-gray-100 border-b sticky top-0 z-10">
@@ -1419,7 +1360,6 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                                                     />
                                                                 </td>
                                                                 <td className="p-2 space-y-1.5">
-                                                                    {/* Selects normales (excluye checkboxes) */}
                                                                     {optionGroups.filter(wto => !CHECKBOX_GROUPS.has(wto.group.key)).map(wto => (
                                                                         <select
                                                                             key={wto.group.key}
@@ -1434,14 +1374,12 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                                                             ))}
                                                                         </select>
                                                                     ))}
-                                                                    {/* Checkboxes: mosquitero y refuerzos */}
                                                                     {optionGroups.filter(wto => CHECKBOX_GROUPS.has(wto.group.key)).length > 0 && (
                                                                         <div className="flex flex-col gap-1 pt-0.5">
                                                                             {optionGroups.filter(wto => CHECKBOX_GROUPS.has(wto.group.key)).map(wto => {
                                                                                 const groupKey = wto.group.key;
                                                                                 const activeValue = CHECKBOX_ACTIVE_VALUE[groupKey];
                                                                                 const isChecked = win.options?.[groupKey] === activeValue;
-                                                                                // refuerzo_mosquitero solo disponible si mosquitero está ON
                                                                                 const isDisabled = groupKey === 'refuerzo_mosquitero' &&
                                                                                     win.options?.['mosquitero'] !== 'con_mosquitero';
                                                                                 return (
@@ -1569,7 +1507,6 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                         <FaPlus className="mr-2" size={11} /> Añadir Ventana
                                     </Button>
 
-                                    {/* ── Análisis de costos (solo visible cuando hay datos) ── */}
                                     {(totalMaterialCost > 0 || isCalculatingAny) && (
                                         <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-sm">
                                             {isCalculatingAny ? (
@@ -1594,7 +1531,6 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                     )}
                                 </div>
 
-                                {/* ── Errores de validación ── */}
                                 {validationErrors.length > 0 && (
                                     <div className="mx-4 sm:mx-6 mt-3 p-3 sm:p-4 bg-red-50 border border-red-200 rounded-lg flex-shrink-0">
                                         <p className="text-sm font-semibold text-red-700 mb-2 flex items-center gap-2">
@@ -1612,7 +1548,6 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                     </div>
                                 )}
 
-                                {/* ── Footer ── */}
                                 <div className="px-4 sm:px-6 py-4 border-t border-gray-100 flex-shrink-0">
                                     <DialogFooter className="flex justify-end gap-2">
                                         <Button type="button" variant="ghost" onClick={onClose} className="px-4 sm:px-6">
