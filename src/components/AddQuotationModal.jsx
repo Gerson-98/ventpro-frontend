@@ -311,7 +311,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                     const windowsCompletas = prev.windows.filter(w =>
                         w.window_type_id && w.width_m && w.height_m && w.color_id
                     );
-                    if (windowsCompletas.length > 1) {
+                    if (windowsCompletas.length > 0) {
                         const batchPayload = windowsCompletas.map(w => ({
                             window_type_id: Number(w.window_type_id),
                             width_cm: parseFloat(w.width_m) * 100,
@@ -538,6 +538,10 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                 }
                             });
                             setWindowCosts(newCosts);
+                            // Actualizar totales de cotización con el recálculo fresco (global bin-packing)
+                            // para que coincidan exactamente con los valores mostrados al crear.
+                            setQuotationPrecioSugerido(res.data?.precio_sugerido_minimo || 0);
+                            setQuotationCostoTotal(res.data?.costo_total_proyecto || 0);
                         } catch {
                             // ── FIX: NO disparar calculateWindowCost individual por cada ventana ──
                             // El catch anterior hacía: for (const win of windows) calculateWindowCost(win)

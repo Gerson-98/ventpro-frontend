@@ -38,13 +38,13 @@ function StatCard({ label, value, sub, color = 'blue', icon }) {
     };
     return (
         <div className={`rounded-xl border p-4 ${colors[color]}`}>
-            <div className="flex items-start justify-between">
+            <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold uppercase tracking-wider opacity-70 mb-1 truncate">{label}</p>
-                    <p className="text-xl sm:text-2xl font-bold truncate">{value}</p>
-                    {sub && <p className="text-xs mt-1 opacity-60">{sub}</p>}
+                    <p className="text-xs font-semibold uppercase tracking-wider opacity-70 mb-1 leading-tight">{label}</p>
+                    <p className="text-xl sm:text-2xl font-bold leading-tight break-words">{value}</p>
+                    {sub && <p className="text-xs mt-1 opacity-60 leading-tight">{sub}</p>}
                 </div>
-                {icon && <div className="opacity-40 text-2xl ml-2 flex-shrink-0">{icon}</div>}
+                {icon && <div className="opacity-40 text-2xl flex-shrink-0">{icon}</div>}
             </div>
         </div>
     );
