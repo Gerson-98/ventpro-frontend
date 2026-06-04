@@ -44,10 +44,14 @@ const buildRegla = (formula, mult) =>
     formula && mult ? `${formula} *${mult}` : "";
 
 const parseRegla = (regla) => {
-    if (!regla) return { formula: "", mult: 2 };
+    // FIX: cuando regla es null/vacía se devuelve la fórmula por defecto (no "").
+    // Con formula:"" el guard `matId && regla?.formula` en handleSave falla aunque
+    // haya un perfil asignado, produciendo payload[reglaKey]=null →
+    // assertProfilePairsConsistent lanza 400 ("material asignado sin regla de corte").
+    if (!regla) return { formula: FORMULAS[0].value, mult: 2 };
     const match = regla.match(/^(.+?)\s*\*\s*(\d+)$/);
-    if (!match) return { formula: regla.trim(), mult: 2 };
-    return { formula: match[1].trim(), mult: parseInt(match[2], 10) };
+    if (!match) return { formula: regla.trim() || FORMULAS[0].value, mult: 2 };
+    return { formula: match[1].trim() || FORMULAS[0].value, mult: parseInt(match[2], 10) || 2 };
 };
 
 const buildEmptyForm = (windowTypeId) => {
@@ -425,8 +429,22 @@ export default function CatalogoPerfilesTab() {
             closeModal();
             fetchAll();
         } catch (err) {
-            const msg = err?.response?.data?.message || "Error al guardar el catálogo.";
-            setFormError(Array.isArray(msg) ? msg.join(", ") : msg);
+            // FIX: garantizar que formError sea siempre string.
+            // Si msg resulta ser un objeto (ej: la respuesta entera de NestJS
+            // {message, error, statusCode}) se produce React error #31 al renderizar
+            // {formError} directamente en el JSX.
+            const raw = err?.response?.data?.message;
+            let msg;
+            if (!raw) {
+                msg = "Error al guardar el catálogo.";
+            } else if (Array.isArray(raw)) {
+                msg = raw.map(item => (typeof item === "string" ? item : JSON.stringify(item))).join(", ");
+            } else if (typeof raw === "string") {
+                msg = raw;
+            } else {
+                msg = JSON.stringify(raw);
+            }
+            setFormError(msg);
             console.error("Error guardando catálogo:", err);
         } finally {
             setSaving(false);
