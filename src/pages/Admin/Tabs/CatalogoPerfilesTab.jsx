@@ -347,6 +347,22 @@ export default function CatalogoPerfilesTab() {
                         });
                     }
                 });
+                // Inyectar opciones virtuales __glass__ en todos los tipos de ventana.
+                // Permiten definir overrides condicionales según el tipo de vidrio
+                // seleccionado en el cotizador, sin necesidad de crear grupos de opción.
+                const GLASS_OPTIONS = [
+                    { key: 'VIDRIO', label: '🪟 Vidrio (no duela)' },
+                    { key: 'DUELA', label: '🪵 Vidrio tipo DUELA' },
+                ];
+                const types = Array.isArray(typesRes.data) ? typesRes.data : [];
+                types.forEach(t => {
+                    if (!optMap[t.id]) optMap[t.id] = [];
+                    GLASS_OPTIONS.forEach(go => {
+                        if (!optMap[t.id].some(ov => ov.key === go.key)) {
+                            optMap[t.id].push(go);
+                        }
+                    });
+                });
                 setOptionValuesByType(optMap);
             } catch {
                 setOptionValuesByType({});
