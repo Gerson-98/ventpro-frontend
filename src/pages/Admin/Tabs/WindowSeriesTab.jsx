@@ -97,10 +97,20 @@ export default function WindowSeriesTab() {
       const toAdd = nextIds.filter(id => !previousIds.includes(id));
       const toRemove = previousIds.filter(id => !nextIds.includes(id));
 
-      await Promise.all([
+      const results = await Promise.allSettled([
         ...toAdd.map(catId => api.post(`/window-series/${savedId}/categories/${catId}`)),
         ...toRemove.map(catId => api.delete(`/window-series/${savedId}/categories/${catId}`)),
       ]);
+
+      const failures = results.filter(r => {
+        if (r.status === 'fulfilled') return false;
+        const status = r.reason?.response?.status;
+        return status !== 409 && status !== 404; // 409=ya existe, 404=ya no existe → ambos son OK
+      });
+      if (failures.length > 0) {
+        const msg = failures[0].reason?.response?.data?.message || 'Error al vincular categorías.';
+        throw new Error(Array.isArray(msg) ? msg.join(', ') : msg);
+      }
 
       closeModal();
       fetchData();
