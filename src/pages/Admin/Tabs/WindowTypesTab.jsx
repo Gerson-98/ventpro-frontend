@@ -4,11 +4,29 @@ import { useEffect, useState, useMemo } from "react";
 import { FaPlus, FaTrashAlt, FaEdit, FaSearch, FaExclamationTriangle } from "react-icons/fa";
 import api from "@/services/api";
 
-const EMPTY_FORM = { name: "", displayName: "", description: "", pvcColorIds: [] };
+const EMPTY_FORM = {
+  name: "",
+  displayName: "",
+  description: "",
+  pvcColorIds: [],
+  series_id: "",
+  category_id: "",
+};
+
+function Spinner() {
+  return (
+    <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+    </svg>
+  );
+}
 
 export default function WindowTypesTab() {
   const [windowTypes, setWindowTypes] = useState([]);
   const [pvcColors, setPvcColors] = useState([]);
+  const [allSeries, setAllSeries] = useState([]);
+  const [allCategories, setAllCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -22,12 +40,16 @@ export default function WindowTypesTab() {
     setLoading(true);
     setError("");
     try {
-      const [typesRes, colorsRes] = await Promise.all([
+      const [typesRes, colorsRes, seriesRes, categoriesRes] = await Promise.all([
         api.get("/window-types"),
         api.get("/pvc-colors"),
+        api.get("/window-series"),
+        api.get("/window-categories"),
       ]);
       setWindowTypes(Array.isArray(typesRes.data) ? typesRes.data : []);
       setPvcColors(Array.isArray(colorsRes.data) ? colorsRes.data : []);
+      setAllSeries(Array.isArray(seriesRes.data) ? seriesRes.data : []);
+      setAllCategories(Array.isArray(categoriesRes.data) ? categoriesRes.data : []);
     } catch (err) {
       console.error("Error al obtener los datos:", err);
       setError("No se pudieron cargar los datos. Verifica que el servidor esté activo.");
@@ -38,11 +60,22 @@ export default function WindowTypesTab() {
 
   useEffect(() => { fetchData(); }, []);
 
+  // Categorías disponibles filtradas por la serie seleccionada en el formulario.
+  // Si no hay serie seleccionada se muestran todas.
+  const availableCategories = useMemo(() => {
+    if (!formData.series_id) return allCategories;
+    const series = allSeries.find(s => s.id === Number(formData.series_id));
+    if (!series?.categories?.length) return allCategories;
+    return series.categories.map(sc => sc.category).filter(Boolean);
+  }, [formData.series_id, allSeries, allCategories]);
+
   const filtered = useMemo(() =>
     windowTypes.filter(t =>
       t.name.toLowerCase().includes(search.toLowerCase()) ||
       (t.displayName || "").toLowerCase().includes(search.toLowerCase()) ||
-      (t.description || "").toLowerCase().includes(search.toLowerCase())
+      (t.description || "").toLowerCase().includes(search.toLowerCase()) ||
+      (t.series?.name || "").toLowerCase().includes(search.toLowerCase()) ||
+      (t.category?.name || "").toLowerCase().includes(search.toLowerCase())
     ), [windowTypes, search]);
 
   const handleSave = async (e) => {
@@ -63,6 +96,8 @@ export default function WindowTypesTab() {
       displayName: formData.displayName.trim() || null,
       description: formData.description.trim() || null,
       pvcColorIds: formData.pvcColorIds.map(Number),
+      series_id: formData.series_id ? Number(formData.series_id) : null,
+      category_id: formData.category_id ? Number(formData.category_id) : null,
     };
 
     setSaving(true);
@@ -72,6 +107,8 @@ export default function WindowTypesTab() {
           name: payload.name,
           displayName: payload.displayName,
           description: payload.description,
+          series_id: payload.series_id,
+          category_id: payload.category_id,
         });
       } else {
         await api.post("/window-types", payload);
@@ -105,6 +142,8 @@ export default function WindowTypesTab() {
       displayName: type.displayName || "",
       description: type.description || "",
       pvcColorIds: (type.pvcColors || []).map(c => String(c.id)),
+      series_id: type.series_id ? String(type.series_id) : "",
+      category_id: type.category_id ? String(type.category_id) : "",
     });
     setFormError("");
     setShowModal(true);
@@ -129,6 +168,11 @@ export default function WindowTypesTab() {
     setFormData(prev => ({ ...prev, pvcColorIds: selectedIds }));
   };
 
+  const handleSeriesChange = (e) => {
+    // Al cambiar la serie, resetear la categoría para forzar re-selección
+    setFormData(prev => ({ ...prev, series_id: e.target.value, category_id: "" }));
+  };
+
   return (
     <div className="bg-white p-4 sm:p-6 rounded-lg shadow-md">
 
@@ -137,7 +181,9 @@ export default function WindowTypesTab() {
         <div>
           <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">Tipos de Ventana</h2>
           <p className="text-gray-500 text-xs sm:text-sm mt-0.5">
-            Administra los tipos de ventana. El <span className="font-medium text-gray-700">Nombre Comercial</span> es el que aparece en cotizaciones y PDFs para el cliente.
+            Administra los tipos de ventana. El{" "}
+            <span className="font-medium text-gray-700">Nombre Comercial</span>{" "}
+            es el que aparece en cotizaciones y PDFs para el cliente.
           </p>
         </div>
         <button
@@ -155,7 +201,7 @@ export default function WindowTypesTab() {
         <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={13} />
         <input
           type="text"
-          placeholder="Buscar por nombre o nombre comercial..."
+          placeholder="Buscar por nombre, serie o categoría..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-full sm:max-w-sm pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
@@ -172,11 +218,8 @@ export default function WindowTypesTab() {
       {/* Contenido */}
       {loading ? (
         <div className="flex justify-center items-center py-16 text-gray-400">
-          <svg className="animate-spin w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-          </svg>
-          Cargando...
+          <Spinner />
+          <span className="ml-2">Cargando...</span>
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-16 text-gray-400 text-sm">
@@ -194,7 +237,8 @@ export default function WindowTypesTab() {
                     Nombre comercial
                     <span className="ml-1 text-gray-400 font-normal normal-case tracking-normal">(para clientes)</span>
                   </th>
-                  <th className="py-3 px-4 text-left">Colores PVC asociados</th>
+                  <th className="py-3 px-4 text-left">Serie / Categoría</th>
+                  <th className="py-3 px-4 text-left">Colores PVC</th>
                   <th className="py-3 px-4 text-center">Acciones</th>
                 </tr>
               </thead>
@@ -210,6 +254,22 @@ export default function WindowTypesTab() {
                       )}
                     </td>
                     <td className="py-2.5 px-4">
+                      <div className="flex flex-col gap-1">
+                        {t.series ? (
+                          <span className="inline-flex items-center px-2 py-0.5 text-xs rounded-full bg-purple-50 text-purple-700 border border-purple-100 w-fit">
+                            {t.series.displayName || t.series.name}
+                          </span>
+                        ) : null}
+                        {t.category ? (
+                          <span className="inline-flex items-center px-2 py-0.5 text-xs rounded-full bg-green-50 text-green-700 border border-green-100 w-fit">
+                            {t.category.displayName || t.category.name}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-amber-500 italic">Sin clasificar</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-4">
                       {t.pvcColors && t.pvcColors.length > 0 ? (
                         <div className="flex flex-wrap gap-1">
                           {t.pvcColors.map(c => (
@@ -219,7 +279,7 @@ export default function WindowTypesTab() {
                           ))}
                         </div>
                       ) : (
-                        <span className="text-xs text-gray-400 italic">Sin colores asociados</span>
+                        <span className="text-xs text-gray-400 italic">Sin colores</span>
                       )}
                     </td>
                     <td className="py-2.5 px-4 text-center">
@@ -242,35 +302,40 @@ export default function WindowTypesTab() {
           <div className="md:hidden border border-gray-200 rounded-lg overflow-hidden divide-y divide-gray-100">
             {filtered.map((t) => (
               <div key={t.id} className="p-4">
-                {/* Fila 1: nombre + acciones */}
                 <div className="flex items-start justify-between gap-2 mb-1">
                   <p className="font-semibold text-sm text-gray-900 leading-tight">{t.name}</p>
                   <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <button
-                      onClick={() => openEdit(t)}
-                      className="text-blue-500 p-1.5 rounded-lg border border-blue-100 active:bg-blue-50"
-                      title="Editar"
-                    >
+                    <button onClick={() => openEdit(t)} className="text-blue-500 p-1.5 rounded-lg border border-blue-100 active:bg-blue-50" title="Editar">
                       <FaEdit size={13} />
                     </button>
-                    <button
-                      onClick={() => handleDelete(t.id)}
-                      className="text-red-400 p-1.5 rounded-lg border border-red-100 active:bg-red-50"
-                      title="Eliminar"
-                    >
+                    <button onClick={() => handleDelete(t.id)} className="text-red-400 p-1.5 rounded-lg border border-red-100 active:bg-red-50" title="Eliminar">
                       <FaTrashAlt size={12} />
                     </button>
                   </div>
                 </div>
 
-                {/* Nombre comercial */}
                 {t.displayName ? (
-                  <p className="text-xs text-blue-700 font-medium mb-2">📋 {t.displayName}</p>
+                  <p className="text-xs text-blue-700 font-medium mb-1.5">📋 {t.displayName}</p>
                 ) : (
-                  <p className="text-xs text-amber-500 italic mb-2">Sin nombre comercial</p>
+                  <p className="text-xs text-amber-500 italic mb-1.5">Sin nombre comercial</p>
                 )}
 
-                {/* Chips de colores PVC */}
+                {/* Serie / Categoría chips */}
+                <div className="flex flex-wrap gap-1 mb-1.5">
+                  {t.series && (
+                    <span className="px-2 py-0.5 text-xs rounded-full bg-purple-50 text-purple-700 border border-purple-100">
+                      {t.series.displayName || t.series.name}
+                    </span>
+                  )}
+                  {t.category ? (
+                    <span className="px-2 py-0.5 text-xs rounded-full bg-green-50 text-green-700 border border-green-100">
+                      {t.category.displayName || t.category.name}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-amber-500 italic">Sin clasificar</span>
+                  )}
+                </div>
+
                 {t.pvcColors && t.pvcColors.length > 0 ? (
                   <div className="flex flex-wrap gap-1">
                     {t.pvcColors.map(c => (
@@ -297,7 +362,7 @@ export default function WindowTypesTab() {
       {/* ── MODAL — bottom sheet móvil / centrado sm+ ── */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white w-full flex flex-col rounded-t-2xl sm:rounded-xl h-auto max-h-[92dvh] sm:max-w-md overflow-hidden shadow-2xl border border-gray-100">
+          <div className="bg-white w-full flex flex-col rounded-t-2xl sm:rounded-xl h-auto max-h-[92dvh] sm:max-w-lg overflow-hidden shadow-2xl border border-gray-100">
 
             {/* Drag handle */}
             <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mt-3 sm:hidden" />
@@ -307,10 +372,7 @@ export default function WindowTypesTab() {
               <h3 className="text-base sm:text-lg font-semibold text-gray-800">
                 {editingType ? "Editar Tipo de Ventana" : "Nuevo Tipo de Ventana"}
               </h3>
-              <button
-                onClick={closeModal}
-                className="text-gray-400 hover:text-gray-600 w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100"
-              >
+              <button onClick={closeModal} className="text-gray-400 hover:text-gray-600 w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100">
                 ✕
               </button>
             </div>
@@ -337,8 +399,7 @@ export default function WindowTypesTab() {
               {/* Nombre comercial */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nombre comercial{" "}
-                  <span className="text-gray-400 font-normal">(opcional)</span>
+                  Nombre comercial <span className="text-gray-400 font-normal">(opcional)</span>
                 </label>
                 <input
                   type="text"
@@ -348,7 +409,7 @@ export default function WindowTypesTab() {
                   className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
                 <p className="text-xs text-gray-400 mt-1">
-                  Este nombre aparece en cotizaciones y PDFs para el cliente. Si se deja vacío, se usa el nombre interno.
+                  Aparece en cotizaciones y PDFs. Si se deja vacío, se usa el nombre interno.
                 </p>
               </div>
 
@@ -365,6 +426,44 @@ export default function WindowTypesTab() {
                   placeholder="Descripción breve del tipo de ventana..."
                 />
               </div>
+
+              {/* Serie y Categoría */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Serie</label>
+                  <select
+                    value={formData.series_id}
+                    onChange={handleSeriesChange}
+                    className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  >
+                    <option value="">Sin serie</option>
+                    {allSeries.map(s => (
+                      <option key={s.id} value={String(s.id)}>
+                        {s.displayName || s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
+                  <select
+                    value={formData.category_id}
+                    onChange={(e) => setFormData(p => ({ ...p, category_id: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    disabled={availableCategories.length === 0}
+                  >
+                    <option value="">Sin categoría</option>
+                    {availableCategories.map(c => (
+                      <option key={c.id} value={String(c.id)}>
+                        {c.displayName || c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <p className="text-xs text-gray-400 -mt-2">
+                La categoría se filtra por la serie seleccionada. Gestiona las series y sus categorías en las pestañas correspondientes.
+              </p>
 
               {/* Colores PVC */}
               <div>
@@ -414,17 +513,7 @@ export default function WindowTypesTab() {
                   disabled={saving}
                   className="px-5 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 transition disabled:opacity-60 flex items-center gap-2"
                 >
-                  {saving ? (
-                    <>
-                      <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                      </svg>
-                      Guardando...
-                    </>
-                  ) : (
-                    editingType ? "Guardar Cambios" : "Crear Tipo"
-                  )}
+                  {saving ? (<><Spinner /> Guardando...</>) : (editingType ? "Guardar Cambios" : "Crear Tipo")}
                 </button>
               </div>
             </form>

@@ -9,12 +9,35 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import AddClientModal from './AddClientModal';
-import {
-    buildSelectorList,
-    resolveWindowTypeId,
-    findGroupAndVariants,
-    WINDOW_GROUPS,
-} from '@/config/windowTypesConfig';
+
+// ─── Cache de módulo para el árbol Serie→Categoría→Tipo ──────────────────────
+// Mismo patrón que catalogCache en CatalogContext: TTL 5 min,
+// sobrevive a cierres/aperturas del modal sin volver a pegarle al backend.
+const modalStructureCache = { data: null, timestamp: null };
+const MODAL_CACHE_TTL = 5 * 60 * 1000;
+const isModalCacheValid = () =>
+    modalStructureCache.data !== null &&
+    modalStructureCache.timestamp !== null &&
+    Date.now() - modalStructureCache.timestamp < MODAL_CACHE_TTL;
+
+// ─── findCascadeInfo ──────────────────────────────────────────────────────────
+// Reverse lookup: dado un window_type_id, encuentra su seriesId y categoryId
+// en el árbol de modalStructure. Sustituye a findGroupAndVariants del config.
+function findCascadeInfo(windowTypeId, modalStructure) {
+    if (!windowTypeId || !modalStructure) return null;
+    const numId = Number(windowTypeId);
+    for (const s of modalStructure.series || []) {
+        for (const c of s.categories || []) {
+            if ((c.windowTypes || []).some(wt => wt.id === numId)) {
+                return { seriesId: String(s.id), categoryId: String(c.id) };
+            }
+        }
+    }
+    if ((modalStructure.unclassified?.windowTypes || []).some(wt => wt.id === numId)) {
+        return { seriesId: '__unclassified__', categoryId: '' };
+    }
+    return null;
+}
 
 // ─── Checkboxes: grupos que se renderizan como checkbox, NO como select ───────
 const CHECKBOX_GROUPS = new Set(['mosquitero', 'refuerzo_hojas', 'refuerzo_mosquitero']);
@@ -69,8 +92,8 @@ const emptyWindow = () => ({
     fileToUpload: null,
     design_image_url: null,
     tempId: `temp_${Date.now()}_${Math.random()}`,
-    _groupId: '',
-    _variantValues: {},
+    _seriesId: '',
+    _categoryId: '',
     _optionGroups: [],
 });
 
@@ -90,47 +113,113 @@ function buildDisplayName(typeName, typeDisplayName, options, optionGroups) {
     return parts.join(' ');
 }
 
-function WindowTypeSelector({ win, selectorList, onGroupChange, onVariantChange }) {
-    const group = WINDOW_GROUPS.find(g => g.id === win._groupId);
-    const firstSelectValue = win._groupId
-        ? win._groupId
-        : win.window_type_id
-            ? `simple_${win.window_type_id}`
-            : '';
+// ─── CascadeWindowTypeSelector ────────────────────────────────────────────────
+// Selector en cascada: Serie → Categoría → Tipo de Ventana.
+// Sustituye al antiguo WindowTypeSelector que dependía de windowTypesConfig.js.
+// El window_type_id se resuelve directamente desde el árbol, sin lookup por nombre.
+function CascadeWindowTypeSelector({ win, modalStructure, onChange }) {
+    if (!modalStructure) {
+        return <div className="text-xs text-gray-400 italic py-2">Cargando tipos...</div>;
+    }
+
+    const series = modalStructure.series || [];
+    const hasUnclassified = (modalStructure.unclassified?.windowTypes || []).length > 0;
+
+    const isUnclassified = win._seriesId === '__unclassified__';
+    const selectedSeries = isUnclassified ? null : series.find(s => String(s.id) === win._seriesId);
+    const categories = selectedSeries?.categories || [];
+    const selectedCategory = categories.find(c => String(c.id) === win._categoryId);
+    const types = isUnclassified
+        ? (modalStructure.unclassified?.windowTypes || [])
+        : (selectedCategory?.windowTypes || []);
+
+    const handleSeriesChange = (e) => {
+        onChange({
+            _seriesId: e.target.value,
+            _categoryId: '',
+            window_type_id: '',
+            displayName: '',
+            _optionGroups: [],
+            options: {},
+            color_id: '',
+            design_image_url: null,
+            fileToUpload: null,
+        });
+    };
+
+    const handleCategoryChange = (e) => {
+        onChange({
+            _categoryId: e.target.value,
+            window_type_id: '',
+            displayName: '',
+            _optionGroups: [],
+            options: {},
+            color_id: '',
+            design_image_url: null,
+            fileToUpload: null,
+        });
+    };
+
+    const handleTypeChange = (e) => {
+        onChange({ window_type_id: e.target.value });
+    };
+
+    const showCategoryStep = win._seriesId && !isUnclassified;
+    const showTypeStep = isUnclassified || (win._categoryId && selectedCategory);
 
     return (
         <div className="space-y-1.5">
+            {/* Paso 1: Serie */}
             <select
-                value={firstSelectValue}
-                onChange={(e) => onGroupChange(e.target.value)}
+                value={win._seriesId}
+                onChange={handleSeriesChange}
                 className="w-full p-2 border rounded text-sm"
                 required
             >
                 <option value="">Seleccione tipo...</option>
-                {selectorList.map(item => (
-                    <option
-                        key={item.id}
-                        value={item.isGroup ? item.id : `simple_${item.windowTypeId}`}
-                    >
-                        {item.displayName}
+                {series.map(s => (
+                    <option key={s.id} value={String(s.id)}>
+                        {s.displayName || s.name}
                     </option>
                 ))}
+                {hasUnclassified && (
+                    <option value="__unclassified__">Otros</option>
+                )}
             </select>
 
-            {group && group.steps.map((step) => (
+            {/* Paso 2: Categoría */}
+            {showCategoryStep && (
                 <select
-                    key={step.key}
-                    value={win._variantValues?.[step.key] || ''}
-                    onChange={(e) => onVariantChange(step.key, e.target.value)}
+                    value={win._categoryId}
+                    onChange={handleCategoryChange}
                     className="w-full p-2 border border-blue-300 rounded text-sm bg-blue-50"
                     required
                 >
-                    <option value="">— {step.label} —</option>
-                    {step.options.map(opt => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    <option value="">— Categoría —</option>
+                    {categories.map(c => (
+                        <option key={c.id} value={String(c.id)}>
+                            {c.displayName || c.name}
+                        </option>
                     ))}
                 </select>
-            ))}
+            )}
+
+            {/* Paso 3: Tipo de ventana */}
+            {showTypeStep && types.length > 0 && (
+                <select
+                    value={win.window_type_id ? String(win.window_type_id) : ''}
+                    onChange={handleTypeChange}
+                    className="w-full p-2 border border-blue-300 rounded text-sm bg-blue-50"
+                    required
+                >
+                    <option value="">— Tipo —</option>
+                    {types.map(t => (
+                        <option key={t.id} value={String(t.id)}>
+                            {t.displayName || t.name}
+                        </option>
+                    ))}
+                </select>
+            )}
 
             {win.displayName && (
                 <p className="text-xs text-gray-500 truncate" title={win.displayName}>
@@ -185,8 +274,32 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
         loadingCatalogs,
         addClient,
     } = useCatalog();
-    const selectorList = useMemo(() => buildSelectorList(windowTypes), [windowTypes]);
-    const catalogsLoaded = !loadingCatalogs && windowTypes.length > 0;
+
+    // ── Modal structure (Serie→Categoría→Tipo) ────────────────────────────────
+    const [modalStructure, setModalStructure] = useState(null);
+    const [loadingStructure, setLoadingStructure] = useState(false);
+
+    useEffect(() => {
+        if (!open) return;
+        if (isModalCacheValid()) {
+            setModalStructure(modalStructureCache.data);
+            return;
+        }
+        setLoadingStructure(true);
+        api.get('/window-types/modal-structure')
+            .then(res => {
+                modalStructureCache.data = res.data;
+                modalStructureCache.timestamp = Date.now();
+                setModalStructure(res.data);
+            })
+            .catch(err => {
+                console.error('Error cargando estructura del modal:', err);
+            })
+            .finally(() => setLoadingStructure(false));
+    }, [open]);
+
+    const catalogsLoaded = !loadingCatalogs && !loadingStructure && windowTypes.length > 0 && modalStructure !== null;
+
     const [showAddClientModal, setShowAddClientModal] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -393,7 +506,15 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                     const optGroups = win.window_type_id
                         ? await loadOptionGroups(win.window_type_id)
                         : [];
-                    return { ...win, _optionGroups: optGroups };
+                    // Reconstruir estado de cascada desde la estructura del backend.
+                    // Borradores antiguos tienen _groupId/_variantValues (ignorados).
+                    const cascade = findCascadeInfo(win.window_type_id, modalStructureCache.data);
+                    return {
+                        ...win,
+                        _optionGroups: optGroups,
+                        _seriesId: cascade?.seriesId ?? win._seriesId ?? '',
+                        _categoryId: cascade?.categoryId ?? win._categoryId ?? '',
+                    };
                 })
             );
             setQuotation({
@@ -445,12 +566,8 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                 const sortedWins = [...(quotationToEdit.quotation_windows || [])]
                     .sort((a, b) => (a.id || 0) - (b.id || 0));
 
-                // ── FIX: Pre-cargar option groups secuencialmente por tipo único ──
-                // Sin esto, si hay N ventanas con tipos distintos y el cache está
-                // vacío, se disparan N llamadas simultáneas a /window-type-options
-                // → 429 en cascada cuando el backend recién despertó en Render.
-                // Con la carga secuencial, el cache se llena antes del Promise.all
-                // y las llamadas subsiguientes retornan instantáneamente del cache.
+                // Pre-cargar option groups secuencialmente por tipo único para evitar
+                // 429 en cascada cuando el backend recién despertó en Render.
                 const uniqueTypeIds = [...new Set(
                     sortedWins.map(w => w.window_type_id).filter(Boolean)
                 )];
@@ -460,8 +577,10 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
 
                 const windows = await Promise.all(
                     sortedWins.map(async (win) => {
-                        const found = findGroupAndVariants(win.window_type_id, windowTypes);
-                        // Ahora viene del cache — sin llamada HTTP adicional
+                        // findCascadeInfo reemplaza a findGroupAndVariants del config hardcodeado.
+                        // Reconstruye el estado de navegación (_seriesId, _categoryId) desde
+                        // el árbol que devuelve el backend.
+                        const cascade = findCascadeInfo(win.window_type_id, modalStructure);
                         const optionGroups = win.window_type_id
                             ? await loadOptionGroups(win.window_type_id)
                             : [];
@@ -485,8 +604,8 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                             design_image_url: win.design_image_url || null,
                             fileToUpload: null,
                             tempId: `existing_${win.id}`,
-                            _groupId: found?.groupId || '',
-                            _variantValues: found?.variantValues || {},
+                            _seriesId: cascade?.seriesId || '',
+                            _categoryId: cascade?.categoryId || '',
                             _optionGroups: optionGroups,
                         };
                     })
@@ -538,15 +657,11 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                 }
                             });
                             setWindowCosts(newCosts);
-                            // Actualizar totales de cotización con el recálculo fresco (global bin-packing)
-                            // para que coincidan exactamente con los valores mostrados al crear.
                             setQuotationPrecioSugerido(res.data?.precio_sugerido_minimo || 0);
                             setQuotationCostoTotal(res.data?.costo_total_proyecto || 0);
                         } catch {
-                            // ── FIX: NO disparar calculateWindowCost individual por cada ventana ──
-                            // El catch anterior hacía: for (const win of windows) calculateWindowCost(win)
-                            // Eso causaba N llamadas simultáneas a /window-type-options cuando el
-                            // backend recién despertó → 429 en cascada.
+                            // FIX: NO disparar calculateWindowCost individual por cada ventana.
+                            // Causaría N llamadas simultáneas → 429 cuando el backend recién despertó.
                             // Los costos se recalcularán cuando el usuario edite cualquier ventana.
                             console.warn('Costos no calculados al abrir (backend ocupado) — se recalcularán al editar.');
                         }
@@ -578,9 +693,6 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                         });
                         setWindowCosts(newCosts);
                     } catch {
-                        // ── FIX: NO disparar calculateWindowCost individual por cada ventana ──
-                        // Mismo problema que el catch anterior — N llamadas → 429.
-                        // Los costos se recalcularán cuando el usuario edite cualquier ventana.
                         console.warn('Costos no calculados al abrir (backend ocupado) — se recalcularán al editar.');
                     }
                 }
@@ -605,86 +717,42 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, catalogsLoaded]);
 
-    const handleGroupChange = async (index, value) => {
-        const isSimple = value.startsWith('simple_');
-        let wtId = null;
-        let wtName = '';
-        let optionGroups = [];
-        if (isSimple) {
-            wtId = Number(value.replace('simple_', ''));
+    // ─── handleCascadeChange ──────────────────────────────────────────────────
+    // Reemplaza handleGroupChange + handleVariantChange del sistema anterior.
+    // patch puede contener: _seriesId, _categoryId, window_type_id, y campos
+    // de reset (displayName, _optionGroups, options, color_id, design_image_url).
+    // Cuando window_type_id cambia a un valor real, carga los option groups.
+    const handleCascadeChange = async (index, patch) => {
+        // Aplicar el patch inmediatamente para que la UI responda sin esperar
+        setQuotation(prev => ({
+            ...prev,
+            windows: prev.windows.map((w, i) => i === index ? { ...w, ...patch } : w),
+        }));
+
+        // Si se está seleccionando un tipo concreto, cargar sus opciones
+        if (patch.window_type_id) {
+            const wtId = Number(patch.window_type_id);
+            const optionGroups = await loadOptionGroups(wtId);
+            const defaultOptions = applyCheckboxDefaults({}, optionGroups, wtId);
             const wt = windowTypes.find(w => w.id === wtId);
-            wtName = wt?.name || '';
-            optionGroups = await loadOptionGroups(wtId);
-        }
-        setQuotation(prev => {
-            const updatedWindows = prev.windows.map((win, i) => {
-                if (i !== index) return win;
-                if (isSimple) {
-                    const newType = windowTypes.find(w => w.id === wtId);
-                    const allowedIds = new Set((newType?.pvcLinks || []).map(l => l.pvcColor_id));
-                    const defaultOptions = applyCheckboxDefaults({}, optionGroups, wtId);
+            const allowedColorIds = new Set((wt?.pvcLinks || []).map(l => l.pvcColor_id));
+
+            setQuotation(prev => ({
+                ...prev,
+                windows: prev.windows.map((w, i) => {
+                    if (i !== index) return w;
                     return {
-                        ...win,
+                        ...w,
+                        ...patch,
                         window_type_id: wtId,
-                        displayName: newType?.displayName || wtName,
-                        options: defaultOptions,
-                        color_id: allowedIds.has(Number(win.color_id)) ? win.color_id : '',
-                        _groupId: '',
-                        _variantValues: {},
+                        displayName: wt?.displayName || wt?.name || '',
                         _optionGroups: optionGroups,
+                        options: defaultOptions,
+                        color_id: allowedColorIds.has(Number(w.color_id)) ? w.color_id : '',
                         design_image_url: null,
                         fileToUpload: null,
                     };
-                }
-                return {
-                    ...win,
-                    window_type_id: '',
-                    displayName: '',
-                    options: {},
-                    color_id: '',
-                    _groupId: value,
-                    _variantValues: {},
-                    _optionGroups: [],
-                    design_image_url: null,
-                    fileToUpload: null,
-                };
-            });
-            return { ...prev, windows: updatedWindows };
-        });
-    };
-
-    const handleVariantChange = async (index, stepKey, stepValue) => {
-        let resolvedId = null;
-        setQuotation(prev => {
-            const win = prev.windows[index];
-            const newVariants = { ...win._variantValues, [stepKey]: stepValue };
-            resolvedId = resolveWindowTypeId(win._groupId, newVariants, windowTypes);
-            const resolvedType = resolvedId ? windowTypes.find(wt => wt.id === resolvedId) : null;
-            const updatedWindows = prev.windows.map((w, i) => {
-                if (i !== index) return w;
-                const allowedIds = new Set((resolvedType?.pvcLinks || []).map(l => l.pvcColor_id));
-                return {
-                    ...w,
-                    _variantValues: newVariants,
-                    window_type_id: resolvedId || '',
-                    displayName: resolvedType?.displayName || resolvedType?.name || '',
-                    options: {},
-                    color_id: (resolvedId && allowedIds.has(Number(w.color_id))) ? w.color_id : '',
-                    _optionGroups: [],
-                    design_image_url: null,
-                    fileToUpload: null,
-                };
-            });
-            return { ...prev, windows: updatedWindows };
-        });
-        if (resolvedId) {
-            const optionGroups = await loadOptionGroups(resolvedId);
-            const defaultOptions = applyCheckboxDefaults({}, optionGroups, resolvedId);
-            setQuotation(prev => ({
-                ...prev,
-                windows: prev.windows.map((w, i) =>
-                    i === index ? { ...w, _optionGroups: optionGroups, options: defaultOptions } : w
-                ),
+                }),
             }));
         }
     };
@@ -790,7 +858,8 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             height_m: '',
             quantity: 1,
             options: { ...src.options },
-            _variantValues: { ...src._variantValues },
+            _seriesId: src._seriesId,
+            _categoryId: src._categoryId,
             _optionGroups: [...(src._optionGroups || [])],
             tempId: `temp_${Date.now()}_${Math.random()}`,
         };
@@ -1306,11 +1375,10 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                                         <Fragment key={win.tempId || win.id}>
                                                             <tr className="border-b align-top hover:bg-gray-50">
                                                                 <td className="p-2">
-                                                                    <WindowTypeSelector
+                                                                    <CascadeWindowTypeSelector
                                                                         win={win}
-                                                                        selectorList={selectorList}
-                                                                        onGroupChange={(val) => handleGroupChange(index, val)}
-                                                                        onVariantChange={(key, val) => handleVariantChange(index, key, val)}
+                                                                        modalStructure={modalStructure}
+                                                                        onChange={(patch) => handleCascadeChange(index, patch)}
                                                                     />
                                                                 </td>
                                                                 <td className="p-2">

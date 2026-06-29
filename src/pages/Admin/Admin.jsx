@@ -2,6 +2,8 @@
 
 import React, { useState } from "react";
 import WindowTypesTab from "./Tabs/WindowTypesTab";
+import WindowSeriesTab from "./Tabs/WindowSeriesTab";
+import WindowCategoriesTab from "./Tabs/WindowCategoriesTab";
 import PvcColorsTab from "./Tabs/PvcColorsTab";
 import GlassColorsTab from "./Tabs/GlassColorsTab";
 import ClientsTab from "./Tabs/ClientsTab";
@@ -20,6 +22,8 @@ export default function Admin() {
 
   const tabs = [
     { id: "windowTypes", label: "Tipos de Ventana" },
+    { id: "windowSeries", label: "Series" },
+    { id: "windowCategories", label: "Categorías" },
     { id: "catalogoPerfiles", label: "Catálogo de Perfiles" },
     { id: "calculations", label: "Ajustes de Cálculo" },
     { id: "accessoryRules", label: "Reglas de Accesorios" },
@@ -66,6 +70,8 @@ export default function Admin() {
       {/* Contenido */}
       <div className="bg-white p-3 sm:p-4 rounded-lg shadow-sm">
         {activeTab === "windowTypes" && <WindowTypesTab />}
+        {activeTab === "windowSeries" && <WindowSeriesTab />}
+        {activeTab === "windowCategories" && <WindowCategoriesTab />}
         {activeTab === "catalogoPerfiles" && <CatalogoPerfilesTab />}
         {activeTab === "calculations" && <CalculationsTab />}
         {activeTab === "accessoryRules" && <AccessoryRulesTab />}
