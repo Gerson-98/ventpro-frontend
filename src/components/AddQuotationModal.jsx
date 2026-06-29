@@ -148,8 +148,11 @@ function CascadeWindowTypeSelector({ win, modalStructure, onChange }) {
     };
 
     const handleCategoryChange = (e) => {
-        onChange({
-            _categoryId: e.target.value,
+        const catId = e.target.value;
+        const cat = categories.find(c => String(c.id) === catId);
+        const catTypes = cat?.windowTypes || [];
+        const patch = {
+            _categoryId: catId,
             window_type_id: '',
             displayName: '',
             _optionGroups: [],
@@ -157,7 +160,12 @@ function CascadeWindowTypeSelector({ win, modalStructure, onChange }) {
             color_id: '',
             design_image_url: null,
             fileToUpload: null,
-        });
+        };
+        // Si la categoría tiene un solo tipo, seleccionarlo automáticamente
+        if (catTypes.length === 1) {
+            patch.window_type_id = String(catTypes[0].id);
+        }
+        onChange(patch);
     };
 
     const handleTypeChange = (e) => {
@@ -165,7 +173,9 @@ function CascadeWindowTypeSelector({ win, modalStructure, onChange }) {
     };
 
     const showCategoryStep = win._seriesId && !isUnclassified;
-    const showTypeStep = isUnclassified || (win._categoryId && selectedCategory);
+    // Si la categoría tiene un solo tipo ya fue auto-seleccionado → no mostrar dropdown redundante
+    const singleTypeCategory = !isUnclassified && types.length === 1 && win._categoryId;
+    const showTypeStep = !singleTypeCategory && (isUnclassified || (win._categoryId && selectedCategory));
 
     return (
         <div className="space-y-1.5">
