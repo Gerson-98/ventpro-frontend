@@ -12,6 +12,21 @@ const EMPTY_FORM = {
   linkedCategoryIds: [],
 };
 
+// Reintenta una request una vez si falla con 5xx (cold-start de Render).
+// 409 y 404 se tratan como éxito (operación ya aplicada).
+async function withRetry(fn) {
+  try {
+    return await fn();
+  } catch (err) {
+    const status = err?.response?.status;
+    if (status >= 500) {
+      await new Promise(res => setTimeout(res, 1000));
+      return fn();
+    }
+    throw err;
+  }
+}
+
 function Spinner() {
   return (
     <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
@@ -98,8 +113,8 @@ export default function WindowSeriesTab() {
       const toRemove = previousIds.filter(id => !nextIds.includes(id));
 
       const results = await Promise.allSettled([
-        ...toAdd.map(catId => api.post(`/window-series/${savedId}/categories/${catId}`)),
-        ...toRemove.map(catId => api.delete(`/window-series/${savedId}/categories/${catId}`)),
+        ...toAdd.map(catId => withRetry(() => api.post(`/window-series/${savedId}/categories/${catId}`))),
+        ...toRemove.map(catId => withRetry(() => api.delete(`/window-series/${savedId}/categories/${catId}`))),
       ]);
 
       const failures = results.filter(r => {
