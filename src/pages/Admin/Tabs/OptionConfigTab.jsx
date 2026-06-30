@@ -56,8 +56,9 @@ export default function OptionConfigTab() {
 
     const [newGroupForm, setNewGroupForm] = useState({ key: '', label: '' });
     const [editGroupForm, setEditGroupForm] = useState({ label: '' });
-    const [newValueForm, setNewValueForm] = useState({ key: '', label: '' });
-    const [editValueForm, setEditValueForm] = useState({ label: '' });
+    const EMPTY_VALUE_CONDITIONS = { depends_on_group_key: '', depends_on_value_key: '', forces_mosquitero: '' };
+    const [newValueForm, setNewValueForm] = useState({ key: '', label: '', ...EMPTY_VALUE_CONDITIONS });
+    const [editValueForm, setEditValueForm] = useState({ label: '', ...EMPTY_VALUE_CONDITIONS });
     const [saving, setSaving] = useState(false);
     const [formError, setFormError] = useState('');
 
@@ -120,6 +121,13 @@ export default function OptionConfigTab() {
     };
 
     // ── CRUD Valor ────────────────────────────────────────────────────────────
+    // Convierte el sentinel "" del form a null para enviar al backend
+    const conditionsPayload = (form) => ({
+        depends_on_group_key: form.depends_on_group_key || null,
+        depends_on_value_key: form.depends_on_group_key ? (form.depends_on_value_key || null) : null,
+        forces_mosquitero: form.forces_mosquitero === '' ? null : form.forces_mosquitero === 'true',
+    });
+
     const handleCreateValue = async (e) => {
         e.preventDefault();
         setFormError('');
@@ -129,9 +137,10 @@ export default function OptionConfigTab() {
                 group_id: modalNewValue.id,
                 key: newValueForm.key,
                 label: newValueForm.label,
+                ...conditionsPayload(newValueForm),
             });
             setModalNewValue(null);
-            setNewValueForm({ key: '', label: '' });
+            setNewValueForm({ key: '', label: '', ...EMPTY_VALUE_CONDITIONS });
             loadGroups();
         } catch (err) {
             const msg = err?.response?.data?.message;
@@ -144,7 +153,10 @@ export default function OptionConfigTab() {
         setFormError('');
         setSaving(true);
         try {
-            await api.patch(`/option-values/${modalEditValue.id}`, { label: editValueForm.label });
+            await api.patch(`/option-values/${modalEditValue.id}`, {
+                label: editValueForm.label,
+                ...conditionsPayload(editValueForm),
+            });
             setModalEditValue(null);
             loadGroups();
         } catch (err) {
@@ -206,6 +218,59 @@ export default function OptionConfigTab() {
             </div>
         </>
     );
+
+    // ── Campos de condiciones: visibilidad condicional + auto-mosquitero ──────
+    const ConditionFields = ({ form, onChange, currentGroupKey }) => {
+        const depGroup = groups.find(g => g.key === form.depends_on_group_key);
+        return (
+            <div className="border-t border-slate-100 pt-3 mt-1 space-y-3">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Avanzado (opcional)</p>
+                <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">
+                        Solo mostrar esta opción si...
+                    </label>
+                    <div className="flex gap-2">
+                        <select
+                            value={form.depends_on_group_key}
+                            onChange={(e) => onChange({ ...form, depends_on_group_key: e.target.value, depends_on_value_key: '' })}
+                            className="flex-1 border border-slate-300 rounded-lg p-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-slate-400"
+                        >
+                            <option value="">— Sin condición —</option>
+                            {groups.filter(g => g.key !== currentGroupKey).map(g => (
+                                <option key={g.key} value={g.key}>{g.label} ({g.key})</option>
+                            ))}
+                        </select>
+                        {form.depends_on_group_key && (
+                            <select
+                                value={form.depends_on_value_key}
+                                onChange={(e) => onChange({ ...form, depends_on_value_key: e.target.value })}
+                                className="flex-1 border border-slate-300 rounded-lg p-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-slate-400"
+                            >
+                                <option value="">— valor —</option>
+                                {(depGroup?.values || []).map(v => (
+                                    <option key={v.key} value={v.key}>{v.label}</option>
+                                ))}
+                            </select>
+                        )}
+                    </div>
+                </div>
+                <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">
+                        Mosquitero al elegir esta opción
+                    </label>
+                    <select
+                        value={form.forces_mosquitero}
+                        onChange={(e) => onChange({ ...form, forces_mosquitero: e.target.value })}
+                        className="w-full border border-slate-300 rounded-lg p-2 text-xs focus:outline-none focus:ring-2 focus:ring-slate-400"
+                    >
+                        <option value="">Libre — el usuario decide</option>
+                        <option value="true">Siempre con mosquitero (oculta el toggle)</option>
+                        <option value="false">Siempre sin mosquitero (oculta el toggle)</option>
+                    </select>
+                </div>
+            </div>
+        );
+    };
 
     const ModalButtons = ({ onCancel, saving, submitLabel }) => (
         <div className="flex gap-2 pt-2">
@@ -308,13 +373,32 @@ export default function OptionConfigTab() {
                                     <div key={value.id} className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 hover:bg-slate-50 transition-colors">
                                         <span className="w-1.5 h-1.5 rounded-full bg-slate-300 flex-shrink-0 ml-3 sm:ml-4" />
                                         <span className="text-sm text-slate-700 flex-1 min-w-0">{value.label}</span>
+                                        {value.depends_on_group_key && (
+                                            <span className="hidden sm:block text-xs text-orange-600 bg-orange-50 border border-orange-100 px-1.5 py-0.5 rounded flex-shrink-0" title={`Solo visible si ${value.depends_on_group_key} = ${value.depends_on_value_key}`}>
+                                                si {value.depends_on_group_key}={value.depends_on_value_key}
+                                            </span>
+                                        )}
+                                        {value.forces_mosquitero !== null && value.forces_mosquitero !== undefined && (
+                                            <span className="hidden sm:block text-xs text-cyan-700 bg-cyan-50 border border-cyan-100 px-1.5 py-0.5 rounded flex-shrink-0">
+                                                {value.forces_mosquitero ? '🦟 con mosq.' : '🚫 sin mosq.'}
+                                            </span>
+                                        )}
                                         {/* key badge — se oculta en móvil muy pequeño */}
                                         <span className="hidden xs:block font-mono text-xs text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded flex-shrink-0">
                                             {value.key}
                                         </span>
                                         <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
                                             <button
-                                                onClick={() => { setEditValueForm({ label: value.label }); setFormError(''); setModalEditValue(value); }}
+                                                onClick={() => {
+                                                    setEditValueForm({
+                                                        label: value.label,
+                                                        depends_on_group_key: value.depends_on_group_key || '',
+                                                        depends_on_value_key: value.depends_on_value_key || '',
+                                                        forces_mosquitero: value.forces_mosquitero === null || value.forces_mosquitero === undefined ? '' : String(value.forces_mosquitero),
+                                                    });
+                                                    setFormError('');
+                                                    setModalEditValue(value);
+                                                }}
                                                 className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                                                 title="Editar nombre"
                                             >
@@ -399,6 +483,7 @@ export default function OptionConfigTab() {
                             onKeyChange={(v) => setNewValueForm(p => ({ ...p, key: v }))}
                             onLabelChange={(v) => setNewValueForm(p => ({ ...p, label: v }))}
                         />
+                        <ConditionFields form={newValueForm} onChange={setNewValueForm} currentGroupKey={modalNewValue?.key} />
                         {formError && (
                             <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-2">{formError}</p>
                         )}
@@ -415,8 +500,9 @@ export default function OptionConfigTab() {
                             keyReadOnly
                             keyReadOnlyValue={modalEditValue.key}
                             labelVal={editValueForm.label}
-                            onLabelChange={(v) => setEditValueForm({ label: v })}
+                            onLabelChange={(v) => setEditValueForm(p => ({ ...p, label: v }))}
                         />
+                        <ConditionFields form={editValueForm} onChange={setEditValueForm} currentGroupKey={modalEditValue?.group?.key} />
                         {formError && (
                             <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-2">{formError}</p>
                         )}

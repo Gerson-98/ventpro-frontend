@@ -826,6 +826,34 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                 }
             } else {
                 newOptions[optionName] = optionValue;
+
+                // ── Auto-mosquitero: si el valor elegido fuerza un estado, aplicarlo
+                // y dejar de pedirle al usuario que lo seleccione manualmente ──────
+                const changedGroup = (win._optionGroups || []).find(wto => wto.group.key === optionName);
+                const valueObj = changedGroup?.group.values.find(v => v.key === optionValue);
+                if (valueObj && valueObj.forces_mosquitero !== null && valueObj.forces_mosquitero !== undefined) {
+                    newOptions.mosquitero = valueObj.forces_mosquitero ? 'con_mosquitero' : 'sin_mosquitero';
+                    if (!valueObj.forces_mosquitero) {
+                        const { refuerzo_mosquitero: _rm, ...rest } = newOptions;
+                        newOptions = rest;
+                    }
+                }
+
+                // ── Limpiar selecciones de grupos dependientes que ya no aplican ──
+                // (ej: si cambia "afuera"→"adentro", la opción de tipo_cierre elegida
+                // antes para "afuera" deja de ser válida)
+                (win._optionGroups || []).forEach(wto2 => {
+                    const currentVal = newOptions[wto2.group.key];
+                    if (!currentVal) return;
+                    const currentValObj = wto2.group.values.find(v => v.key === currentVal);
+                    if (
+                        currentValObj?.depends_on_group_key === optionName &&
+                        currentValObj.depends_on_value_key !== optionValue
+                    ) {
+                        const { [wto2.group.key]: _stale, ...rest } = newOptions;
+                        newOptions = rest;
+                    }
+                });
             }
 
             const newWindow = { ...win, options: newOptions };
@@ -1380,6 +1408,14 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                                     const optionGroups = win._optionGroups || [];
                                                     const showUpload = optionGroups.some(wto => wto.group.key === 'diseno')
                                                         && win.options?.diseno === 'con_diseno';
+                                                    // Mosquitero forzado: si la opción elegida en algún grupo define
+                                                    // forces_mosquitero, el toggle manual se oculta del cotizador.
+                                                    const mosquiteroForced = optionGroups.some(wto =>
+                                                        wto.group.values.some(v =>
+                                                            v.key === win.options?.[wto.group.key] &&
+                                                            (v.forces_mosquitero === true || v.forces_mosquitero === false)
+                                                        )
+                                                    );
 
                                                     return (
                                                         <Fragment key={win.tempId || win.id}>
@@ -1451,14 +1487,16 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                                                             required
                                                                         >
                                                                             <option value="">{wto.group.label}...</option>
-                                                                            {wto.group.values.map(v => (
-                                                                                <option key={v.key} value={v.key}>{v.label}</option>
-                                                                            ))}
+                                                                            {wto.group.values
+                                                                                .filter(v => !v.depends_on_group_key || win.options?.[v.depends_on_group_key] === v.depends_on_value_key)
+                                                                                .map(v => (
+                                                                                    <option key={v.key} value={v.key}>{v.label}</option>
+                                                                                ))}
                                                                         </select>
                                                                     ))}
-                                                                    {optionGroups.filter(wto => CHECKBOX_GROUPS.has(wto.group.key)).length > 0 && (
+                                                                    {optionGroups.filter(wto => CHECKBOX_GROUPS.has(wto.group.key) && !(wto.group.key === 'mosquitero' && mosquiteroForced)).length > 0 && (
                                                                         <div className="flex flex-col gap-1 pt-0.5">
-                                                                            {optionGroups.filter(wto => CHECKBOX_GROUPS.has(wto.group.key)).map(wto => {
+                                                                            {optionGroups.filter(wto => CHECKBOX_GROUPS.has(wto.group.key) && !(wto.group.key === 'mosquitero' && mosquiteroForced)).map(wto => {
                                                                                 const groupKey = wto.group.key;
                                                                                 const activeValue = CHECKBOX_ACTIVE_VALUE[groupKey];
                                                                                 const isChecked = win.options?.[groupKey] === activeValue;

@@ -12,7 +12,19 @@ const EMPTY_FORM = {
     isFija: true,
     option_group: "",
     option_key: "",
+    useFormula: false,
+    formula_type: "PER_BARRA",
+    formula_slot: "marco",
+    formula_factor: 1,
 };
+
+const FORMULA_SLOTS = [
+    { value: "marco", label: "Marco" },
+    { value: "hoja", label: "Hoja" },
+    { value: "mosquitero", label: "Mosquitero" },
+    { value: "batiente", label: "Batiente" },
+    { value: "tapajamba", label: "Tapajamba" },
+];
 
 // ─── Subcomponente: badge de tipo de regla ────────────────────────────────────
 function RuleBadge({ rule }) {
@@ -135,6 +147,10 @@ export default function AccessoryRulesTab() {
             isFija: !rule.option_group,
             option_group: rule.option_group ?? "",
             option_key: rule.option_key ?? "",
+            useFormula: !!rule.formula_type,
+            formula_type: rule.formula_type ?? "PER_BARRA",
+            formula_slot: rule.formula_slot ?? "marco",
+            formula_factor: rule.formula_factor ?? 1,
         });
         setFormError("");
         setShowModal(true);
@@ -170,6 +186,9 @@ export default function AccessoryRulesTab() {
             quantity: Number(formData.quantity) || 1,
             option_group: formData.isFija ? null : formData.option_group,
             option_key: formData.isFija ? null : formData.option_key,
+            formula_type: formData.useFormula ? formData.formula_type : null,
+            formula_slot: formData.useFormula ? formData.formula_slot : null,
+            formula_factor: formData.useFormula ? (Number(formData.formula_factor) || 1) : null,
         };
 
         setSaving(true);
@@ -347,7 +366,11 @@ export default function AccessoryRulesTab() {
                                                                     {rule.material?.name ?? getMatName(rule.material_id)}
                                                                 </td>
                                                                 <td className="py-2 px-3 text-center font-mono font-bold text-gray-700">
-                                                                    {rule.quantity}
+                                                                    {rule.formula_type ? (
+                                                                        <span className="text-purple-600 text-xs font-semibold" title={`${rule.formula_type} × ${rule.formula_factor} sobre ${rule.formula_slot}`}>
+                                                                            ƒ {rule.formula_factor}×{rule.formula_slot}
+                                                                        </span>
+                                                                    ) : rule.quantity}
                                                                 </td>
                                                                 <td className="py-2 px-3">
                                                                     <RuleBadge rule={rule} />
@@ -483,16 +506,74 @@ export default function AccessoryRulesTab() {
                                 </select>
                             </div>
 
-                            {/* Cantidad */}
+                            {/* Cantidad fija o por fórmula */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Cantidad</label>
-                                <input
-                                    type="number"
-                                    min="1"
-                                    value={formData.quantity}
-                                    onChange={(e) => setField("quantity", e.target.value)}
-                                    className="w-24 border border-gray-300 rounded-lg p-2.5 text-sm text-center font-mono font-bold focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                />
+                                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.useFormula}
+                                        onChange={(e) => setField("useFormula", e.target.checked)}
+                                        className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                                    />
+                                    Cantidad calculada por fórmula (en vez de fija)
+                                </label>
+
+                                {formData.useFormula ? (
+                                    <div className="p-3 bg-purple-50 rounded-lg border border-purple-100 space-y-2">
+                                        <p className="text-xs text-purple-700">
+                                            Ej: "5 metros de empaque por cada barra de mosquitero" → tipo: Por barra, slot: Mosquitero, factor: 5
+                                        </p>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <label className="block text-xs text-gray-600 mb-1">Basado en</label>
+                                                <select
+                                                    value={formData.formula_type}
+                                                    onChange={(e) => setField("formula_type", e.target.value)}
+                                                    className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-purple-400 focus:outline-none"
+                                                >
+                                                    <option value="PER_BARRA">Barras del perfil</option>
+                                                    <option value="PER_M2">Área (m²) del perfil</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs text-gray-600 mb-1">Perfil (slot)</label>
+                                                <select
+                                                    value={formData.formula_slot}
+                                                    onChange={(e) => setField("formula_slot", e.target.value)}
+                                                    className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-purple-400 focus:outline-none"
+                                                >
+                                                    {FORMULA_SLOTS.map(s => (
+                                                        <option key={s.value} value={s.value}>{s.label}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs text-gray-600 mb-1">
+                                                Factor (cantidad = {formData.formula_type === "PER_M2" ? "m²" : "barras"} × factor)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                step="0.1"
+                                                min="0"
+                                                value={formData.formula_factor}
+                                                onChange={(e) => setField("formula_factor", e.target.value)}
+                                                className="w-28 border border-gray-300 rounded-lg p-2 text-sm text-center font-mono font-bold focus:ring-2 focus:ring-purple-400 focus:outline-none"
+                                            />
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-600 mb-1">Cantidad fija</label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            value={formData.quantity}
+                                            onChange={(e) => setField("quantity", e.target.value)}
+                                            className="w-24 border border-gray-300 rounded-lg p-2.5 text-sm text-center font-mono font-bold focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                        />
+                                    </div>
+                                )}
                             </div>
 
                             {/* Toggle fija/condicional */}
