@@ -1417,8 +1417,11 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                                         ? glassColors
                                                         : glassColors.filter(c => !c.name.toUpperCase().includes('DUELA'));
                                                     const optionGroups = win._optionGroups || [];
-                                                    const showUpload = optionGroups.some(wto => wto.group.key === 'diseno')
-                                                        && win.options?.diseno === 'con_diseno';
+                                                    // Imagen de referencia: opcional y siempre visible si el tipo lo permite
+                                                    // (allows_reference_image), o el flujo legado vía grupo "diseno"=con_diseno
+                                                    // para tipos que aún no migran a este flag.
+                                                    const showUpload = winType?.allows_reference_image
+                                                        || (optionGroups.some(wto => wto.group.key === 'diseno') && win.options?.diseno === 'con_diseno');
                                                     // Mosquitero forzado: si la opción elegida en algún grupo define
                                                     // forces_mosquitero, el toggle manual se oculta del cotizador.
                                                     const mosquiteroForced = optionGroups.some(wto =>
