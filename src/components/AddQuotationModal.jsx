@@ -746,11 +746,14 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             const defaultOptions = applyCheckboxDefaults({}, optionGroups, wtId);
             const wt = windowTypes.find(w => w.id === wtId);
             const allowedColorIds = new Set((wt?.pvcLinks || []).map(l => l.pvcColor_id));
+            const allowsDuela = wt?.allows_duela !== false;
 
             setQuotation(prev => ({
                 ...prev,
                 windows: prev.windows.map((w, i) => {
                     if (i !== index) return w;
+                    const currentGlass = glassColors.find(gc => gc.id === Number(w.glass_color_id));
+                    const glassIsDuela = currentGlass?.name.toUpperCase().includes('DUELA');
                     return {
                         ...w,
                         ...patch,
@@ -759,6 +762,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                         _optionGroups: optionGroups,
                         options: defaultOptions,
                         color_id: allowedColorIds.has(Number(w.color_id)) ? w.color_id : '',
+                        glass_color_id: (!allowsDuela && glassIsDuela) ? '' : w.glass_color_id,
                         design_image_url: null,
                         fileToUpload: null,
                     };
@@ -1405,6 +1409,13 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                                 {quotation.windows.map((win, index) => {
                                                     const selectedGlass = glassColors.find(gc => gc.id === Number(win.glass_color_id));
                                                     const needsAddGlass = selectedGlass?.name.toUpperCase() === 'VIDRIO Y DUELA';
+                                                    // Si el tipo de ventana no admite DUELA (ej: batiente solo compatible con vidrio),
+                                                    // se oculta del selector — configurable por tipo desde el Admin.
+                                                    const winType = windowTypes.find(wt => wt.id === Number(win.window_type_id));
+                                                    const allowsDuela = winType?.allows_duela !== false;
+                                                    const availableGlassColors = allowsDuela
+                                                        ? glassColors
+                                                        : glassColors.filter(c => !c.name.toUpperCase().includes('DUELA'));
                                                     const optionGroups = win._optionGroups || [];
                                                     const showUpload = optionGroups.some(wto => wto.group.key === 'diseno')
                                                         && win.options?.diseno === 'con_diseno';
@@ -1591,7 +1602,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                                                         className="w-full p-2 border rounded text-xs"
                                                                     >
                                                                         <option value="">Seleccione...</option>
-                                                                        {glassColors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                                                        {availableGlassColors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                                                     </select>
                                                                     {needsAddGlass && (
                                                                         <select
