@@ -22,6 +22,7 @@ const EMPTY_FORM = {
     price_white: "",
     price_color: "",
     unit: "barra",
+    coverage_per_unit: "",
 };
 
 // ─── Helper: badge de tipo ────────────────────────────────────────────────────
@@ -112,6 +113,7 @@ export default function MaterialsTab() {
             price_white: mat.price_white ?? "",
             price_color: mat.price_color ?? "",
             unit: mat.unit ?? "barra",
+            coverage_per_unit: mat.coverage_per_unit ?? "",
         });
         setFormError("");
         setShowModal(true);
@@ -144,6 +146,7 @@ export default function MaterialsTab() {
             price_white: Number(formData.price_white),
             price_color: formData.price_color !== "" ? Number(formData.price_color) : null,
             unit: formData.unit,
+            coverage_per_unit: formData.coverage_per_unit !== "" ? Number(formData.coverage_per_unit) : null,
         };
 
         setSaving(true);
@@ -538,6 +541,25 @@ export default function MaterialsTab() {
                                         Si se deja vacío, se usará el precio blanco.
                                     </p>
                                 </div>
+                            </div>
+
+                            {/* Cobertura por unidad — para materiales usados en reglas de accesorio con fórmula */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Cobertura por unidad
+                                    <span className="text-gray-400 text-xs ml-1">(opcional)</span>
+                                </label>
+                                <input
+                                    type="number" step="0.01" min="0"
+                                    placeholder="Ej: 100"
+                                    value={formData.coverage_per_unit}
+                                    onChange={(e) => setFormData({ ...formData, coverage_per_unit: e.target.value })}
+                                    className="w-full border border-gray-300 rounded-lg p-2.5 text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                />
+                                <p className="text-xs text-gray-400 mt-1 leading-tight">
+                                    Cuántos metros o m² cubre 1 {formData.unit || "unidad"} de este material. Ej: un rollo de 100m de empaque → 100.
+                                    Solo aplica si este material se usa en una regla de accesorio "por fórmula". Vacío = sin conversión.
+                                </p>
                             </div>
 
                             {formError && (
