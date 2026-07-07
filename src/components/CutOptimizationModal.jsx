@@ -180,7 +180,7 @@ function buildSeries(optimizationData) {
                     });
                 }
             } else {
-                const rowLbl = shortName(pName);
+                const rowLbl = pName;
                 for (const bar of (group.bars ?? [])) {
                     idx++;
                     groupIdx++;
@@ -233,7 +233,7 @@ function BarRow({ rowLabel, cuts, waste, palette, singleMode = false }) {
     return (
         <div className="mb-1">
             <div className="flex items-center" style={{ minHeight: BAR_H }}>
-                <div className="flex-shrink-0 pr-2" style={{ width: 120 }}>
+                <div className="flex-shrink-0 pr-2" style={{ width: 150 }}>
                     <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide leading-tight">{rowLabel}</span>
                 </div>
                 <div className="flex overflow-hidden border border-gray-300" style={{ flex: 1, height: BAR_H }}>
@@ -257,7 +257,7 @@ function BarRow({ rowLabel, cuts, waste, palette, singleMode = false }) {
                     )}
                 </div>
             </div>
-            <div className="flex items-center ml-[120px] mt-0.5">
+            <div className="flex items-center ml-[150px] mt-0.5">
                 <div className="flex-1 h-px bg-red-400" />
             </div>
         </div>
@@ -511,14 +511,14 @@ body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;padd
 .sblk{page-break-inside:avoid}
 .stit{font-size:13px;font-weight:900;text-transform:uppercase;color:#111;margin-bottom:6px}
 .brow{display:flex;align-items:stretch;margin-bottom:2px}
-.rlbl{width:90px;flex-shrink:0;font-size:9px;text-transform:uppercase;color:#666;padding-right:6px;display:flex;align-items:center;font-weight:600}
+.rlbl{width:130px;flex-shrink:0;font-size:9px;text-transform:uppercase;color:#666;padding-right:6px;display:flex;align-items:center;font-weight:600}
 .bwrp{flex:1;display:flex;height:50px;border:1px solid #ccc;overflow:hidden}
 .pc{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;border-right:1px solid rgba(255,255,255,.6);min-width:30px;overflow:hidden;flex-shrink:0}
 .pc .top{font-size:12px;font-weight:900;color:#333;line-height:1}
 .pc .bot{font-size:10px;font-weight:600;color:#555;line-height:1;margin-top:2px}
 .pc.waste{background:#fff!important;border-left:1px dashed #aaa;flex:1}
 .pc.waste span{font-size:9px;color:#aaa;writing-mode:vertical-rl;transform:rotate(180deg)}
-.ruler{display:flex;align-items:center;margin-left:90px;margin-top:2px;margin-bottom:8px}
+.ruler{display:flex;align-items:center;margin-left:130px;margin-top:2px;margin-bottom:8px}
 .ruler-line{flex:1;height:1px;background:#e53935}
 @media print{
   .sblk{page-break-inside:avoid}
