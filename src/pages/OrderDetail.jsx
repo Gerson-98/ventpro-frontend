@@ -87,6 +87,13 @@ export default function OrderDetail() {
   const [glassCutData, setGlassCutData] = useState({});
   const [isGlassLoading, setIsGlassLoading] = useState(false);
 
+  // Estado del tamaño de marco: derivado de los window_types reales del pedido.
+  // Si alguna ventana tiene "MARCO 5 CM" en su tipo → el pedido usa 5 cm.
+  const [isSwappingMarco, setIsSwappingMarco] = useState(false);
+  const currentMarcoSize = (order?.windows ?? []).some(
+    w => w.window_type?.name?.includes('MARCO 5 CM')
+  ) ? '5.0' : '4.5';
+
   // Sincronizar includeIva desde los datos del pedido cuando carguen
   useEffect(() => {
     if (order?.include_iva !== undefined) setIncludeIva(!!order.include_iva);
@@ -166,6 +173,19 @@ export default function OrderDetail() {
   };
 
   const handleGeneratePDF = () => generateDocumentPDF(order, 'order');
+
+  const handleMarcoSizeToggle = async () => {
+    const nextSize = currentMarcoSize === '4.5' ? '5.0' : '4.5';
+    setIsSwappingMarco(true);
+    try {
+      await api.patch(`/orders/${id}/marco-size`, { marcoSize: nextSize });
+      await refetch();
+    } catch {
+      alert('No se pudo cambiar el tamaño del marco.');
+    } finally {
+      setIsSwappingMarco(false);
+    }
+  };
 
   // ── Loading / not found ──────────────────────────────────────────────────────
   if (loading) {
@@ -370,6 +390,28 @@ export default function OrderDetail() {
               <span className="hidden sm:inline">Corte Vidrio</span>
               <span className="sm:hidden">Vidrio</span>
             </Button>
+            <button
+              onClick={handleMarcoSizeToggle}
+              disabled={isSwappingMarco}
+              title={`Marco actual: ${currentMarcoSize} cm — click para cambiar a ${currentMarcoSize === '4.5' ? '5' : '4.5'} cm`}
+              className={`
+                inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold
+                transition-colors disabled:opacity-50 disabled:cursor-not-allowed
+                ${currentMarcoSize === '5.0'
+                  ? 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100'
+                  : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'}
+              `}
+            >
+              {isSwappingMarco ? (
+                <svg className="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                </svg>
+              ) : (
+                <span className="font-mono font-black">{currentMarcoSize === '5.0' ? '5cm' : '4.5cm'}</span>
+              )}
+              <span className="hidden sm:inline">Marco</span>
+            </button>
             <Button
               size="sm"
               className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white ml-auto text-xs sm:text-sm"
