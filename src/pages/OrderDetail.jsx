@@ -91,7 +91,7 @@ export default function OrderDetail() {
   // Si alguna ventana tiene "MARCO 5 CM" en su tipo → el pedido usa 5 cm.
   const [isSwappingMarco, setIsSwappingMarco] = useState(false);
   const currentMarcoSize = (order?.windows ?? []).some(
-    w => w.window_type?.name?.includes('MARCO 5 CM')
+    w => w.windowType?.name?.includes('MARCO 5 CM')
   ) ? '5.0' : '4.5';
 
   // Sincronizar includeIva desde los datos del pedido cuando carguen
