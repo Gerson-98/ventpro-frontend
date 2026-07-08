@@ -76,107 +76,49 @@ function ordinal(n) {
     return `${n}° SERIE DE CORTE`;
 }
 
-// Nombre corto para etiqueta de fila: "MARCO CORREDIZO S80 4,5 CM" → "MARCO 4,5 CM"
-function shortName(name) {
-    return name
-        .replace(/CORREDIZ[AO]\s+S\d+\s*/gi, '')
-        .replace(/\bFIJO\b\s*/gi, '')
-        .replace(/\s+/g, ' ')
-        .trim()
-        .toUpperCase();
-}
-
-// ─── FFD bin-packing con labels ───────────────────────────────────────────────
-function ffd(cuts, barLen = 580) {
-    const sorted = [...cuts].sort((a, b) => b.length - a.length);
-    const bins = [];
-    for (const cut of sorted) {
-        let placed = false;
-        for (const bin of bins) {
-            if (cut.length <= bin.rem) {
-                bin.cuts.push(cut);
-                bin.rem -= cut.length;
-                placed = true;
-                break;
-            }
-        }
-        if (!placed) bins.push({ cuts: [cut], rem: barLen - cut.length });
-    }
-    return bins;
-}
-
 // ─── Transforma los datos del backend en la lista plana de series ─────────────
 function buildSeries(optimizationData) {
     const items = [];
-    const combos = [];
     let idx = 0;
 
     const names = Object.keys(optimizationData);
+    const isMachine = (n) => optimizationData[n].some(g => g.machineSeries);
+    // Perfiles individuales primero (marco, batiente…), luego las series de máquina.
     const ordered = [
-        ...names.filter(n => !n.includes(' + ')),
-        ...names.filter(n => n.includes(' + ')),
+        ...names.filter(n => !isMachine(n)),
+        ...names.filter(n => isMachine(n)),
     ];
 
     for (const pName of ordered) {
         const groups = optimizationData[pName];
-        const isCombo = pName.includes(' + ');
-
-        const [hojaFullName = '', cedazoFullName = ''] = pName.split(' + ');
-        const hojaLbl = isCombo ? shortName(hojaFullName) : '';
-        const cedazoLbl = isCombo
-            ? (cedazoFullName.toUpperCase().includes('CEDAZO') || cedazoFullName.toUpperCase().includes('MOSQUITERO')
-                ? 'MOSQUITERO'
-                : shortName(cedazoFullName))
-            : '';
-
         let groupIdx = 0;
 
         for (const group of groups) {
-            if (isCombo) {
-                let series = [];
+            if (group.machineSeries && group.series?.length > 0) {
+                // Etiquetas: nombre completo de la hoja + "MOSQUITERO"
+                const [hojaFull = '', mosqFull = ''] = pName.split(' + ');
+                const hojaLbl = hojaFull;
+                const mosqLbl = mosqFull
+                    ? (mosqFull.toUpperCase().includes('CEDAZO') || mosqFull.toUpperCase().includes('MOSQUITERO')
+                        ? 'MOSQUITERO'
+                        : mosqFull)
+                    : 'MOSQUITERO';
 
-                if (group.machineSeries && group.series?.length > 0) {
-                    series = group.series.map(s => ({ cuts: s.cuts, waste: s.waste }));
-                } else if (group.bars?.length > 0) {
-                    const hojaCuts = [];
-                    for (const bar of group.bars) {
-                        for (const cut of bar.cuts) {
-                            if (!cut.windowLabel?.includes('|CEDAZO')) {
-                                hojaCuts.push({
-                                    length: cut.length,
-                                    windowLabel: cut.windowLabel.replace(/\|HOJA$/, ''),
-                                });
-                            }
-                        }
-                    }
-                    const bins = ffd(hojaCuts);
-                    series = bins.map(b => ({
-                        cuts: [...b.cuts].sort((a, z) => z.length - a.length),
-                        waste: parseFloat(b.rem.toFixed(1)),
-                    }));
-                }
-
-                const nSeries = series.length;
-                combos.push({
-                    hojaLabel: hojaLbl,
-                    cedazoLabel: cedazoLbl,
-                    totalHoja: nSeries * 2,
-                    totalCedazo: nSeries * 1,
-                });
-
-                for (const s of series) {
+                for (const s of group.series) {
                     idx++;
                     groupIdx++;
                     items.push({
                         type: 'machine',
                         idx,
                         groupIdx,
-                        groupName: `${hojaLbl} + ${cedazoLbl}`,
-                        cuts: s.cuts,
+                        groupName: pName,
+                        hojaLbl,
+                        mosqLbl,
+                        hojaBars: s.hojaBars ?? 2,
+                        mosqBars: s.mosqBars ?? 1,
+                        cuts: [...s.cuts].sort((a, z) => z.length - a.length),
                         waste: s.waste,
                         palette: PALETTES[(groupIdx - 1) % PALETTES.length],
-                        hojaLbl,
-                        cedazoLbl,
                     });
                 }
             } else {
@@ -199,7 +141,7 @@ function buildSeries(optimizationData) {
         }
     }
 
-    return { items, combos };
+    return { items };
 }
 
 // ─── Una pieza en la barra ────────────────────────────────────────────────────
@@ -268,9 +210,8 @@ function BarRow({ rowLabel, cuts, waste, palette, singleMode = false }) {
 function SerieBlock({ item, showGroupHeader }) {
     const rows = item.type === 'machine'
         ? [
-            { lbl: item.hojaLbl || 'HOJA 6,6 CM', cuts: item.cuts, waste: item.waste },
-            { lbl: item.hojaLbl || 'HOJA 6,6', cuts: item.cuts, waste: item.waste },
-            { lbl: item.cedazoLbl || 'MOSQUITERO', cuts: item.cuts, waste: item.waste },
+            ...Array.from({ length: item.hojaBars }, () => ({ lbl: item.hojaLbl, cuts: item.cuts, waste: item.waste })),
+            ...Array.from({ length: item.mosqBars }, () => ({ lbl: item.mosqLbl, cuts: item.cuts, waste: item.waste })),
         ]
         : [{ lbl: item.rowLbl, cuts: item.cuts, waste: item.waste }];
 
@@ -367,17 +308,15 @@ export default function CutOptimizationModal({
     clientName,
     windows = [],
 }) {
-    const { items, combos } = buildSeries(optimizationData);
+    const { items } = buildSeries(optimizationData);
 
-    let totalBarsSingle = 0, totalWaste = 0, totalUsed = 0;
+    let totalBars = 0, totalWaste = 0, totalUsed = 0;
     for (const it of items) {
-        const rows = it.type === 'machine' ? 3 : 1;
+        const rows = it.type === 'machine' ? (it.hojaBars + it.mosqBars) : 1;
+        totalBars += rows;
         totalWaste += it.waste * rows;
         totalUsed += (580 - it.waste) * rows;
-        if (it.type === 'single') totalBarsSingle++;
     }
-    const totalBarsCombo = combos.reduce((s, c) => s + c.totalHoja + c.totalCedazo, 0);
-    const totalBars = totalBarsSingle + totalBarsCombo;
     const eff = totalUsed > 0
         ? ((totalUsed / (totalUsed + totalWaste)) * 100).toFixed(1)
         : '0';
@@ -437,9 +376,8 @@ export default function CutOptimizationModal({
 
             const rows = it.type === 'machine'
                 ? [
-                    { lbl: it.hojaLbl || 'HOJA 6,6 CM', cuts: it.cuts, waste: it.waste },
-                    { lbl: it.hojaLbl || 'HOJA 6,6', cuts: it.cuts, waste: it.waste },
-                    { lbl: it.cedazoLbl || 'MOSQUITERO', cuts: it.cuts, waste: it.waste },
+                    ...Array.from({ length: it.hojaBars }, () => ({ lbl: it.hojaLbl, cuts: it.cuts, waste: it.waste })),
+                    ...Array.from({ length: it.mosqBars }, () => ({ lbl: it.mosqLbl, cuts: it.cuts, waste: it.waste })),
                 ]
                 : [{ lbl: it.rowLbl, cuts: it.cuts, waste: it.waste }];
 
