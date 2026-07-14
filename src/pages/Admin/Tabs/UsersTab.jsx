@@ -6,6 +6,12 @@ import { Button } from '@/components/ui/button';
 import { FaUserPlus, FaTrashAlt, FaEdit } from 'react-icons/fa';
 import AddUserModal from '@/components/AddUserModal';
 
+const ROLE_BADGE = {
+    ADMIN: 'bg-red-100 text-red-800',
+    SUPERVISOR: 'bg-purple-100 text-purple-800',
+    VENDEDOR: 'bg-blue-100 text-blue-800',
+};
+
 export default function UsersTab() {
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -106,10 +112,7 @@ export default function UsersTab() {
                                         <td className="py-3 px-4 font-medium text-gray-900">{user.name}</td>
                                         <td className="py-3 px-4 text-gray-500">{user.email}</td>
                                         <td className="py-3 px-4">
-                                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${user.role === 'ADMIN'
-                                                ? 'bg-red-100 text-red-800'
-                                                : 'bg-blue-100 text-blue-800'
-                                                }`}>
+                                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${ROLE_BADGE[user.role] || 'bg-gray-100 text-gray-800'}`}>
                                                 {user.role}
                                             </span>
                                         </td>
@@ -150,10 +153,7 @@ export default function UsersTab() {
                                             <p className="text-xs text-gray-500 mt-0.5 truncate">{user.email}</p>
                                         </div>
                                         <div className="flex items-center gap-2 flex-shrink-0">
-                                            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${user.role === 'ADMIN'
-                                                ? 'bg-red-100 text-red-800'
-                                                : 'bg-blue-100 text-blue-800'
-                                                }`}>
+                                            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${ROLE_BADGE[user.role] || 'bg-gray-100 text-gray-800'}`}>
                                                 {user.role}
                                             </span>
                                             <button

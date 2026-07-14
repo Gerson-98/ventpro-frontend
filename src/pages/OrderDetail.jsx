@@ -16,6 +16,7 @@ import GlassCutModal from '@/components/GlassCutModal';
 import RescheduleOrderModal from '@/components/RescheduleOrderModal';
 import EditOrderWindowModal from '@/components/EditOrderWindowModal';
 import { useAuth } from '@/context/AuthContext';
+import { usePermissions } from '@/context/PermissionsContext';
 import { generateDocumentPDF } from '@/lib/generateDocumentPDF';
 import ChecklistPanel from '@/components/ChecklistPanel';
 import {
@@ -53,6 +54,17 @@ const formatInstallationDate = (start, end) => {
 export default function OrderDetail() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
+  const { hasPermission } = usePermissions();
+  const canSeeFinancials = hasPermission('orders.view_financials');
+  const canManageChecklist = hasPermission('orders.manage_checklist');
+  const canReschedule = hasPermission('orders.reschedule');
+  const canChangeStatus = hasPermission('orders.change_status');
+  const canSeeProfilesReport = hasPermission('reports.profiles');
+  const canSeeCutOptimizer = hasPermission('reports.cut_optimizer');
+  const canSeeGlassCut = hasPermission('reports.glass_cut');
+  const canEditMeasurements = hasPermission('orders.edit_measurements');
+  const canGeneratePdf = hasPermission('orders.generate_pdf');
+  const showActionsBar = canSeeProfilesReport || canSeeCutOptimizer || canSeeGlassCut || canEditMeasurements || canGeneratePdf;
   const { id } = useParams();
   const navigate = useNavigate();
 
@@ -300,27 +312,29 @@ export default function OrderDetail() {
             )}
 
             {/* Total + IVA toggle */}
-            <div className="flex items-center gap-3 flex-wrap">
-              <div>
-                <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Total</p>
-                <p className="text-2xl sm:text-3xl font-black text-gray-900">{formatCurrency(displayedTotal)}</p>
-                {includeIva && (
-                  <p className="text-xs text-green-600 font-medium mt-0.5">IVA incluido (12%)</p>
-                )}
+            {canSeeFinancials && (
+              <div className="flex items-center gap-3 flex-wrap">
+                <div>
+                  <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Total</p>
+                  <p className="text-2xl sm:text-3xl font-black text-gray-900">{formatCurrency(displayedTotal)}</p>
+                  {includeIva && (
+                    <p className="text-xs text-green-600 font-medium mt-0.5">IVA incluido (12%)</p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-xl border border-gray-200">
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      checked={includeIva}
+                      onChange={handleIvaToggle}
+                    />
+                    <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600" />
+                    <span className="ml-2 text-xs font-semibold text-gray-600">Incluir IVA</span>
+                  </label>
+                </div>
               </div>
-              <div className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-xl border border-gray-200">
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="sr-only peer"
-                    checked={includeIva}
-                    onChange={handleIvaToggle}
-                  />
-                  <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600" />
-                  <span className="ml-2 text-xs font-semibold text-gray-600">Incluir IVA</span>
-                </label>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Columna derecha — estado + fecha */}
@@ -328,7 +342,7 @@ export default function OrderDetail() {
             <select
               value={order.status || ''}
               onChange={handleStatusChange}
-              disabled={isUpdatingStatus || !isAdmin}
+              disabled={isUpdatingStatus || !canChangeStatus}
               className={`px-3 py-1.5 text-xs border rounded-full font-semibold appearance-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed transition-colors outline-none focus:ring-2 focus:ring-blue-400 ${getStatusStyle(order.status).badgeFull}`}
             >
               {ORDER_STATUS_LIST.map(s => (
@@ -342,7 +356,7 @@ export default function OrderDetail() {
                   <FaCalendarAlt size={12} className="text-indigo-500 flex-shrink-0" />
                   <span className="text-xs sm:text-sm">{formatInstallationDate(order.installationStartDate, order.installationEndDate)}</span>
                 </div>
-                {isAdmin && (
+                {canReschedule && (
                   <button
                     onClick={() => setShowRescheduleModal(true)}
                     className="text-xs text-blue-500 hover:text-blue-700 font-medium mt-1 underline-offset-2 hover:underline"
@@ -357,70 +371,80 @@ export default function OrderDetail() {
           </div>
         </div>
 
-        {/* ── Botones de acción ── */}
-        {isAdmin && (
+        {/* ── Botones de acción — cada uno gated por su propio permiso ── */}
+        {showActionsBar && (
           <div className="flex flex-wrap gap-2 mt-5 pt-4 border-t border-gray-100">
-            <Button
-              size="sm"
-              variant="outline"
-              className="flex items-center gap-1.5 text-xs sm:text-sm"
-              onClick={handleGenerateReport}
-            >
-              <FaChartBar size={11} />
-              <span className="hidden sm:inline">Reporte Perfiles</span>
-              <span className="sm:hidden">Perfiles</span>
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="flex items-center gap-1.5 text-xs sm:text-sm"
-              onClick={handleOptimizeCuts}
-            >
-              <FaMagic size={11} />
-              <span className="hidden sm:inline">Optimizar Cortes</span>
-              <span className="sm:hidden">Cortes</span>
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="flex items-center gap-1.5 text-xs sm:text-sm"
-              onClick={handleGlassCuts}
-            >
-              <FaFileAlt size={11} />
-              <span className="hidden sm:inline">Corte Vidrio</span>
-              <span className="sm:hidden">Vidrio</span>
-            </Button>
-            <button
-              onClick={handleMarcoSizeToggle}
-              disabled={isSwappingMarco}
-              title={`Marco actual: ${currentMarcoSize} cm — click para cambiar a ${currentMarcoSize === '4.5' ? '5' : '4.5'} cm`}
-              className={`
-                inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold
-                transition-colors disabled:opacity-50 disabled:cursor-not-allowed
-                ${currentMarcoSize === '5.0'
-                  ? 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100'
-                  : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'}
-              `}
-            >
-              {isSwappingMarco ? (
-                <svg className="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                </svg>
-              ) : (
-                <span className="font-mono font-black">{currentMarcoSize === '5.0' ? '5cm' : '4.5cm'}</span>
-              )}
-              <span className="hidden sm:inline">Marco</span>
-            </button>
-            <Button
-              size="sm"
-              className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white ml-auto text-xs sm:text-sm"
-              onClick={handleGeneratePDF}
-            >
-              <FaFilePdf size={11} />
-              <span className="hidden sm:inline">PDF Pedido</span>
-              <span className="sm:hidden">PDF</span>
-            </Button>
+            {canSeeProfilesReport && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="flex items-center gap-1.5 text-xs sm:text-sm"
+                onClick={handleGenerateReport}
+              >
+                <FaChartBar size={11} />
+                <span className="hidden sm:inline">Reporte Perfiles</span>
+                <span className="sm:hidden">Perfiles</span>
+              </Button>
+            )}
+            {canSeeCutOptimizer && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="flex items-center gap-1.5 text-xs sm:text-sm"
+                onClick={handleOptimizeCuts}
+              >
+                <FaMagic size={11} />
+                <span className="hidden sm:inline">Optimizar Cortes</span>
+                <span className="sm:hidden">Cortes</span>
+              </Button>
+            )}
+            {canSeeGlassCut && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="flex items-center gap-1.5 text-xs sm:text-sm"
+                onClick={handleGlassCuts}
+              >
+                <FaFileAlt size={11} />
+                <span className="hidden sm:inline">Corte Vidrio</span>
+                <span className="sm:hidden">Vidrio</span>
+              </Button>
+            )}
+            {canEditMeasurements && (
+              <button
+                onClick={handleMarcoSizeToggle}
+                disabled={isSwappingMarco}
+                title={`Marco actual: ${currentMarcoSize} cm — click para cambiar a ${currentMarcoSize === '4.5' ? '5' : '4.5'} cm`}
+                className={`
+                  inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold
+                  transition-colors disabled:opacity-50 disabled:cursor-not-allowed
+                  ${currentMarcoSize === '5.0'
+                    ? 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100'
+                    : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'}
+                `}
+              >
+                {isSwappingMarco ? (
+                  <svg className="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                  </svg>
+                ) : (
+                  <span className="font-mono font-black">{currentMarcoSize === '5.0' ? '5cm' : '4.5cm'}</span>
+                )}
+                <span className="hidden sm:inline">Marco</span>
+              </button>
+            )}
+            {canGeneratePdf && (
+              <Button
+                size="sm"
+                className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white ml-auto text-xs sm:text-sm"
+                onClick={handleGeneratePDF}
+              >
+                <FaFilePdf size={11} />
+                <span className="hidden sm:inline">PDF Pedido</span>
+                <span className="sm:hidden">PDF</span>
+              </Button>
+            )}
           </div>
         )}
       </div>
@@ -461,7 +485,7 @@ export default function OrderDetail() {
                     <th className="py-3 px-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">PVC</th>
                     <th className="py-3 px-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Vidrio</th>
                     <th className="py-3 px-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Cant.</th>
-                    <th className="py-3 px-5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Precio</th>
+                    {canSeeFinancials && <th className="py-3 px-5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Precio</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -528,23 +552,27 @@ export default function OrderDetail() {
                             {win.quantity || 1}
                           </span>
                         </td>
-                        <td className="py-3.5 px-5 text-right font-mono font-black text-gray-900">
-                          {formatCurrency(win.price)}
-                        </td>
+                        {canSeeFinancials && (
+                          <td className="py-3.5 px-5 text-right font-mono font-black text-gray-900">
+                            {formatCurrency(win.price)}
+                          </td>
+                        )}
                       </tr>
                     );
                   })}
                 </tbody>
-                <tfoot className="border-t-2 border-gray-200 bg-gray-50/70">
-                  <tr>
-                    <td colSpan={8} className="py-3 px-5 text-sm font-semibold text-gray-600 text-right">
-                      {includeIva ? 'Total con IVA (12%)' : 'Total del pedido'}
-                    </td>
-                    <td className="py-3 px-5 text-right font-mono font-black text-gray-900 text-base">
-                      {formatCurrency(displayedTotal)}
-                    </td>
-                  </tr>
-                </tfoot>
+                {canSeeFinancials && (
+                  <tfoot className="border-t-2 border-gray-200 bg-gray-50/70">
+                    <tr>
+                      <td colSpan={7} className="py-3 px-5 text-sm font-semibold text-gray-600 text-right">
+                        {includeIva ? 'Total con IVA (12%)' : 'Total del pedido'}
+                      </td>
+                      <td className="py-3 px-5 text-right font-mono font-black text-gray-900 text-base">
+                        {formatCurrency(displayedTotal)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                )}
               </table>
             </div>
 
@@ -586,9 +614,11 @@ export default function OrderDetail() {
                           </button>
                         )}
                       </div>
-                      <span className="font-mono font-black text-gray-900 text-sm flex-shrink-0">
-                        {formatCurrency(win.price)}
-                      </span>
+                      {canSeeFinancials && (
+                        <span className="font-mono font-black text-gray-900 text-sm flex-shrink-0">
+                          {formatCurrency(win.price)}
+                        </span>
+                      )}
                     </div>
                     {/* Detalles en grid compacto */}
                     <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-500">
@@ -614,19 +644,21 @@ export default function OrderDetail() {
                 );
               })}
               {/* Footer total en móvil */}
-              <div className="px-4 py-3 bg-gray-50/70 border-t-2 border-gray-200 flex justify-between items-center">
-                <span className="text-sm font-semibold text-gray-600">
-                  {includeIva ? 'Total con IVA (12%)' : 'Total del pedido'}
-                </span>
-                <span className="font-mono font-black text-gray-900">{formatCurrency(displayedTotal)}</span>
-              </div>
+              {canSeeFinancials && (
+                <div className="px-4 py-3 bg-gray-50/70 border-t-2 border-gray-200 flex justify-between items-center">
+                  <span className="text-sm font-semibold text-gray-600">
+                    {includeIva ? 'Total con IVA (12%)' : 'Total del pedido'}
+                  </span>
+                  <span className="font-mono font-black text-gray-900">{formatCurrency(displayedTotal)}</span>
+                </div>
+              )}
             </div>
           </>
         )}
       </div>
 
       {/* ── Checklists ── */}
-      {isAdmin && (
+      {canManageChecklist && (
         <div className="mb-6">
           <ChecklistPanel orderId={Number(id)} isAdmin={isAdmin} />
         </div>

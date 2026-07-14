@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "@/services/api";
 import { useAuth } from "@/context/AuthContext";
+import { usePermissions } from "@/context/PermissionsContext";
 import { Button } from "@/components/ui/button";
 import AddClientModal from "@/components/AddClientModal";
 import {
@@ -54,6 +55,8 @@ const months = [
 export default function Orders() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
+  const { hasPermission } = usePermissions();
+  const canSeeFinancials = hasPermission('orders.view_financials');
   const navigate = useNavigate();
 
   const [orders, setOrders] = useState([]);
@@ -205,7 +208,7 @@ export default function Orders() {
       </div>
 
       {/* ── Métricas ── */}
-      <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-5 sm:mb-6">
+      <div className={`grid gap-2 sm:gap-4 mb-5 sm:mb-6 ${canSeeFinancials ? 'grid-cols-3' : 'grid-cols-2'}`}>
         <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 shadow-sm p-3 sm:p-4">
           <p className="text-[10px] sm:text-xs font-semibold text-gray-400 uppercase tracking-wide">Activos</p>
           <p className="text-2xl sm:text-3xl font-black text-gray-900 mt-1">{metrics.active}</p>
@@ -216,11 +219,13 @@ export default function Orders() {
           <p className="text-2xl sm:text-3xl font-black text-green-600 mt-1">{metrics.completed}</p>
           <p className="text-[9px] text-gray-300 mt-0.5">esta página</p>
         </div>
-        <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 shadow-sm p-3 sm:p-4">
-          <p className="text-[10px] sm:text-xs font-semibold text-gray-400 uppercase tracking-wide">Facturado</p>
-          <p className="text-base sm:text-2xl font-black text-blue-700 mt-1 truncate">{formatCurrency(metrics.total)}</p>
-          <p className="text-[9px] text-gray-300 mt-0.5">esta página</p>
-        </div>
+        {canSeeFinancials && (
+          <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 shadow-sm p-3 sm:p-4">
+            <p className="text-[10px] sm:text-xs font-semibold text-gray-400 uppercase tracking-wide">Facturado</p>
+            <p className="text-base sm:text-2xl font-black text-blue-700 mt-1 truncate">{formatCurrency(metrics.total)}</p>
+            <p className="text-[9px] text-gray-300 mt-0.5">esta página</p>
+          </div>
+        )}
       </div>
 
       {/* ── Filtros ── */}
@@ -278,7 +283,7 @@ export default function Orders() {
                     <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Vendedor</th>
                     <th className="py-3 px-5 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Estado</th>
                     <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Instalación</th>
-                    <th className="py-3 px-5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Total</th>
+                    {canSeeFinancials && <th className="py-3 px-5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Total</th>}
                     {isAdmin && <th className="py-3 px-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Acc.</th>}
                   </tr>
                 </thead>
@@ -328,9 +333,11 @@ export default function Orders() {
                             <span className="text-gray-300">—</span>
                           )}
                         </td>
-                        <td className="py-3.5 px-5 text-right font-mono font-semibold text-gray-800">
-                          {formatCurrency(order.total)}
-                        </td>
+                        {canSeeFinancials && (
+                          <td className="py-3.5 px-5 text-right font-mono font-semibold text-gray-800">
+                            {formatCurrency(order.total)}
+                          </td>
+                        )}
                         {isAdmin && (
                           <td className="py-3.5 px-3 text-center" onClick={(e) => e.stopPropagation()}>
                             <button
@@ -400,9 +407,11 @@ export default function Orders() {
                           <span className="text-gray-300">Sin fecha</span>
                         )}
                       </span>
-                      <span className="font-mono font-bold text-gray-900 text-sm">
-                        {formatCurrency(order.total)}
-                      </span>
+                      {canSeeFinancials && (
+                        <span className="font-mono font-bold text-gray-900 text-sm">
+                          {formatCurrency(order.total)}
+                        </span>
+                      )}
                     </div>
                     {order.generatedFromQuotation?.user?.name && (
                       <p className="text-[10px] text-gray-400 mt-1">

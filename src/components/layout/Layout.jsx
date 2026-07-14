@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Outlet, Link, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { usePermissions } from "../../context/PermissionsContext";
 
 const icons = {
   inicio: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12L11.204 3.045a1.125 1.125 0 011.591 0L21.75 12M4.5 9.75V19.5a.75.75 0 00.75.75h4.5a.75.75 0 00.75-.75v-4.5a.75.75 0 01.75-.75h2.25a.75.75 0 01.75.75v4.5a.75.75 0 00.75.75h4.5a.75.75 0 00.75-.75V9.75" /></svg>,
@@ -48,9 +49,12 @@ export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const { user, logout } = useAuth();
+  const { hasPermission } = usePermissions();
 
   const isAdmin = user?.role === "ADMIN";
   const isVendor = user?.role === "VENDEDOR";
+  const canSeeOrders = hasPermission("orders.view_all");
+  const canSeeQuotations = hasPermission("quotations.view");
 
   const p = location.pathname;
 
@@ -109,8 +113,10 @@ export default function Layout() {
         )}
 
         <NavSection label="Operaciones">
-          <NavLink to="/quotations" label="Cotizaciones" icon={icons.coti} active={p === "/quotations" || p.startsWith("/quotations/")} onClick={closeSidebar} />
-          {isAdmin && (
+          {canSeeQuotations && (
+            <NavLink to="/quotations" label="Cotizaciones" icon={icons.coti} active={p === "/quotations" || p.startsWith("/quotations/")} onClick={closeSidebar} />
+          )}
+          {canSeeOrders && (
             <NavLink to="/orders" label="Pedidos" icon={icons.pedidos} active={p === "/orders" || p.startsWith("/orders/")} onClick={closeSidebar} />
           )}
           <NavLink to="/calendar" label="Calendario" icon={icons.calendar} active={p === "/calendar"} onClick={closeSidebar} />

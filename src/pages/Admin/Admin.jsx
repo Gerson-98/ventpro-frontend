@@ -9,6 +9,7 @@ import GlassColorsTab from "./Tabs/GlassColorsTab";
 import ClientsTab from "./Tabs/ClientsTab";
 import CalculationsTab from "./Tabs/CalculationsTab";
 import UsersTab from "./Tabs/UsersTab";
+import PermissionsTab from "./Tabs/PermissionsTab";
 import MaterialsTab from "./Tabs/MaterialsTab";
 import CatalogoPerfilesTab from "./Tabs/CatalogoPerfilesTab";
 import AccessoryRulesTab from "./Tabs/AccessoryRulesTab";
@@ -32,6 +33,7 @@ export default function Admin() {
     { id: "glassColors", label: "Tipos de Vidrio" },
     { id: "clients", label: "Clientes" },
     { id: "users", label: "Usuarios" },
+    { id: "permissions", label: "Permisos" },
     { id: "optionConfig", label: "Opciones del Cotizador" },
     { id: "windowOptionAssign", label: "Asignación de Opciones" },
     { id: "checklists", label: "✓ Checklists" },
@@ -80,6 +82,7 @@ export default function Admin() {
         {activeTab === "glassColors" && <GlassColorsTab />}
         {activeTab === "clients" && <ClientsTab />}
         {activeTab === "users" && <UsersTab />}
+        {activeTab === "permissions" && <PermissionsTab />}
         {activeTab === "optionConfig" && <OptionConfigTab />}
         {activeTab === "windowOptionAssign" && <WindowOptionAssignTab />}
         {activeTab === "checklists" && <ChecklistTemplateTab />}

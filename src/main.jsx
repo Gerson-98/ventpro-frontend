@@ -21,7 +21,9 @@ import GananciasPage from './pages/GananciasPage';
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./context/AuthContext";
 import { CatalogProvider } from "./context/CatalogContext";
+import { PermissionsProvider } from "./context/PermissionsContext";
 import AdminRoute from "./components/AdminRoute";
+import PermissionRoute from "./components/PermissionRoute";
 import { Toaster } from 'sonner';
 import MaterialesConsolidado from './pages/MaterialesConsolidado';
 
@@ -34,9 +36,11 @@ const router = createBrowserRouter([
     path: "/",
     element: (
       <ProtectedRoute>
-        <CatalogProvider>
-          <Layout />
-        </CatalogProvider>
+        <PermissionsProvider>
+          <CatalogProvider>
+            <Layout />
+          </CatalogProvider>
+        </PermissionsProvider>
       </ProtectedRoute>
     ),
     children: [
@@ -49,8 +53,8 @@ const router = createBrowserRouter([
         ),
       },
       { path: "/my-dashboard", element: <MyDashboard /> },
-      { path: "/orders", element: <AdminRoute><Orders /></AdminRoute> },
-      { path: "/orders/:id", element: <AdminRoute><OrderDetail /></AdminRoute> },
+      { path: "/orders", element: <PermissionRoute permission="orders.view_all"><Orders /></PermissionRoute> },
+      { path: "/orders/:id", element: <PermissionRoute permission="orders.view_all"><OrderDetail /></PermissionRoute> },
       { path: "/windows", element: <Windows /> },
       { path: "/clients", element: <Clients /> },
       { path: "/materiales-consolidado", element: <AdminRoute><MaterialesConsolidado /></AdminRoute> },
@@ -64,8 +68,8 @@ const router = createBrowserRouter([
         ),
       },
       { path: "/calculationsmanager", element: <CalculationsManager /> },
-      { path: "/quotations", element: <Quotations /> },
-      { path: "/quotations/:id", element: <QuotationDetail /> },
+      { path: "/quotations", element: <PermissionRoute permission="quotations.view"><Quotations /></PermissionRoute> },
+      { path: "/quotations/:id", element: <PermissionRoute permission="quotations.view"><QuotationDetail /></PermissionRoute> },
       { path: "/calendar", element: <CalendarPage /> },
     ],
   },

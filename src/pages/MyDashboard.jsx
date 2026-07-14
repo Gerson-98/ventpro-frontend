@@ -28,6 +28,15 @@ const formatDate = (d) => {
     return new Date(d).toLocaleDateString('es-GT', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
+const MONTHS = [
+    { value: 1, label: 'Enero' }, { value: 2, label: 'Febrero' },
+    { value: 3, label: 'Marzo' }, { value: 4, label: 'Abril' },
+    { value: 5, label: 'Mayo' }, { value: 6, label: 'Junio' },
+    { value: 7, label: 'Julio' }, { value: 8, label: 'Agosto' },
+    { value: 9, label: 'Septiembre' }, { value: 10, label: 'Octubre' },
+    { value: 11, label: 'Noviembre' }, { value: 12, label: 'Diciembre' },
+];
+
 function StatCard({ icon, label, value, sub, color }) {
     const colors = {
         blue: 'bg-blue-50 text-blue-600',
@@ -62,6 +71,7 @@ export default function MyDashboard() {
     const [searchQ, setSearchQ] = useState('');
     const [searchO, setSearchO] = useState('');
     const [qStatusFilter, setQStatusFilter] = useState('all');
+    const [monthFilter, setMonthFilter] = useState('all');
 
     useEffect(() => {
         api.get('/dashboard/summary')
@@ -79,8 +89,16 @@ export default function MyDashboard() {
             })
             .catch(() => { })
             .finally(() => setLoadingQ(false));
+    }, []);
 
-        api.get('/orders', { params: { page: 1, limit: 20 } })
+    useEffect(() => {
+        setLoadingO(true);
+        const params = { page: 1, limit: 20 };
+        if (monthFilter !== 'all') {
+            const year = new Date().getFullYear();
+            params.month = `${year}-${String(monthFilter).padStart(2, '0')}`;
+        }
+        api.get('/orders', { params })
             .then(r => {
                 // El endpoint puede devolver array directo o { data: [...], total, ... }
                 const list = Array.isArray(r.data) ? r.data : (r.data?.data || []);
@@ -88,7 +106,7 @@ export default function MyDashboard() {
             })
             .catch(err => console.error('Error pedidos:', err))
             .finally(() => setLoadingO(false));
-    }, []);
+    }, [monthFilter]);
 
     const filteredQuotations = useMemo(() => {
         return recentQuotations
@@ -301,18 +319,26 @@ export default function MyDashboard() {
                         <h2 className="text-base sm:text-lg font-semibold text-gray-800">Mis Pedidos Confirmados</h2>
                     </div>
 
-                    {/* Buscador pedidos */}
-                    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-3 mb-3">
-                        <div className="relative">
+                    {/* Buscador + filtro de mes pedidos */}
+                    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-3 mb-3 flex flex-col sm:flex-row gap-2 sm:gap-3">
+                        <div className="relative flex-grow min-w-0">
                             <FaSearch className="absolute top-1/2 left-3 -translate-y-1/2 text-gray-400" size={12} />
                             <input
                                 type="text"
                                 placeholder="Buscar por proyecto o cliente..."
                                 value={searchO}
                                 onChange={e => setSearchO(e.target.value)}
-                                className="w-full sm:max-w-sm pl-8 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none bg-gray-50 focus:bg-white transition-colors"
+                                className="w-full pl-8 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none bg-gray-50 focus:bg-white transition-colors"
                             />
                         </div>
+                        <select
+                            value={monthFilter}
+                            onChange={e => setMonthFilter(e.target.value)}
+                            className="flex-shrink-0 border border-gray-200 rounded-xl py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-gray-50"
+                        >
+                            <option value="all">Todos los meses</option>
+                            {MONTHS.map(m => <option key={m.value} value={String(m.value)}>{m.label}</option>)}
+                        </select>
                     </div>
 
                     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">

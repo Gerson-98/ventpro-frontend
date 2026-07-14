@@ -7,7 +7,7 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import api from '@/services/api';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/context/AuthContext';
+import { usePermissions } from '@/context/PermissionsContext';
 import { FaCalendarAlt, FaUser, FaTimes, FaEye } from 'react-icons/fa';
 
 const STATUS_CONFIG = {
@@ -105,8 +105,8 @@ function EventTooltip({ info }) {
 }
 
 export default function CalendarPage() {
-    const { user } = useAuth();
-    const isVendedor = user?.role === 'VENDEDOR';
+    const { hasPermission } = usePermissions();
+    const canNavigateToOrder = hasPermission('calendar.navigate_to_order');
 
     const [events, setEvents] = useState([]);
     const [allOrders, setAllOrders] = useState([]);
@@ -157,16 +157,16 @@ export default function CalendarPage() {
         }))
         : events;
 
-    // Vendedor: no navega al pedido, solo ve el calendario
+    // Sin el permiso calendar.navigate_to_order: solo ve el calendario, no navega al pedido
     const handleEventClick = useCallback((info) => {
-        if (isVendedor) return;
+        if (!canNavigateToOrder) return;
         navigate(`/orders/${info.event.id}`);
-    }, [navigate, isVendedor]);
+    }, [navigate, canNavigateToOrder]);
 
     const handleEventMouseEnter = useCallback((info) => {
         clearTimeout(tooltipTimeout.current);
-        setTooltip({ info: { ...info, isVendedor } });
-    }, [isVendedor]);
+        setTooltip({ info: { ...info, isVendedor: !canNavigateToOrder } });
+    }, [canNavigateToOrder]);
 
     const handleEventMouseLeave = useCallback(() => {
         tooltipTimeout.current = setTimeout(() => setTooltip(null), 200);
@@ -187,8 +187,8 @@ export default function CalendarPage() {
                         return (
                             <div
                                 key={order.id}
-                                onClick={() => !isVendedor && navigate(`/orders/${order.id}`)}
-                                className={`px-4 py-3 transition-colors ${!isVendedor ? 'hover:bg-gray-50 cursor-pointer' : 'cursor-default'}`}
+                                onClick={() => canNavigateToOrder && navigate(`/orders/${order.id}`)}
+                                className={`px-4 py-3 transition-colors ${canNavigateToOrder ? 'hover:bg-gray-50 cursor-pointer' : 'cursor-default'}`}
                             >
                                 <div className="flex items-start justify-between gap-2">
                                     <div className="min-w-0">
@@ -246,8 +246,8 @@ export default function CalendarPage() {
                                     · {STATUS_CONFIG[activeStatusFilter]?.label}
                                 </span>
                             )}
-                            {/* Badge solo lectura para vendedor */}
-                            {isVendedor && (
+                            {/* Badge solo lectura si no puede navegar al detalle del pedido */}
+                            {!canNavigateToOrder && (
                                 <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200">
                                     <FaEye size={8} /> Solo lectura
                                 </span>
@@ -315,8 +315,8 @@ export default function CalendarPage() {
                                 </div>
                             </div>
 
-                            {/* readonly class para vendedor → cursor default en CSS */}
-                            <div className={`p-2 sm:p-4 calendar-wrapper ${isVendedor ? 'readonly' : ''}`}>
+                            {/* readonly class si no puede navegar → cursor default en CSS */}
+                            <div className={`p-2 sm:p-4 calendar-wrapper ${!canNavigateToOrder ? 'readonly' : ''}`}>
                                 <FullCalendar
                                     plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
                                     initialView="dayGridMonth"
