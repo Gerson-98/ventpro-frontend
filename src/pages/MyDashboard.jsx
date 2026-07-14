@@ -133,6 +133,11 @@ export default function MyDashboard() {
         });
     }, [orders, searchO]);
 
+    const ordersTotal = useMemo(
+        () => filteredOrders.reduce((sum, o) => sum + Number(o.total || 0), 0),
+        [filteredOrders]
+    );
+
     return (
         <div className="min-h-screen bg-gray-50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 sm:py-8 space-y-6 sm:space-y-8">
@@ -397,6 +402,16 @@ export default function MyDashboard() {
                                                 </tr>
                                             ))}
                                         </tbody>
+                                        <tfoot className="border-t-2 border-gray-200 bg-gray-50/70">
+                                            <tr>
+                                                <td colSpan={4} className="py-3 px-5 text-sm font-semibold text-gray-600 text-right">
+                                                    Total ({filteredOrders.length} pedido{filteredOrders.length !== 1 ? 's' : ''})
+                                                </td>
+                                                <td className="py-3 px-5 text-right font-mono font-black text-gray-900 text-base">
+                                                    Q {ordersTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                                </td>
+                                            </tr>
+                                        </tfoot>
                                     </table>
                                 </div>
 
@@ -427,6 +442,15 @@ export default function MyDashboard() {
                                             )}
                                         </div>
                                     ))}
+                                    {/* Footer total en móvil */}
+                                    <div className="px-4 py-3 bg-gray-50/70 border-t-2 border-gray-200 flex justify-between items-center">
+                                        <span className="text-sm font-semibold text-gray-600">
+                                            Total ({filteredOrders.length} pedido{filteredOrders.length !== 1 ? 's' : ''})
+                                        </span>
+                                        <span className="font-mono font-black text-gray-900">
+                                            Q {ordersTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                        </span>
+                                    </div>
                                 </div>
                             </>
                         )}
