@@ -9,7 +9,8 @@ import { FaFilePdf, FaCheckSquare, FaSquare, FaLayerGroup, FaCut, FaBoxes } from
 const ORDER_STATUS_LABELS = {
     en_proceso: 'En Proceso',
     en_fabricacion: 'En Fabricación',
-    listo_para_instalar: 'Listo para Instalar',
+    fabricado: 'Fabricado',
+    agendado: 'Agendado',
     en_ruta: 'En Ruta',
     completado: 'Completado',
     cancelado: 'Cancelado',
@@ -18,7 +19,8 @@ const ORDER_STATUS_LABELS = {
 const ORDER_STATUS_STYLES = {
     en_proceso: 'bg-yellow-100 text-yellow-800',
     en_fabricacion: 'bg-blue-100 text-blue-800',
-    listo_para_instalar: 'bg-indigo-100 text-indigo-800',
+    fabricado: 'bg-amber-100 text-amber-800',
+    agendado: 'bg-indigo-100 text-indigo-800',
     en_ruta: 'bg-cyan-100 text-cyan-800',
     completado: 'bg-emerald-100 text-emerald-800',
     cancelado: 'bg-red-100 text-red-800',

@@ -12,12 +12,13 @@ const fmtPct = (n) => `${(n || 0).toFixed(1)}%`;
 
 const STATUS_LABELS = {
     en_proceso: 'En Proceso', en_fabricacion: 'En Fabricación',
-    listo_para_instalar: 'Listo p/ Instalar', en_ruta: 'En Ruta', completado: 'Completado',
+    fabricado: 'Fabricado', agendado: 'Agendado', en_ruta: 'En Ruta', completado: 'Completado',
 };
 const STATUS_COLORS = {
     en_proceso: 'bg-blue-100 text-blue-800 border-blue-300',
     en_fabricacion: 'bg-orange-100 text-orange-800 border-orange-300',
-    listo_para_instalar: 'bg-purple-100 text-purple-800 border-purple-300',
+    fabricado: 'bg-amber-100 text-amber-800 border-amber-300',
+    agendado: 'bg-purple-100 text-purple-800 border-purple-300',
     en_ruta: 'bg-cyan-100 text-cyan-800 border-cyan-300',
     completado: 'bg-green-100 text-green-800 border-green-300',
 };

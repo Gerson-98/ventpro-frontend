@@ -282,7 +282,7 @@ export default function Orders() {
                     <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Cliente</th>
                     <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Vendedor</th>
                     <th className="py-3 px-5 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Estado</th>
-                    <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Instalación</th>
+                    <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Fabricación</th>
                     {canSeeFinancials && <th className="py-3 px-5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Total</th>}
                     {isAdmin && <th className="py-3 px-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Acc.</th>}
                   </tr>
@@ -321,12 +321,12 @@ export default function Orders() {
                           </span>
                         </td>
                         <td className="py-3.5 px-5 text-xs text-indigo-600">
-                          {order.installationStartDate ? (
+                          {order.fabricationStartDate ? (
                             <div className="flex items-center gap-1.5">
                               <FaCalendarAlt size={10} />
-                              <span>{formatDate(order.installationStartDate)}</span>
-                              {order.installationEndDate && order.installationEndDate !== order.installationStartDate && (
-                                <span className="text-indigo-400">→ {formatDate(order.installationEndDate)}</span>
+                              <span>{formatDate(order.fabricationStartDate)}</span>
+                              {order.fabricationEndDate && order.fabricationEndDate !== order.fabricationStartDate && (
+                                <span className="text-indigo-400">→ {formatDate(order.fabricationEndDate)}</span>
                               )}
                             </div>
                           ) : (
@@ -401,8 +401,8 @@ export default function Orders() {
                     {/* Fila final: fecha instalación + total */}
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-indigo-500 flex items-center gap-1">
-                        {order.installationStartDate ? (
-                          <><FaCalendarAlt size={9} />{formatDate(order.installationStartDate)}</>
+                        {order.fabricationStartDate ? (
+                          <><FaCalendarAlt size={9} />{formatDate(order.fabricationStartDate)}</>
                         ) : (
                           <span className="text-gray-300">Sin fecha</span>
                         )}

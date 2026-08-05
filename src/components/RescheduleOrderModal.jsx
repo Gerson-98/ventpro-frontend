@@ -20,10 +20,10 @@ export default function RescheduleOrderModal({ open, onClose, order, onReschedul
 
     useEffect(() => {
         if (!open) return;
-        if (order?.installationStartDate && order?.installationEndDate) {
+        if (order?.fabricationStartDate && order?.fabricationEndDate) {
             setRange({
-                from: new Date(order.installationStartDate),
-                to: new Date(order.installationEndDate),
+                from: new Date(order.fabricationStartDate),
+                to: new Date(order.fabricationEndDate),
             });
         } else {
             setRange({ from: null, to: null });
@@ -76,8 +76,8 @@ export default function RescheduleOrderModal({ open, onClose, order, onReschedul
 
     const bookedDaysList = bookedRanges.flatMap((o) => {
         const days = [];
-        const current = new Date(o.installationStartDate);
-        const end = new Date(o.installationEndDate);
+        const current = new Date(o.fabricationStartDate);
+        const end = new Date(o.fabricationEndDate);
         current.setHours(0, 0, 0, 0);
         end.setHours(0, 0, 0, 0);
         while (current <= end) {
@@ -106,10 +106,10 @@ export default function RescheduleOrderModal({ open, onClose, order, onReschedul
                     <DialogHeader>
                         <DialogTitle className="text-white text-lg sm:text-xl font-bold flex items-center gap-2.5">
                             <CalendarCheck2 size={20} />
-                            Reprogramar Instalación
+                            Reprogramar Fabricación
                         </DialogTitle>
                         <p className="text-white/80 text-xs sm:text-sm mt-1">
-                            Selecciona el nuevo rango de fechas para{" "}
+                            Selecciona el nuevo rango de fechas de fabricación para{" "}
                             <span className="font-semibold">{order?.project}</span>.
                         </p>
                     </DialogHeader>
@@ -122,7 +122,7 @@ export default function RescheduleOrderModal({ open, onClose, order, onReschedul
                     <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
                         <div className="flex items-center gap-1.5">
                             <span className="w-3 h-3 rounded-full bg-red-300 inline-block" />
-                            Con instalación
+                            Con fabricación
                         </div>
                         <div className="flex items-center gap-1.5">
                             <span className="w-3 h-3 rounded-full bg-indigo-500 inline-block" />
@@ -188,7 +188,7 @@ export default function RescheduleOrderModal({ open, onClose, order, onReschedul
                         <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3 flex items-start gap-3">
                             <CheckCircle2 size={18} className="mt-0.5 flex-shrink-0 text-indigo-600" />
                             <div className="text-sm">
-                                <p className="font-semibold text-indigo-800">Nueva fecha de instalación</p>
+                                <p className="font-semibold text-indigo-800">Nueva fecha de fabricación</p>
                                 <p className="mt-0.5 text-indigo-700">
                                     <span className="font-medium">
                                         {format(range.from, "EEEE d 'de' MMMM", { locale: es })}
@@ -203,7 +203,7 @@ export default function RescheduleOrderModal({ open, onClose, order, onReschedul
                                     )}
                                 </p>
                                 <p className="text-xs mt-1 text-indigo-600 font-medium">
-                                    {duration} {duration === 1 ? "día" : "días"} de instalación
+                                    {duration} {duration === 1 ? "día" : "días"} de fabricación
                                 </p>
                             </div>
                         </div>
@@ -213,16 +213,16 @@ export default function RescheduleOrderModal({ open, onClose, order, onReschedul
                     {bookedRanges.length > 0 && (
                         <div className="text-xs space-y-1.5">
                             <p className="font-semibold text-gray-500 uppercase tracking-wide text-[10px]">
-                                Otras instalaciones agendadas:
+                                Otras fabricaciones agendadas:
                             </p>
                             {bookedRanges.map(o => (
                                 <div key={o.id} className="flex items-center gap-2 text-gray-500">
                                     <span className="w-2 h-2 rounded-full bg-red-300 flex-shrink-0" />
                                     <span className="font-medium text-gray-700 truncate max-w-[140px] sm:max-w-[170px]">{o.project}</span>
                                     <span className="text-gray-400 ml-auto whitespace-nowrap">
-                                        {format(new Date(o.installationStartDate), "d MMM", { locale: es })}
-                                        {o.installationStartDate !== o.installationEndDate && (
-                                            <> → {format(new Date(o.installationEndDate), "d MMM yy", { locale: es })}</>
+                                        {format(new Date(o.fabricationStartDate), "d MMM", { locale: es })}
+                                        {o.fabricationStartDate !== o.fabricationEndDate && (
+                                            <> → {format(new Date(o.fabricationEndDate), "d MMM yy", { locale: es })}</>
                                         )}
                                     </span>
                                 </div>

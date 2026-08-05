@@ -8,7 +8,8 @@ import { FaSearch, FaCalendarAlt, FaClipboardList, FaCheckCircle, FaClock } from
 const ORDER_STATUS_LABELS = {
     en_proceso: 'En Proceso',
     en_fabricacion: 'En Fabricación',
-    listo_para_instalar: 'Listo p/ Instalar',
+    fabricado: 'Fabricado',
+    agendado: 'Agendado',
     en_ruta: 'En Ruta',
     completado: 'Completado',
     cancelado: 'Cancelado',
@@ -17,7 +18,8 @@ const ORDER_STATUS_LABELS = {
 const ORDER_STATUS_STYLES = {
     en_proceso: 'bg-yellow-100 text-yellow-800',
     en_fabricacion: 'bg-blue-100 text-blue-800',
-    listo_para_instalar: 'bg-indigo-100 text-indigo-800',
+    fabricado: 'bg-amber-100 text-amber-800',
+    agendado: 'bg-indigo-100 text-indigo-800',
     en_ruta: 'bg-purple-100 text-purple-800',
     completado: 'bg-emerald-100 text-emerald-800',
     cancelado: 'bg-red-100 text-red-800',
@@ -370,7 +372,7 @@ export default function MyDashboard() {
                                             <tr className="border-b border-gray-100 bg-gray-50/70">
                                                 <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Proyecto</th>
                                                 <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Cliente</th>
-                                                <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Instalación</th>
+                                                <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Fabricación</th>
                                                 <th className="py-3 px-5 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Estado</th>
                                                 <th className="py-3 px-5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Total</th>
                                             </tr>
@@ -381,12 +383,12 @@ export default function MyDashboard() {
                                                     <td className="py-3 px-5 font-semibold text-gray-800">{o.project}</td>
                                                     <td className="py-3 px-5 text-gray-600">{o.client?.name || '—'}</td>
                                                     <td className="py-3 px-5 text-xs text-gray-500">
-                                                        {o.installationStartDate ? (
+                                                        {o.fabricationStartDate ? (
                                                             <span className="flex items-center gap-1.5 text-indigo-600">
                                                                 <FaCalendarAlt size={10} />
-                                                                {formatDate(o.installationStartDate)}
-                                                                {o.installationEndDate && o.installationEndDate !== o.installationStartDate && (
-                                                                    <span className="text-gray-400">→ {formatDate(o.installationEndDate)}</span>
+                                                                {formatDate(o.fabricationStartDate)}
+                                                                {o.fabricationEndDate && o.fabricationEndDate !== o.fabricationStartDate && (
+                                                                    <span className="text-gray-400">→ {formatDate(o.fabricationEndDate)}</span>
                                                                 )}
                                                             </span>
                                                         ) : '—'}
@@ -431,12 +433,12 @@ export default function MyDashboard() {
                                                     {ORDER_STATUS_LABELS[o.status] || o.status}
                                                 </span>
                                             </div>
-                                            {o.installationStartDate && (
+                                            {o.fabricationStartDate && (
                                                 <div className="flex items-center gap-1.5 text-[11px] text-indigo-600 mt-1">
                                                     <FaCalendarAlt size={9} />
-                                                    <span>{formatDate(o.installationStartDate)}</span>
-                                                    {o.installationEndDate && o.installationEndDate !== o.installationStartDate && (
-                                                        <span className="text-gray-400">→ {formatDate(o.installationEndDate)}</span>
+                                                    <span>{formatDate(o.fabricationStartDate)}</span>
+                                                    {o.fabricationEndDate && o.fabricationEndDate !== o.fabricationStartDate && (
+                                                        <span className="text-gray-400">→ {formatDate(o.fabricationEndDate)}</span>
                                                     )}
                                                 </div>
                                             )}

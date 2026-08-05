@@ -812,8 +812,8 @@ export default function QuotationDetail() {
                     isReconfirm={isReopenada}
                     excludeOrderId={isReopenada ? quotation.generatedOrder?.id : null}
                     initialDates={isReopenada && quotation.generatedOrder ? {
-                        from: quotation.generatedOrder.installationStartDate,
-                        to: quotation.generatedOrder.installationEndDate,
+                        from: quotation.generatedOrder.fabricationStartDate,
+                        to: quotation.generatedOrder.fabricationEndDate,
                     } : null}
                     onConfirmSuccess={(newOrderId) => {
                         const targetOrderId = newOrderId || quotation.generatedOrder?.id;

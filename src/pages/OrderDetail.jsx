@@ -14,6 +14,7 @@ import ProfilesReportModal from '@/components/ProfilesReportModal';
 import CutOptimizationModal from '@/components/CutOptimizationModal';
 import GlassCutModal from '@/components/GlassCutModal';
 import RescheduleOrderModal from '@/components/RescheduleOrderModal';
+import ScheduleInstallationModal from '@/components/ScheduleInstallationModal';
 import EditOrderWindowModal from '@/components/EditOrderWindowModal';
 import { useAuth } from '@/context/AuthContext';
 import { usePermissions } from '@/context/PermissionsContext';
@@ -92,6 +93,7 @@ export default function OrderDetail() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [windowToEdit, setWindowToEdit] = useState(null);
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [showScheduleInstallationModal, setShowScheduleInstallationModal] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState(null);
 
   // Modal de corte de vidrio (no cubierto por useOrderReports)
@@ -350,24 +352,61 @@ export default function OrderDetail() {
               ))}
             </select>
 
-            {order.installationStartDate ? (
-              <div className="sm:text-right">
-                <div className="flex items-center gap-1.5 text-sm text-gray-600">
-                  <FaCalendarAlt size={12} className="text-indigo-500 flex-shrink-0" />
-                  <span className="text-xs sm:text-sm">{formatInstallationDate(order.installationStartDate, order.installationEndDate)}</span>
-                </div>
-                {canReschedule && (
-                  <button
-                    onClick={() => setShowRescheduleModal(true)}
-                    className="text-xs text-blue-500 hover:text-blue-700 font-medium mt-1 underline-offset-2 hover:underline"
-                  >
-                    Reprogramar
-                  </button>
-                )}
-              </div>
-            ) : (
-              <span className="text-xs text-gray-400">Sin fecha de instalación</span>
-            )}
+            {/* Fecha de fabricación */}
+            <div className="sm:text-right">
+              <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide">Fabricación</p>
+              {order.fabricationStartDate ? (
+                <>
+                  <div className="flex items-center gap-1.5 text-sm text-gray-600 sm:justify-end">
+                    <FaCalendarAlt size={12} className="text-orange-500 flex-shrink-0" />
+                    <span className="text-xs sm:text-sm">{formatInstallationDate(order.fabricationStartDate, order.fabricationEndDate)}</span>
+                  </div>
+                  {canReschedule && (
+                    <button
+                      onClick={() => setShowRescheduleModal(true)}
+                      className="text-xs text-blue-500 hover:text-blue-700 font-medium mt-1 underline-offset-2 hover:underline"
+                    >
+                      Reprogramar
+                    </button>
+                  )}
+                </>
+              ) : (
+                <span className="text-xs text-gray-400">Sin agendar</span>
+              )}
+            </div>
+
+            {/* Fecha real de instalación */}
+            <div className="sm:text-right">
+              <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide">Instalación</p>
+              {order.installationStartDate ? (
+                <>
+                  <div className="flex items-center gap-1.5 text-sm text-gray-600 sm:justify-end">
+                    <FaCalendarAlt size={12} className="text-purple-500 flex-shrink-0" />
+                    <span className="text-xs sm:text-sm">{formatInstallationDate(order.installationStartDate, order.installationEndDate)}</span>
+                  </div>
+                  {canReschedule && (
+                    <button
+                      onClick={() => setShowScheduleInstallationModal(true)}
+                      className="text-xs text-purple-500 hover:text-purple-700 font-medium mt-1 underline-offset-2 hover:underline"
+                    >
+                      Reprogramar
+                    </button>
+                  )}
+                </>
+              ) : (
+                <>
+                  <span className="text-xs text-gray-400 block">Sin agendar</span>
+                  {canReschedule && (
+                    <button
+                      onClick={() => setShowScheduleInstallationModal(true)}
+                      className="text-xs text-purple-500 hover:text-purple-700 font-medium mt-1 underline-offset-2 hover:underline"
+                    >
+                      Agendar instalación
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         </div>
 
@@ -718,6 +757,15 @@ export default function OrderDetail() {
           onClose={() => setShowRescheduleModal(false)}
           order={order}
           onRescheduleSuccess={() => { setShowRescheduleModal(false); refetch(); }}
+        />
+      )}
+
+      {showScheduleInstallationModal && (
+        <ScheduleInstallationModal
+          open={showScheduleInstallationModal}
+          onClose={() => setShowScheduleInstallationModal(false)}
+          order={order}
+          onScheduleSuccess={() => { setShowScheduleInstallationModal(false); refetch(); }}
         />
       )}
 

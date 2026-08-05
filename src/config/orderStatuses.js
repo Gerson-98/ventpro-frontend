@@ -4,7 +4,8 @@
 export const ORDER_STATUS = {
   EN_PROCESO: 'en_proceso',
   EN_FABRICACION: 'en_fabricacion',
-  LISTO_PARA_INSTALAR: 'listo_para_instalar',
+  FABRICADO: 'fabricado',
+  AGENDADO: 'agendado',
   EN_RUTA: 'en_ruta',
   COMPLETADO: 'completado',
   CANCELADO: 'cancelado',
@@ -13,7 +14,8 @@ export const ORDER_STATUS = {
 export const ORDER_STATUS_LABELS = {
   [ORDER_STATUS.EN_PROCESO]: 'En Proceso',
   [ORDER_STATUS.EN_FABRICACION]: 'En Fabricación',
-  [ORDER_STATUS.LISTO_PARA_INSTALAR]: 'Listo para Instalar',
+  [ORDER_STATUS.FABRICADO]: 'Fabricado',
+  [ORDER_STATUS.AGENDADO]: 'Agendado',
   [ORDER_STATUS.EN_RUTA]: 'En Ruta',
   [ORDER_STATUS.COMPLETADO]: 'Completado',
   [ORDER_STATUS.CANCELADO]: 'Cancelado',
@@ -26,7 +28,8 @@ export const ORDER_STATUS_LIST = Object.entries(ORDER_STATUS_LABELS).map(
 export const ORDER_STATUS_STYLES = {
   [ORDER_STATUS.EN_PROCESO]: { badge: 'bg-blue-100 text-blue-800 border-blue-200', dot: 'bg-blue-500', badgeFull: 'bg-blue-100 text-blue-800 border-blue-300' },
   [ORDER_STATUS.EN_FABRICACION]: { badge: 'bg-orange-100 text-orange-800 border-orange-200', dot: 'bg-orange-500', badgeFull: 'bg-orange-100 text-orange-800 border-orange-300' },
-  [ORDER_STATUS.LISTO_PARA_INSTALAR]: { badge: 'bg-purple-100 text-purple-800 border-purple-200', dot: 'bg-purple-500', badgeFull: 'bg-purple-100 text-purple-800 border-purple-300' },
+  [ORDER_STATUS.FABRICADO]: { badge: 'bg-amber-100 text-amber-800 border-amber-200', dot: 'bg-amber-500', badgeFull: 'bg-amber-100 text-amber-800 border-amber-300' },
+  [ORDER_STATUS.AGENDADO]: { badge: 'bg-purple-100 text-purple-800 border-purple-200', dot: 'bg-purple-500', badgeFull: 'bg-purple-100 text-purple-800 border-purple-300' },
   [ORDER_STATUS.EN_RUTA]: { badge: 'bg-cyan-100 text-cyan-800 border-cyan-200', dot: 'bg-cyan-500', badgeFull: 'bg-cyan-100 text-cyan-800 border-cyan-300' },
   [ORDER_STATUS.COMPLETADO]: { badge: 'bg-green-100 text-green-800 border-green-200', dot: 'bg-green-500', badgeFull: 'bg-green-100 text-green-800 border-green-300' },
   [ORDER_STATUS.CANCELADO]: { badge: 'bg-red-100 text-red-800 border-red-200', dot: 'bg-red-500', badgeFull: 'bg-red-100 text-red-800 border-red-300' },
