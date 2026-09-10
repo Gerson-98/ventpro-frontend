@@ -4,7 +4,8 @@ import { useEffect, useState, useMemo } from 'react';
 import api from '@/services/api';
 import { generateMaterialsPDF } from '@/lib/generateMaterialsPDF';
 import { generateCutOptimizationPDF } from '@/lib/generateCutOptimizationPDF';
-import { FaFilePdf, FaCheckSquare, FaSquare, FaLayerGroup, FaCut, FaBoxes } from 'react-icons/fa';
+import GlassCutModal from '@/components/GlassCutModal';
+import { FaFilePdf, FaCheckSquare, FaSquare, FaLayerGroup, FaCut, FaBoxes, FaGem } from 'react-icons/fa';
 
 const ORDER_STATUS_LABELS = {
     en_proceso: 'En Proceso',
@@ -67,7 +68,7 @@ function Spinner({ className = 'w-4 h-4' }) {
 }
 
 // ── Panel de selección de pedidos ──
-function OrdersPanel({ orders, selectedIds, loadingOrders, running, toggleOrder, toggleAll, onProfiles, onCuts, mode }) {
+function OrdersPanel({ orders, selectedIds, loadingOrders, running, toggleOrder, toggleAll, onProfiles, onCuts, onGlass, mode }) {
     return (
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden h-full flex flex-col">
             <div className="px-4 py-3.5 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
@@ -140,6 +141,17 @@ function OrdersPanel({ orders, selectedIds, loadingOrders, running, toggleOrder,
                         <><FaCut size={12} /> Optimizar Cortes {selectedIds.size > 0 ? `(${selectedIds.size})` : ''}</>
                     )}
                 </button>
+                <button
+                    onClick={onGlass}
+                    disabled={selectedIds.size === 0 || running}
+                    className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-xl font-medium text-sm transition-all active:scale-95"
+                >
+                    {running && mode === 'glass' ? (
+                        <><Spinner /> Combinando...</>
+                    ) : (
+                        <><FaGem size={12} /> Corte de Vidrio {selectedIds.size > 0 ? `(${selectedIds.size})` : ''}</>
+                    )}
+                </button>
             </div>
         </div>
     );
@@ -158,6 +170,10 @@ export default function MaterialesConsolidado() {
 
     // Datos cortes
     const [cutsData, setCutsData] = useState(null); // { optimization, windows, orders }
+
+    // Datos corte de vidrio combinado
+    const [glassCutsData, setGlassCutsData] = useState(null); // { glassCutData, windows, orders, comparison }
+    const [showGlassModal, setShowGlassModal] = useState(false);
 
     const [generatingPDF, setGeneratingPDF] = useState(false);
     const [showOrdersDrawer, setShowOrdersDrawer] = useState(false);
@@ -182,6 +198,7 @@ export default function MaterialesConsolidado() {
         setConsolidatedData(null);
         setPerProjectReports([]);
         setCutsData(null);
+        setGlassCutsData(null);
         setMode(null);
     };
 
@@ -242,6 +259,7 @@ export default function MaterialesConsolidado() {
         setConsolidatedData(null);
         setPerProjectReports([]);
         setCutsData(null);
+        setGlassCutsData(null);
         setShowOrdersDrawer(false);
 
         try {
@@ -252,6 +270,30 @@ export default function MaterialesConsolidado() {
         } catch (err) {
             console.error('Error al optimizar cortes:', err);
             alert('No se pudo optimizar cortes. Verifica que los pedidos tengan ventanas.');
+        } finally {
+            setRunning(false);
+        }
+    };
+
+    // ── Corte de Vidrio combinado (aprovecha desperdicio entre proyectos) ──
+    const handleGlass = async () => {
+        if (selectedIds.size === 0) return;
+        setRunning(true);
+        setMode('glass');
+        setConsolidatedData(null);
+        setPerProjectReports([]);
+        setCutsData(null);
+        setGlassCutsData(null);
+        setShowOrdersDrawer(false);
+
+        try {
+            const res = await api.post('/reports/orders/optimize-glass-cuts', {
+                orderIds: Array.from(selectedIds),
+            });
+            setGlassCutsData(res.data);
+        } catch (err) {
+            console.error('Error al combinar corte de vidrio:', err);
+            alert('No se pudo combinar el corte de vidrio. Verifica que los pedidos tengan ventanas con vidrio.');
         } finally {
             setRunning(false);
         }
@@ -301,7 +343,7 @@ export default function MaterialesConsolidado() {
     const panelProps = {
         orders, selectedIds, loadingOrders, running,
         toggleOrder, toggleAll,
-        onProfiles: handleProfiles, onCuts: handleCuts, mode,
+        onProfiles: handleProfiles, onCuts: handleCuts, onGlass: handleGlass, mode,
     };
 
     return (
@@ -358,13 +400,13 @@ export default function MaterialesConsolidado() {
                     <div className="flex-1 min-w-0">
 
                         {/* Estado vacío */}
-                        {!running && !consolidatedData && !cutsData && (
+                        {!running && !consolidatedData && !cutsData && !glassCutsData && (
                             <div className="bg-white rounded-2xl border border-dashed border-gray-300 flex flex-col items-center justify-center py-16 sm:py-24 text-gray-400">
                                 <FaLayerGroup size={36} className="mb-3 opacity-20" />
                                 <p className="text-sm font-medium text-center px-4">
                                     Selecciona pedidos y elige una acción
                                 </p>
-                                <p className="text-xs mt-1">Reporte Perfiles · Optimizar Cortes</p>
+                                <p className="text-xs mt-1">Reporte Perfiles · Optimizar Cortes · Corte de Vidrio</p>
                             </div>
                         )}
 
@@ -373,7 +415,7 @@ export default function MaterialesConsolidado() {
                             <div className="bg-white rounded-2xl border border-gray-200 flex flex-col items-center justify-center py-16 sm:py-24 text-gray-400">
                                 <Spinner className="w-6 h-6 mb-3" />
                                 <p className="text-sm">
-                                    {mode === 'cuts' ? 'Optimizando cortes globalmente' : 'Calculando perfiles'} de {selectedIds.size} pedido{selectedIds.size !== 1 ? 's' : ''}...
+                                    {mode === 'cuts' ? 'Optimizando cortes globalmente' : mode === 'glass' ? 'Combinando corte de vidrio' : 'Calculando perfiles'} de {selectedIds.size} pedido{selectedIds.size !== 1 ? 's' : ''}...
                                 </p>
                             </div>
                         )}
@@ -512,9 +554,26 @@ export default function MaterialesConsolidado() {
                                 onDownload={handleDownloadCutsPDF}
                             />
                         )}
+
+                        {/* ── Resultados: Vidrio combinado ── */}
+                        {glassCutsData && !running && (
+                            <GlassResultView
+                                data={glassCutsData}
+                                onViewPlan={() => setShowGlassModal(true)}
+                            />
+                        )}
                     </div>
                 </div>
             </div>
+
+            {showGlassModal && glassCutsData && (
+                <GlassCutModal
+                    glassCutData={glassCutsData.glassCutData}
+                    isLoading={false}
+                    onClose={() => setShowGlassModal(false)}
+                    projectName={(glassCutsData.orders || []).map((o) => o.project).join(' + ')}
+                />
+            )}
         </div>
     );
 }
@@ -563,6 +622,91 @@ function SectionTable({ title, accent, columns, rows, itemCountSuffix }) {
                         ))}
                     </tbody>
                 </table>
+            </div>
+        </div>
+    );
+}
+
+// ── Vista de resultados de corte de vidrio combinado ──
+function GlassResultView({ data, onViewPlan }) {
+    const { glassCutData, windows, orders, comparison } = data || {};
+    const glassTypesCount = Object.keys(glassCutData || {}).length;
+    const ahorroPositivo = (comparison?.ahorro || 0) > 0;
+
+    return (
+        <div className="space-y-4">
+            {/* Comparación: separado vs combinado — lo más importante */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm px-4 sm:px-5 py-4">
+                <div className="mb-4">
+                    <p className="text-sm font-semibold text-gray-800">
+                        Vidrio combinado de {orders?.length || 0} pedido{orders?.length !== 1 ? 's' : ''}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5 truncate">
+                        {(orders || []).map((o) => o.project).join(' · ')}
+                    </p>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                    <div className="bg-gray-50 rounded-xl px-3 py-3 text-center">
+                        <p className="text-[10px] text-gray-500 uppercase tracking-wide font-semibold">Por separado</p>
+                        <p className="text-2xl font-bold text-gray-500 mt-1">{comparison?.planchasSeparado ?? '—'}</p>
+                        <p className="text-[10px] text-gray-400">planchas</p>
+                    </div>
+                    <div className="bg-emerald-50 rounded-xl px-3 py-3 text-center border border-emerald-200">
+                        <p className="text-[10px] text-emerald-700 uppercase tracking-wide font-semibold">Combinado</p>
+                        <p className="text-2xl font-bold text-emerald-700 mt-1">{comparison?.planchasCombinado ?? '—'}</p>
+                        <p className="text-[10px] text-emerald-600">planchas</p>
+                    </div>
+                    <div className={`rounded-xl px-3 py-3 text-center border ${ahorroPositivo ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'}`}>
+                        <p className={`text-[10px] uppercase tracking-wide font-semibold ${ahorroPositivo ? 'text-blue-700' : 'text-gray-500'}`}>Ahorro</p>
+                        <p className={`text-2xl font-bold mt-1 ${ahorroPositivo ? 'text-blue-700' : 'text-gray-500'}`}>
+                            {ahorroPositivo ? `${comparison.ahorro}` : '0'}
+                        </p>
+                        <p className={`text-[10px] ${ahorroPositivo ? 'text-blue-600' : 'text-gray-400'}`}>planchas menos</p>
+                    </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs text-gray-500">
+                        {glassTypesCount} tipo{glassTypesCount !== 1 ? 's' : ''} de vidrio distinto{glassTypesCount !== 1 ? 's' : ''}
+                    </p>
+                    <button
+                        onClick={onViewPlan}
+                        className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 sm:px-5 py-2.5 rounded-xl font-medium text-sm transition-all active:scale-95 flex-shrink-0"
+                    >
+                        <FaGem size={13} />
+                        Ver Plan de Corte
+                    </button>
+                </div>
+            </div>
+
+            {/* Tabla de ventanas con proyecto */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="px-4 sm:px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+                    <span className="w-1 h-5 bg-emerald-500 rounded-full" />
+                    <p className="text-sm font-semibold text-gray-800">Ventanas incluidas</p>
+                    <span className="ml-auto text-xs text-gray-400">
+                        {(windows || []).length} ventana{(windows || []).length !== 1 ? 's' : ''}
+                    </span>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                        <thead>
+                            <tr className="bg-gray-50/70 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase">
+                                <th className="py-2.5 px-4 text-center">Ref</th>
+                                <th className="py-2.5 px-4 text-left">Proyecto</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                            {(windows || []).map((w) => (
+                                <tr key={w.index}>
+                                    <td className="py-2.5 px-4 text-center font-bold text-emerald-600">{w.label}</td>
+                                    <td className="py-2.5 px-4 text-gray-800 font-medium">{w.project}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     );
