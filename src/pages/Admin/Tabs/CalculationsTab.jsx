@@ -21,8 +21,8 @@ const EMPTY_BASE = {
     vidrioDescuento: 0,
 };
 
-const EMPTY_OVERRIDE = {
-    key: '',
+const EMPTY_OVERRIDE_RULE = {
+    keys: [],
     hojaDivision: '',
     hojaMargen: '',
     hojaDescuento: '',
@@ -31,29 +31,59 @@ const EMPTY_OVERRIDE = {
 
 const SIN_SERIE = '__sin_serie__';
 
-const overridesToArray = (json) => {
-    if (!json || typeof json !== 'object') return [];
-    return Object.entries(json).map(([key, val]) => ({
-        key,
-        hojaDivision: val.hojaDivision ?? '',
-        hojaMargen: val.hojaMargen ?? '',
-        hojaDescuento: val.hojaDescuento ?? '',
-        vidrioDescuento: val.vidrioDescuento ?? '',
-    }));
+// Grupos que el backend ignora al aplicar excepciones (no tiene sentido
+// ofrecerlos como opción disparadora de un descuento distinto).
+const SKIP_GROUP_KEYS = new Set(['mosquitero', 'refuerzo_hojas', 'refuerzo_mosquitero']);
+
+// ── Convierte lo guardado en BD (legado: 1 opción = 1 regla, o nuevo:
+// arreglo de reglas con varias opciones) a la forma que edita este formulario ──
+const overridesToRules = (raw) => {
+    if (!raw) return [];
+    if (Array.isArray(raw)) {
+        return raw
+            .filter((r) => r && Array.isArray(r.keys) && r.keys.length > 0)
+            .map((r) => ({
+                keys: [...r.keys],
+                hojaDivision: r.hojaDivision ?? '',
+                hojaMargen: r.hojaMargen ?? '',
+                hojaDescuento: r.hojaDescuento ?? '',
+                vidrioDescuento: r.vidrioDescuento ?? '',
+            }));
+    }
+    if (typeof raw === 'object') {
+        return Object.entries(raw).map(([key, val]) => ({
+            keys: [key],
+            hojaDivision: val?.hojaDivision ?? '',
+            hojaMargen: val?.hojaMargen ?? '',
+            hojaDescuento: val?.hojaDescuento ?? '',
+            vidrioDescuento: val?.vidrioDescuento ?? '',
+        }));
+    }
+    return [];
 };
 
-const arrayToOverrides = (arr) => {
-    const result = {};
-    arr.forEach(({ key, hojaDivision, hojaMargen, hojaDescuento, vidrioDescuento }) => {
-        if (!key.trim()) return;
-        const entry = {};
+// Cuenta cuántas excepciones hay guardadas, sin importar el formato (para la tabla resumen).
+const countOverrideRules = (raw) => {
+    if (!raw) return 0;
+    if (Array.isArray(raw)) return raw.length;
+    if (typeof raw === 'object') return Object.keys(raw).length;
+    return 0;
+};
+
+// ── Convierte las reglas del formulario de vuelta al formato que se guarda ──
+const rulesToOverrides = (rules) => {
+    const result = [];
+    rules.forEach(({ keys, hojaDivision, hojaMargen, hojaDescuento, vidrioDescuento }) => {
+        const cleanKeys = (keys || []).filter(Boolean);
+        if (cleanKeys.length === 0) return;
+        const entry = { keys: cleanKeys };
         if (hojaDivision) entry.hojaDivision = hojaDivision;
         if (hojaMargen !== '') entry.hojaMargen = Number(hojaMargen);
         if (hojaDescuento !== '') entry.hojaDescuento = Number(hojaDescuento);
         if (vidrioDescuento !== '') entry.vidrioDescuento = Number(vidrioDescuento);
-        if (Object.keys(entry).length) result[key.trim()] = entry;
+        if (Object.keys(entry).length > 1) result.push(entry);
     });
-    return Object.keys(result).length ? result : null;
+    return result.length ? result : null;
 };
 
 // ── Misma fórmula que usa el backend (calcularMedidasHoja) — para la vista previa ──
@@ -68,40 +98,61 @@ function calcularEjemplo(anchoCm, altoCm, hojaDivision, hojaMargen, hojaDescuent
 
 const round1 = (n) => (Number.isFinite(n) ? Math.round(n * 10) / 10 : 0);
 
-// ─── OverrideRow — stack vertical en móvil, fila en sm+ ──────────────────────
-function OverrideRow({ override, index, onChange, onRemove, existingKeys }) {
+// ─── OverrideRuleCard — una regla que puede disparar con VARIAS opciones ─────
+function OverrideRuleCard({ rule, index, onChange, onRemove, relevantGroups, loadingGroups }) {
+    const toggleKey = (key) => {
+        const has = rule.keys.includes(key);
+        const nextKeys = has ? rule.keys.filter((k) => k !== key) : [...rule.keys, key];
+        onChange(index, 'keys', nextKeys);
+    };
+
     return (
         <div className="p-3 bg-blue-50 rounded-lg border border-blue-100 space-y-3">
-            {/* Fila superior: key + botón eliminar */}
+            {/* Selector de opciones — checkboxes agrupados, solo los grupos de esta ventana */}
             <div className="flex items-start gap-2">
                 <div className="flex-1 min-w-0">
-                    <label className="block text-xs text-blue-600 font-medium mb-1">Cuando el vendedor elige esta opción...</label>
-                    {existingKeys.length > 0 ? (
-                        <select
-                            value={override.key}
-                            onChange={(e) => onChange(index, 'key', e.target.value)}
-                            className="w-full border border-blue-200 rounded p-1.5 text-xs focus:ring-1 focus:ring-blue-400 focus:outline-none"
-                        >
-                            <option value="">— Seleccionar —</option>
-                            {existingKeys.map((k) => <option key={k} value={k}>{k}</option>)}
-                            <option value="__custom__">✏ Escribir nuevo...</option>
-                        </select>
+                    <label className="block text-xs text-blue-600 font-medium mb-1.5">
+                        Se aplica cuando el vendedor elige cualquiera de estas opciones:
+                    </label>
+                    {loadingGroups ? (
+                        <p className="text-xs text-gray-400 italic">Cargando opciones de esta ventana...</p>
+                    ) : relevantGroups.length === 0 ? (
+                        <p className="text-xs text-gray-400 italic">Esta ventana no tiene opciones configurables en el cotizador.</p>
                     ) : (
-                        <input
-                            type="text"
-                            placeholder="ej: chapa_ambas_hojas"
-                            value={override.key}
-                            onChange={(e) => onChange(index, 'key', e.target.value)}
-                            className="w-full border border-blue-200 rounded p-1.5 text-xs focus:ring-1 focus:ring-blue-400 focus:outline-none"
-                        />
+                        <div className="space-y-2 max-h-56 overflow-y-auto bg-white rounded-lg border border-blue-100 p-2">
+                            {relevantGroups.map((g) => (
+                                <div key={g.key}>
+                                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">{g.label}</p>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {(g.values || []).map((v) => {
+                                            const checked = rule.keys.includes(v.key);
+                                            return (
+                                                <label
+                                                    key={v.key}
+                                                    className={`flex items-center gap-1.5 px-2 py-1 rounded-md border text-xs cursor-pointer transition-colors select-none ${checked
+                                                        ? 'bg-blue-600 text-white border-blue-600'
+                                                        : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                                                        }`}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        className="hidden"
+                                                        checked={checked}
+                                                        onChange={() => toggleKey(v.key)}
+                                                    />
+                                                    {v.label}
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     )}
-                    {override.key === '__custom__' && (
-                        <input
-                            type="text"
-                            placeholder="Escribe el valor exacto..."
-                            className="w-full mt-1 border border-blue-300 rounded p-1.5 text-xs focus:ring-1 focus:ring-blue-400 focus:outline-none"
-                            onChange={(e) => onChange(index, 'key', e.target.value)}
-                        />
+                    {rule.keys.length > 0 && (
+                        <p className="text-[10px] text-blue-600 mt-1">
+                            {rule.keys.length} opción{rule.keys.length !== 1 ? 'es' : ''} seleccionada{rule.keys.length !== 1 ? 's' : ''}
+                        </p>
                     )}
                 </div>
                 <button
@@ -119,7 +170,7 @@ function OverrideRow({ override, index, onChange, onRemove, existingKeys }) {
                 <div>
                     <label className="block text-xs text-blue-600 font-medium mb-1">Hojas</label>
                     <select
-                        value={override.hojaDivision}
+                        value={rule.hojaDivision}
                         onChange={(e) => onChange(index, 'hojaDivision', e.target.value)}
                         className="w-full border border-blue-200 rounded p-1.5 text-xs focus:ring-1 focus:ring-blue-400 focus:outline-none"
                     >
@@ -133,7 +184,7 @@ function OverrideRow({ override, index, onChange, onRemove, existingKeys }) {
                     <label className="block text-xs text-blue-600 font-medium mb-1">Ajuste Ancho</label>
                     <input
                         type="number" step="0.1" placeholder="—"
-                        value={override.hojaMargen}
+                        value={rule.hojaMargen}
                         onChange={(e) => onChange(index, 'hojaMargen', e.target.value)}
                         className="w-full border border-blue-200 rounded p-1.5 text-xs font-mono focus:ring-1 focus:ring-blue-400 focus:outline-none"
                     />
@@ -142,7 +193,7 @@ function OverrideRow({ override, index, onChange, onRemove, existingKeys }) {
                     <label className="block text-xs text-blue-600 font-medium mb-1">Desc. Alto</label>
                     <input
                         type="number" step="0.1" placeholder="—"
-                        value={override.hojaDescuento}
+                        value={rule.hojaDescuento}
                         onChange={(e) => onChange(index, 'hojaDescuento', e.target.value)}
                         className="w-full border border-blue-200 rounded p-1.5 text-xs font-mono focus:ring-1 focus:ring-blue-400 focus:outline-none"
                     />
@@ -151,7 +202,7 @@ function OverrideRow({ override, index, onChange, onRemove, existingKeys }) {
                     <label className="block text-xs text-blue-600 font-medium mb-1">Desc. Vidrio</label>
                     <input
                         type="number" step="0.1" placeholder="—"
-                        value={override.vidrioDescuento}
+                        value={rule.vidrioDescuento}
                         onChange={(e) => onChange(index, 'vidrioDescuento', e.target.value)}
                         className="w-full border border-blue-200 rounded p-1.5 text-xs font-mono focus:ring-1 focus:ring-blue-400 focus:outline-none"
                     />
@@ -165,7 +216,6 @@ function OverrideRow({ override, index, onChange, onRemove, existingKeys }) {
 export default function CalculationsTab() {
     const [windowTypes, setWindowTypes] = useState([]);
     const [calculations, setCalculations] = useState({});
-    const [optionKeys, setOptionKeys] = useState([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
@@ -175,6 +225,8 @@ export default function CalculationsTab() {
     const [editingType, setEditingType] = useState(null);
     const [baseValues, setBaseValues] = useState({ ...EMPTY_BASE });
     const [overrides, setOverrides] = useState([]);
+    const [relevantGroups, setRelevantGroups] = useState([]);
+    const [loadingGroups, setLoadingGroups] = useState(false);
     const [formError, setFormError] = useState('');
     const [ejemploAncho, setEjemploAncho] = useState(100);
     const [ejemploAlto, setEjemploAlto] = useState(200);
@@ -184,10 +236,7 @@ export default function CalculationsTab() {
         setLoading(true);
         setError('');
         try {
-            const [calcsRes, groupsRes] = await Promise.all([
-                api.get('/window-calculations'),
-                api.get('/option-groups'),
-            ]);
+            const calcsRes = await api.get('/window-calculations');
 
             const data = Array.isArray(calcsRes.data) ? calcsRes.data : [];
             setWindowTypes(data);
@@ -199,10 +248,6 @@ export default function CalculationsTab() {
                 }
             });
             setCalculations(map);
-
-            const groups = Array.isArray(groupsRes.data) ? groupsRes.data : [];
-            const keys = groups.flatMap(g => g.values.map(v => v.key)).sort();
-            setOptionKeys([...new Set(keys)]);
 
         } catch (err) {
             console.error('Error cargando datos:', err);
@@ -240,7 +285,7 @@ export default function CalculationsTab() {
     }, [windowTypes, activeSeries]);
 
     // ── Abrir modal ──────────────────────────────────────────────────────────
-    const openModal = (windowType) => {
+    const openModal = async (windowType) => {
         setEditingType(windowType);
         const calc = calculations[windowType.id];
         setBaseValues({
@@ -249,11 +294,36 @@ export default function CalculationsTab() {
             hojaDescuento: calc?.hojaDescuento ?? 0,
             vidrioDescuento: calc?.vidrioDescuento ?? 0,
         });
-        setOverrides(overridesToArray(calc?.calculationOverrides));
+        setOverrides(overridesToRules(calc?.calculationOverrides));
         setEjemploAncho(100);
         setEjemploAlto(200);
         setFormError('');
+        setRelevantGroups([]);
         setShowModal(true);
+
+        // Solo mostrar como opciones seleccionables los grupos que esta ventana
+        // realmente usa en el cotizador — no todos los del sistema.
+        setLoadingGroups(true);
+        try {
+            const res = await api.get('/window-type-options', {
+                params: { windowTypeId: windowType.id },
+            });
+            const groupsMap = new Map();
+            (res.data || []).forEach((wto) => {
+                const g = wto.group;
+                if (g && !SKIP_GROUP_KEYS.has(g.key) && !groupsMap.has(g.key)) {
+                    groupsMap.set(g.key, g);
+                }
+            });
+            setRelevantGroups(
+                Array.from(groupsMap.values()).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)),
+            );
+        } catch (err) {
+            console.error('Error cargando opciones de la ventana:', err);
+            setRelevantGroups([]);
+        } finally {
+            setLoadingGroups(false);
+        }
     };
 
     const closeModal = () => {
@@ -261,11 +331,12 @@ export default function CalculationsTab() {
         setEditingType(null);
         setBaseValues({ ...EMPTY_BASE });
         setOverrides([]);
+        setRelevantGroups([]);
         setFormError('');
     };
 
     // ── Manejo de overrides ──────────────────────────────────────────────────
-    const addOverride = () => setOverrides((prev) => [...prev, { ...EMPTY_OVERRIDE }]);
+    const addOverride = () => setOverrides((prev) => [...prev, { ...EMPTY_OVERRIDE_RULE, keys: [] }]);
 
     const updateOverride = (index, field, value) => {
         setOverrides((prev) => prev.map((o, i) => i === index ? { ...o, [field]: value } : o));
@@ -279,9 +350,14 @@ export default function CalculationsTab() {
     const handleSave = async () => {
         setFormError('');
 
-        const keys = overrides.map((o) => o.key.trim()).filter(Boolean);
-        if (new Set(keys).size !== keys.length) {
-            setFormError('Hay dos excepciones con la misma opción. Cada una debe ser única.');
+        const rulesConOpciones = overrides.filter((o) => (o.keys || []).length > 0);
+        const allKeys = rulesConOpciones.flatMap((o) => o.keys);
+        if (new Set(allKeys).size !== allKeys.length) {
+            setFormError('Una misma opción está marcada en dos excepciones distintas — el sistema no sabría cuál aplicar. Quítala de una de las dos.');
+            return;
+        }
+        if (overrides.some((o) => (o.keys || []).length === 0)) {
+            setFormError('Hay una excepción sin ninguna opción marcada. Selecciona al menos una, o elimínala.');
             return;
         }
 
@@ -291,7 +367,7 @@ export default function CalculationsTab() {
             hojaMargen: Number(baseValues.hojaMargen),
             hojaDescuento: Number(baseValues.hojaDescuento),
             vidrioDescuento: Number(baseValues.vidrioDescuento),
-            calculationOverrides: arrayToOverrides(overrides),
+            calculationOverrides: rulesToOverrides(overrides),
         };
 
         setSaving(true);
@@ -397,9 +473,7 @@ export default function CalculationsTab() {
                             <tbody className="divide-y divide-gray-100">
                                 {filteredTypes.map((wt) => {
                                     const calc = calculations[wt.id];
-                                    const overrideCount = calc?.calculationOverrides
-                                        ? Object.keys(calc.calculationOverrides).length
-                                        : 0;
+                                    const overrideCount = countOverrideRules(calc?.calculationOverrides);
                                     const divisionLabel = calc
                                         ? (HOJA_DIVISION_OPTIONS.find((o) => o.value === calc.hojaDivision)?.label ?? calc.hojaDivision)
                                         : null;
@@ -460,9 +534,7 @@ export default function CalculationsTab() {
                     <div className="md:hidden border border-gray-200 rounded-lg overflow-hidden divide-y divide-gray-100">
                         {filteredTypes.map((wt) => {
                             const calc = calculations[wt.id];
-                            const overrideCount = calc?.calculationOverrides
-                                ? Object.keys(calc.calculationOverrides).length
-                                : 0;
+                            const overrideCount = countOverrideRules(calc?.calculationOverrides);
                             const divisionLabel = calc
                                 ? (HOJA_DIVISION_OPTIONS.find((o) => o.value === calc.hojaDivision)?.label ?? calc.hojaDivision)
                                 : null;
@@ -702,13 +774,14 @@ export default function CalculationsTab() {
                                 ) : (
                                     <div className="space-y-2">
                                         {overrides.map((ov, i) => (
-                                            <OverrideRow
+                                            <OverrideRuleCard
                                                 key={i}
-                                                override={ov}
+                                                rule={ov}
                                                 index={i}
                                                 onChange={updateOverride}
                                                 onRemove={removeOverride}
-                                                existingKeys={optionKeys}
+                                                relevantGroups={relevantGroups}
+                                                loadingGroups={loadingGroups}
                                             />
                                         ))}
                                     </div>
