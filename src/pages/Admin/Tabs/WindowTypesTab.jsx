@@ -1,8 +1,9 @@
 // RUTA: src/pages/Admin/Tabs/WindowTypesTab.jsx
 
 import { useEffect, useState, useMemo } from "react";
-import { FaPlus, FaTrashAlt, FaEdit, FaSearch, FaExclamationTriangle } from "react-icons/fa";
+import { FaPlus, FaTrashAlt, FaEdit, FaSearch, FaExclamationTriangle, FaMagic } from "react-icons/fa";
 import api from "@/services/api";
+import ProductWizardModal from "../ProductWizard/ProductWizardModal";
 
 const EMPTY_FORM = {
   name: "",
@@ -35,6 +36,8 @@ export default function WindowTypesTab() {
   const [editingType, setEditingType] = useState(null);
   const [formData, setFormData] = useState(EMPTY_FORM);
   const [search, setSearch] = useState("");
+  const [showWizard, setShowWizard] = useState(false);
+  const [wizardEditingId, setWizardEditingId] = useState(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -136,6 +139,14 @@ export default function WindowTypesTab() {
   };
 
   const openEdit = (type) => {
+    // Los productos creados con el asistente (motor de fórmulas) SIEMPRE se
+    // editan reabriendo el mismo asistente, precargado — el backend rechaza
+    // cualquier otro camino de edición para ellos (ver ProductWizardService).
+    if (type.calc_engine === "formula") {
+      setWizardEditingId(type.id);
+      setShowWizard(true);
+      return;
+    }
     setEditingType(type);
     setFormData({
       name: type.name,
@@ -186,14 +197,25 @@ export default function WindowTypesTab() {
             es el que aparece en cotizaciones y PDFs para el cliente.
           </p>
         </div>
-        <button
-          onClick={openCreate}
-          className="flex-shrink-0 flex items-center gap-2 bg-blue-600 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-colors shadow-sm text-sm"
-        >
-          <FaPlus size={13} />
-          <span className="hidden sm:inline">Añadir Tipo</span>
-          <span className="sm:hidden">Añadir</span>
-        </button>
+        <div className="flex flex-shrink-0 gap-2">
+          <button
+            onClick={() => { setWizardEditingId(null); setShowWizard(true); }}
+            className="flex items-center gap-2 bg-white text-blue-700 border border-blue-200 px-3 sm:px-4 py-2 rounded-lg hover:bg-blue-50 active:bg-blue-100 transition-colors shadow-sm text-sm"
+            title="Crear un producto nuevo paso a paso, con fórmulas configurables"
+          >
+            <FaMagic size={13} />
+            <span className="hidden sm:inline">Nuevo con asistente</span>
+            <span className="sm:hidden">Asistente</span>
+          </button>
+          <button
+            onClick={openCreate}
+            className="flex items-center gap-2 bg-blue-600 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-colors shadow-sm text-sm"
+          >
+            <FaPlus size={13} />
+            <span className="hidden sm:inline">Añadir Tipo</span>
+            <span className="sm:hidden">Añadir</span>
+          </button>
+        </div>
       </div>
 
       {/* Búsqueda */}
@@ -245,7 +267,14 @@ export default function WindowTypesTab() {
               <tbody className="divide-y divide-gray-100">
                 {filtered.map((t) => (
                   <tr key={t.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="py-2.5 px-4 font-medium text-gray-900 text-xs">{t.name}</td>
+                    <td className="py-2.5 px-4 font-medium text-gray-900 text-xs">
+                      {t.name}
+                      {t.calc_engine === "formula" && (
+                        <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100">
+                          <FaMagic size={8} /> Asistente
+                        </span>
+                      )}
+                    </td>
                     <td className="py-2.5 px-4">
                       {t.displayName ? (
                         <span className="text-gray-800 font-medium">{t.displayName}</span>
@@ -303,7 +332,14 @@ export default function WindowTypesTab() {
             {filtered.map((t) => (
               <div key={t.id} className="p-4">
                 <div className="flex items-start justify-between gap-2 mb-1">
-                  <p className="font-semibold text-sm text-gray-900 leading-tight">{t.name}</p>
+                  <p className="font-semibold text-sm text-gray-900 leading-tight">
+                    {t.name}
+                    {t.calc_engine === "formula" && (
+                      <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100 align-middle">
+                        <FaMagic size={8} /> Asistente
+                      </span>
+                    )}
+                  </p>
                   <div className="flex items-center gap-1.5 flex-shrink-0">
                     <button onClick={() => openEdit(t)} className="text-blue-500 p-1.5 rounded-lg border border-blue-100 active:bg-blue-50" title="Editar">
                       <FaEdit size={13} />
@@ -519,6 +555,17 @@ export default function WindowTypesTab() {
             </form>
           </div>
         </div>
+      )}
+
+      {showWizard && (
+        <ProductWizardModal
+          editingId={wizardEditingId}
+          onClose={() => setShowWizard(false)}
+          onSaved={() => {
+            setShowWizard(false);
+            fetchData();
+          }}
+        />
       )}
     </div>
   );
