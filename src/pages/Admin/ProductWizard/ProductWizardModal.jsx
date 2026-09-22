@@ -41,7 +41,7 @@ function emptyState() {
     pvcColorIds: [],
     perfiles: {
       MARCO: { ...EMPTY_PERFIL },
-      HOJA: { ...EMPTY_PERFIL },
+      HOJA: { enabled: true, ...EMPTY_PERFIL },
       TAPAJAMBA: { enabled: false, ...EMPTY_PERFIL },
       BATIENTE: { enabled: false, ...EMPTY_PERFIL },
     },
@@ -99,6 +99,12 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
         if (editingId) {
           const { data: product } = await api.get(`/product-wizard/${editingId}`);
           const perfiles = { ...emptyState().perfiles };
+          // Los slots opcionales (Hoja/Tapajamba/Batiente) arrancan
+          // deshabilitados al precargar — solo se activan si el producto
+          // realmente trae ese perfil configurado.
+          perfiles.HOJA = { ...perfiles.HOJA, enabled: false };
+          perfiles.TAPAJAMBA = { ...perfiles.TAPAJAMBA, enabled: false };
+          perfiles.BATIENTE = { ...perfiles.BATIENTE, enabled: false };
           for (const p of product.perfiles) {
             perfiles[p.slot] = {
               enabled: true,
@@ -152,7 +158,7 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
     const perfiles = [];
     for (const slot of ["MARCO", "HOJA", "TAPAJAMBA", "BATIENTE"]) {
       const p = data.perfiles[slot];
-      const isOptional = slot === "TAPAJAMBA" || slot === "BATIENTE";
+      const isOptional = slot === "HOJA" || slot === "TAPAJAMBA" || slot === "BATIENTE";
       if (isOptional && !p.enabled) continue;
       perfiles.push({
         slot,
@@ -193,7 +199,8 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
     if (!data.name.trim()) errs.push("El nombre interno es obligatorio.");
     if (data.pvcColorIds.length === 0) errs.push("Debes asociar al menos un color PVC.");
     if (!data.perfiles.MARCO.material_id) errs.push("Debes elegir el perfil de Marco.");
-    if (!data.perfiles.HOJA.material_id) errs.push("Debes elegir el perfil de Hoja.");
+    if (data.perfiles.HOJA.enabled && !data.perfiles.HOJA.material_id)
+      errs.push("Activaste Hoja pero no elegiste su perfil.");
     if (data.perfiles.TAPAJAMBA.enabled && !data.perfiles.TAPAJAMBA.material_id)
       errs.push("Activaste Tapajamba pero no elegiste su perfil.");
     if (data.perfiles.BATIENTE.enabled && !data.perfiles.BATIENTE.material_id)
@@ -544,7 +551,7 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
                 </label>
               </div>
               {renderPerfilCard("MARCO", "Marco", false)}
-              {renderPerfilCard("HOJA", "Hoja", false)}
+              {renderPerfilCard("HOJA", "Hoja", true)}
               {renderPerfilCard("TAPAJAMBA", "Tapajamba", true)}
               {renderPerfilCard("BATIENTE", "Batiente", true)}
             </div>
@@ -767,7 +774,7 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
                 <p>
                   <span className="font-medium text-gray-700">Perfiles:</span>{" "}
                   {["MARCO", "HOJA", "TAPAJAMBA", "BATIENTE"]
-                    .filter((s) => s === "MARCO" || s === "HOJA" || data.perfiles[s].enabled)
+                    .filter((s) => s === "MARCO" || data.perfiles[s].enabled)
                     .map((s) => `${s}: ${materialName(data.perfiles[s].material_id) || "sin elegir"}`)
                     .join(" · ")}
                 </p>
