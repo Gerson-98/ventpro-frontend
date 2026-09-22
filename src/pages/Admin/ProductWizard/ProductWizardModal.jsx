@@ -141,6 +141,9 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
               required: a.required ?? true,
               option_group: a.option_group || "",
               option_key: a.option_key || "",
+              formula_type: a.formula_type,
+              formula_slot: a.formula_slot,
+              formula_factor: a.formula_factor,
             })),
             refuerzoHojaMaterialId: product.refuerzoHojaMaterialId ? String(product.refuerzoHojaMaterialId) : "",
             refuerzoMosquiteroMaterialId: product.refuerzoMosquiteroMaterialId ? String(product.refuerzoMosquiteroMaterialId) : "",
@@ -200,10 +203,13 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
         .filter((a) => a.material_id)
         .map((a) => ({
           material_id: Number(a.material_id),
-          quantity: Number(a.quantity) || 1,
+          quantity: a.formula_type ? undefined : (Number(a.quantity) || 1),
           required: a.required !== false,
           option_group: a.option_group || undefined,
           option_key: a.option_key || undefined,
+          formula_type: a.formula_type || undefined,
+          formula_slot: a.formula_type ? a.formula_slot : undefined,
+          formula_factor: a.formula_type ? Number(a.formula_factor) || 0 : undefined,
         })),
       refuerzoHojaMaterialId: data.refuerzoHojaMaterialId ? Number(data.refuerzoHojaMaterialId) : undefined,
       refuerzoMosquiteroMaterialId: data.refuerzoMosquiteroMaterialId ? Number(data.refuerzoMosquiteroMaterialId) : undefined,
@@ -227,9 +233,14 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
     if (data.vidrio.usesGlass && (!data.vidrio.cant_vidrios || data.vidrio.cant_vidrios <= 0))
       errs.push("La cantidad de vidrios debe ser mayor a 0.");
     for (const a of data.accesorios) {
+      const accName = accessoryMaterials.find(m => String(m.id) === a.material_id)?.name || "";
       if (!a.material_id) errs.push("Hay un accesorio sin seleccionar.");
-      else if (!a.quantity || a.quantity <= 0) errs.push(`El accesorio "${accessoryMaterials.find(m => String(m.id) === a.material_id)?.name || ""}" necesita una cantidad mayor a 0.`);
-      if (!!a.option_group !== !!a.option_key) errs.push(`El accesorio "${accessoryMaterials.find(m => String(m.id) === a.material_id)?.name || ""}" tiene una condición incompleta.`);
+      else if (a.formula_type) {
+        if (!a.formula_factor || a.formula_factor <= 0) errs.push(`El accesorio "${accName}" necesita un factor de fórmula mayor a 0.`);
+      } else if (!a.quantity || a.quantity <= 0) {
+        errs.push(`El accesorio "${accName}" necesita una cantidad mayor a 0.`);
+      }
+      if (!!a.option_group !== !!a.option_key) errs.push(`El accesorio "${accName}" tiene una condición incompleta.`);
     }
     return errs;
   }, [data]);
@@ -727,7 +738,9 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
                 <p className="text-xs text-gray-400 italic">Sin accesorios configurados.</p>
               )}
 
-              {data.accesorios.map((a, idx) => (
+              {data.accesorios.map((a, idx) => {
+                const usesFormula = !!a.formula_type;
+                return (
                 <div key={idx} className="border border-gray-200 rounded-lg p-2 space-y-2">
                   <div className="flex items-center gap-2">
                     <select
@@ -742,14 +755,16 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
                         </option>
                       ))}
                     </select>
-                    <input
-                      type="number"
-                      min={1}
-                      value={a.quantity}
-                      onChange={(e) => updateAccesorio(idx, { quantity: parseInt(e.target.value, 10) || 1 })}
-                      className="w-20 border border-gray-300 rounded-lg p-2 text-sm text-center focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                      title="Cantidad por ventana"
-                    />
+                    {!usesFormula && (
+                      <input
+                        type="number"
+                        min={1}
+                        value={a.quantity}
+                        onChange={(e) => updateAccesorio(idx, { quantity: parseInt(e.target.value, 10) || 1 })}
+                        className="w-20 border border-gray-300 rounded-lg p-2 text-sm text-center focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        title="Cantidad por ventana"
+                      />
+                    )}
                     <button
                       type="button"
                       onClick={() => removeAccesorio(idx)}
@@ -758,6 +773,63 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
                       <FaTrashAlt size={13} />
                     </button>
                   </div>
+
+                  {/* ── Cantidad: fija, o calculada según cuánto material lleve otra pieza ── */}
+                  <div className="flex items-center gap-1.5 pl-0.5">
+                    <button
+                      type="button"
+                      onClick={() => updateAccesorio(idx, { formula_type: undefined, formula_slot: undefined, formula_factor: undefined, quantity: a.quantity || 1 })}
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
+                        !usesFormula ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-500 border-gray-300"
+                      }`}
+                    >
+                      Cantidad fija
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateAccesorio(idx, { formula_type: 'PER_BARRA', formula_slot: 'hoja', formula_factor: 1 })}
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
+                        usesFormula ? "bg-purple-600 text-white border-purple-600" : "bg-white text-gray-500 border-gray-300"
+                      }`}
+                    >
+                      Por fórmula
+                    </button>
+                  </div>
+                  {usesFormula && (
+                    <div className="flex items-center gap-2 pl-0.5 flex-wrap text-xs bg-purple-50 border border-purple-100 rounded-lg p-2">
+                      <span className="text-purple-700">Cantidad =</span>
+                      <select
+                        value={a.formula_type}
+                        onChange={(e) => updateAccesorio(idx, { formula_type: e.target.value })}
+                        className="border border-purple-200 rounded px-1.5 py-1"
+                      >
+                        <option value="PER_BARRA">barras</option>
+                        <option value="PER_M2">m²</option>
+                      </select>
+                      <span className="text-purple-700">de</span>
+                      <select
+                        value={a.formula_slot}
+                        onChange={(e) => updateAccesorio(idx, { formula_slot: e.target.value })}
+                        className="border border-purple-200 rounded px-1.5 py-1"
+                      >
+                        <option value="marco">Marco</option>
+                        <option value="hoja">Hoja</option>
+                        <option value="mosquitero">Mosquitero</option>
+                        <option value="batiente">Batiente</option>
+                        <option value="tapajamba">Tapajamba</option>
+                      </select>
+                      <span className="text-purple-700">×</span>
+                      <input
+                        type="number"
+                        step="any"
+                        value={a.formula_factor}
+                        onChange={(e) => updateAccesorio(idx, { formula_factor: parseFloat(e.target.value) || 0 })}
+                        className="w-16 border border-purple-200 rounded px-1.5 py-1 text-center"
+                      />
+                      <span className="text-purple-700">(redondeado hacia arriba)</span>
+                    </div>
+                  )}
+
                   <div className="flex gap-1.5 pl-0.5">
                     <button
                       type="button"
@@ -812,7 +884,7 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
                     )}
                   </div>
                 </div>
-              ))}
+              );})}
             </div>
           )}
 
@@ -929,7 +1001,10 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
                           const cond = a.option_group
                             ? ` — solo si ${optionGroups.find((g) => g.key === a.option_group)?.label || a.option_group} = ${optionGroups.find((g) => g.key === a.option_group)?.values.find((v) => v.key === a.option_key)?.label || a.option_key}`
                             : "";
-                          return `${name} x${a.quantity} (${a.required !== false ? "obligatorio" : "opcional"})${cond}`;
+                          const qtyLabel = a.formula_type
+                            ? `${a.formula_factor}× ${a.formula_type === "PER_M2" ? "m²" : "barras"} de ${a.formula_slot}`
+                            : `x${a.quantity}`;
+                          return `${name} ${qtyLabel} (${a.required !== false ? "obligatorio" : "opcional"})${cond}`;
                         })
                         .join(", ")}
                 </p>
