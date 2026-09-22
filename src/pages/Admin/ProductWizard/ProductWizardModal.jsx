@@ -30,7 +30,7 @@ const STEPS = [
   { id: 6, label: "Guardar" },
 ];
 
-const EMPTY_PERFIL = { material_id: "", piezas: 2, formulaAncho: [], formulaAlto: [] };
+const EMPTY_PERFIL = { material_id: "", piezasAncho: 2, piezasAlto: 2, formulaAncho: [], formulaAlto: [] };
 
 function emptyState() {
   return {
@@ -116,7 +116,8 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
             perfiles[p.slot] = {
               enabled: true,
               material_id: String(p.material_id ?? ""),
-              piezas: p.piezas,
+              piezasAncho: p.piezasAncho ?? 0,
+              piezasAlto: p.piezasAlto ?? 0,
               formulaAncho: p.formulaAncho || [],
               formulaAlto: p.formulaAlto || [],
             };
@@ -174,7 +175,8 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
       perfiles.push({
         slot,
         material_id: Number(p.material_id) || 0,
-        piezas: Number(p.piezas) || 0,
+        piezasAncho: Number(p.piezasAncho) || 0,
+        piezasAlto: Number(p.piezasAlto) || 0,
         formulaAncho: p.formulaAncho || [],
         formulaAlto: p.formulaAlto || [],
       });
@@ -372,28 +374,65 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
                 <input
                   type="number"
                   min={1}
-                  value={p.piezas}
-                  onChange={(e) => updatePerfil(slot, { piezas: parseInt(e.target.value, 10) || 1 })}
+                  value={p.piezasAncho || p.piezasAlto || 2}
+                  onChange={(e) => {
+                    const n = parseInt(e.target.value, 10) || 1;
+                    updatePerfil(slot, {
+                      piezasAncho: p.piezasAncho > 0 ? n : 0,
+                      piezasAlto: p.piezasAlto > 0 ? n : 0,
+                    });
+                  }}
                   className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
                 <p className="text-[11px] text-gray-400 mt-0.5">Ej: un marco típico usa 2 piezas de ancho y 2 de alto.</p>
               </div>
             </div>
 
-            <FormulaBuilder
-              label="Fórmula de ancho"
-              origenLabel="Ancho"
-              steps={p.formulaAncho}
-              onChange={(steps) => updatePerfil(slot, { formulaAncho: steps })}
-              exampleBase={Number(exampleWidth) || 100}
-            />
-            <FormulaBuilder
-              label="Fórmula de alto"
-              origenLabel="Alto"
-              steps={p.formulaAlto}
-              onChange={(steps) => updatePerfil(slot, { formulaAlto: steps })}
-              exampleBase={Number(exampleHeight) || 150}
-            />
+            {/* Caso especial: perfiles que solo se cortan en un sentido (ej. la
+                Tapajamba de una corrediza típica no lleva corte de ancho). */}
+            <div className="flex gap-4 text-xs text-gray-500">
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  checked={p.piezasAncho === 0}
+                  disabled={p.piezasAlto === 0}
+                  onChange={(e) =>
+                    updatePerfil(slot, { piezasAncho: e.target.checked ? 0 : (p.piezasAlto || 2) })
+                  }
+                />
+                No lleva corte de ancho
+              </label>
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  checked={p.piezasAlto === 0}
+                  disabled={p.piezasAncho === 0}
+                  onChange={(e) =>
+                    updatePerfil(slot, { piezasAlto: e.target.checked ? 0 : (p.piezasAncho || 2) })
+                  }
+                />
+                No lleva corte de alto
+              </label>
+            </div>
+
+            {p.piezasAncho > 0 && (
+              <FormulaBuilder
+                label="Fórmula de ancho"
+                origenLabel="Ancho"
+                steps={p.formulaAncho}
+                onChange={(steps) => updatePerfil(slot, { formulaAncho: steps })}
+                exampleBase={Number(exampleWidth) || 100}
+              />
+            )}
+            {p.piezasAlto > 0 && (
+              <FormulaBuilder
+                label="Fórmula de alto"
+                origenLabel="Alto"
+                steps={p.formulaAlto}
+                onChange={(steps) => updatePerfil(slot, { formulaAlto: steps })}
+                exampleBase={Number(exampleHeight) || 150}
+              />
+            )}
           </>
         )}
       </div>
@@ -826,16 +865,18 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
                         <th className="py-2 px-3 text-left">Pieza</th>
                         <th className="py-2 px-3 text-right">Ancho de corte</th>
                         <th className="py-2 px-3 text-right">Alto de corte</th>
-                        <th className="py-2 px-3 text-right">Piezas</th>
+                        <th className="py-2 px-3 text-right">Piezas ancho</th>
+                        <th className="py-2 px-3 text-right">Piezas alto</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {Object.entries(previewResult).map(([slot, m]) => (
                         <tr key={slot}>
                           <td className="py-2 px-3 font-medium text-gray-800">{slot}</td>
-                          <td className="py-2 px-3 text-right">{m.ancho} cm</td>
-                          <td className="py-2 px-3 text-right">{m.alto} cm</td>
-                          <td className="py-2 px-3 text-right">{m.piezas}</td>
+                          <td className="py-2 px-3 text-right">{m.piezasAncho > 0 ? `${m.ancho} cm` : "—"}</td>
+                          <td className="py-2 px-3 text-right">{m.piezasAlto > 0 ? `${m.alto} cm` : "—"}</td>
+                          <td className="py-2 px-3 text-right">{m.piezasAncho}</td>
+                          <td className="py-2 px-3 text-right">{m.piezasAlto}</td>
                         </tr>
                       ))}
                     </tbody>
