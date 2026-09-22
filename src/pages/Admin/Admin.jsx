@@ -9,14 +9,9 @@ import WindowCategoriesTab from "./Tabs/WindowCategoriesTab";
 import PvcColorsTab from "./Tabs/PvcColorsTab";
 import GlassColorsTab from "./Tabs/GlassColorsTab";
 import ClientsTab from "./Tabs/ClientsTab";
-import CalculationsTab from "./Tabs/CalculationsTab";
 import UsersTab from "./Tabs/UsersTab";
 import PermissionsTab from "./Tabs/PermissionsTab";
 import MaterialsTab from "./Tabs/MaterialsTab";
-import CatalogoPerfilesTab from "./Tabs/CatalogoPerfilesTab";
-import AccessoryRulesTab from "./Tabs/AccessoryRulesTab";
-import OptionConfigTab from './Tabs/OptionConfigTab';
-import WindowOptionAssignTab from './Tabs/WindowOptionAssignTab';
 import ChecklistTemplateTab from './Tabs/ChecklistTemplateTab';
 import ConfiguracionTab from './Tabs/ConfiguracionTab';
 
@@ -24,17 +19,12 @@ const TAB_COMPONENTS = {
   windowTypes: WindowTypesTab,
   windowSeries: WindowSeriesTab,
   windowCategories: WindowCategoriesTab,
-  catalogoPerfiles: CatalogoPerfilesTab,
-  calculations: CalculationsTab,
-  accessoryRules: AccessoryRulesTab,
   materials: MaterialsTab,
   pvcColors: PvcColorsTab,
   glassColors: GlassColorsTab,
   clients: ClientsTab,
   users: UsersTab,
   permissions: PermissionsTab,
-  optionConfig: OptionConfigTab,
-  windowOptionAssign: WindowOptionAssignTab,
   checklists: ChecklistTemplateTab,
   configuracion: ConfiguracionTab,
 };

@@ -5,6 +5,16 @@
 // la barra de pestañas agrupada dentro de la página /admin (Admin.jsx),
 // para que ambas vistas siempre queden sincronizadas.
 
+// Nota: "Catálogo de Perfiles", "Ajustes de Cálculo", "Reglas de Accesorios",
+// "Opciones del Cotizador" y "Asignación de Opciones" existieron acá pero se
+// quitaron del menú — eran las pantallas del sistema de cálculo legacy /
+// pre-asistente. Con los 24 tipos activos ya migrados al asistente (que
+// ahora crea y asigna sus propios grupos de opción al vuelo), esas 5
+// pantallas dejaron de ser parte del flujo normal. Sus componentes siguen en
+// el repo (Tabs/CatalogoPerfilesTab.jsx, CalculationsTab.jsx,
+// AccessoryRulesTab.jsx, OptionConfigTab.jsx, WindowOptionAssignTab.jsx) por
+// si #36/#37 (los 2 tipos legacy que quedan, hoy inactivos) se retoman más
+// adelante — en ese caso, volver a listarlas aquí.
 export const ADMIN_GROUPS = [
   {
     id: "catalogo",
@@ -13,32 +23,15 @@ export const ADMIN_GROUPS = [
       { id: "windowTypes", label: "Tipos de Ventana" },
       { id: "windowSeries", label: "Series" },
       { id: "windowCategories", label: "Categorías" },
-      { id: "catalogoPerfiles", label: "Catálogo de Perfiles" },
     ],
   },
   {
-    id: "calculo",
-    label: "Cálculo y fabricación",
+    id: "materiales",
+    label: "Materiales y colores",
     items: [
-      { id: "calculations", label: "Ajustes de Cálculo" },
-      { id: "accessoryRules", label: "Reglas de Accesorios" },
       { id: "materials", label: "Materiales" },
-    ],
-  },
-  {
-    id: "colores",
-    label: "Colores y vidrio",
-    items: [
       { id: "pvcColors", label: "Colores PVC" },
       { id: "glassColors", label: "Tipos de Vidrio" },
-    ],
-  },
-  {
-    id: "opciones",
-    label: "Opciones del cotizador",
-    items: [
-      { id: "optionConfig", label: "Opciones del Cotizador" },
-      { id: "windowOptionAssign", label: "Asignación de Opciones" },
     ],
   },
   {

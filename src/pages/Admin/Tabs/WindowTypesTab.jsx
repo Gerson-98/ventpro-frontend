@@ -1,7 +1,7 @@
 // RUTA: src/pages/Admin/Tabs/WindowTypesTab.jsx
 
 import { useEffect, useState, useMemo } from "react";
-import { FaPlus, FaTrashAlt, FaEdit, FaSearch, FaExclamationTriangle, FaMagic, FaCopy, FaPowerOff } from "react-icons/fa";
+import { FaTrashAlt, FaEdit, FaSearch, FaExclamationTriangle, FaMagic, FaCopy, FaPowerOff } from "react-icons/fa";
 import api from "@/services/api";
 import ProductWizardModal from "../ProductWizard/ProductWizardModal";
 
@@ -187,13 +187,6 @@ export default function WindowTypesTab() {
     setShowModal(true);
   };
 
-  const openCreate = () => {
-    setEditingType(null);
-    setFormData(EMPTY_FORM);
-    setFormError("");
-    setShowModal(true);
-  };
-
   const closeModal = () => {
     setShowModal(false);
     setEditingType(null);
@@ -227,20 +220,12 @@ export default function WindowTypesTab() {
         <div className="flex flex-shrink-0 gap-2">
           <button
             onClick={() => { setWizardEditingId(null); setShowWizard(true); }}
-            className="flex items-center gap-2 bg-white text-blue-700 border border-blue-200 px-3 sm:px-4 py-2 rounded-lg hover:bg-blue-50 active:bg-blue-100 transition-colors shadow-sm text-sm"
+            className="flex items-center gap-2 bg-blue-600 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-colors shadow-sm text-sm"
             title="Crear un producto nuevo paso a paso, con fórmulas configurables"
           >
             <FaMagic size={13} />
-            <span className="hidden sm:inline">Nuevo con asistente</span>
-            <span className="sm:hidden">Asistente</span>
-          </button>
-          <button
-            onClick={openCreate}
-            className="flex items-center gap-2 bg-blue-600 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-colors shadow-sm text-sm"
-          >
-            <FaPlus size={13} />
-            <span className="hidden sm:inline">Añadir Tipo</span>
-            <span className="sm:hidden">Añadir</span>
+            <span className="hidden sm:inline">Nuevo tipo de ventana</span>
+            <span className="sm:hidden">Nuevo</span>
           </button>
         </div>
       </div>
