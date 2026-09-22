@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Outlet, Link, useLocation, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { usePermissions } from "../../context/PermissionsContext";
+import { ADMIN_GROUPS } from "../../config/adminNav";
 
 const icons = {
   inicio: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12L11.204 3.045a1.125 1.125 0 011.591 0L21.75 12M4.5 9.75V19.5a.75.75 0 00.75.75h4.5a.75.75 0 00.75-.75v-4.5a.75.75 0 01.75-.75h2.25a.75.75 0 01.75.75v4.5a.75.75 0 00.75.75h4.5a.75.75 0 00.75-.75V9.75" /></svg>,
@@ -35,59 +36,10 @@ function NavLink({ to, label, icon, active, onClick }) {
   );
 }
 
-// Grupos del submenú de Administración — deben reflejar los `tab.id` reales
-// definidos en src/pages/Admin/Admin.jsx.
-const ADMIN_GROUPS = [
-  {
-    label: "Catálogo de producto",
-    items: [
-      { id: "windowTypes", label: "Tipos de Ventana" },
-      { id: "windowSeries", label: "Series" },
-      { id: "windowCategories", label: "Categorías" },
-      { id: "catalogoPerfiles", label: "Catálogo de Perfiles" },
-    ],
-  },
-  {
-    label: "Cálculo y fabricación",
-    items: [
-      { id: "calculations", label: "Ajustes de Cálculo" },
-      { id: "accessoryRules", label: "Reglas de Accesorios" },
-      { id: "materials", label: "Materiales" },
-    ],
-  },
-  {
-    label: "Colores y vidrio",
-    items: [
-      { id: "pvcColors", label: "Colores PVC" },
-      { id: "glassColors", label: "Tipos de Vidrio" },
-    ],
-  },
-  {
-    label: "Opciones del cotizador",
-    items: [
-      { id: "optionConfig", label: "Opciones del Cotizador" },
-      { id: "windowOptionAssign", label: "Asignación de Opciones" },
-    ],
-  },
-  {
-    label: "Personas",
-    items: [
-      { id: "clients", label: "Clientes" },
-      { id: "users", label: "Usuarios" },
-      { id: "permissions", label: "Permisos" },
-    ],
-  },
-  {
-    label: "Sistema",
-    items: [
-      { id: "checklists", label: "Checklists" },
-      { id: "configuracion", label: "Configuración" },
-    ],
-  },
-];
-
 function AdminNavGroup({ active, currentSearch, onNavigate }) {
-  const [expanded, setExpanded] = useState(active);
+  // Contraído por defecto siempre — incluso si ya estás dentro de /admin.
+  // El usuario abre el submenú a propósito con el chevron cuando lo necesita.
+  const [expanded, setExpanded] = useState(false);
 
   return (
     <div>

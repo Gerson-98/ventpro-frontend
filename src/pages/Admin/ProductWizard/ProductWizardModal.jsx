@@ -84,9 +84,11 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
   const [previewError, setPreviewError] = useState("");
 
   // ── Estado de secciones plegables (paso 2/3/4) ─────────────────────────────
+  // Todas arrancan cerradas siempre, incluso al editar un producto con datos
+  // ya cargados — el usuario las despliega a propósito con el chevron.
   const [openPerfiles, setOpenPerfiles] = useState({
-    MARCO: true,
-    HOJA: true,
+    MARCO: false,
+    HOJA: false,
     TAPAJAMBA: false,
     BATIENTE: false,
     MOSQUITERO: false,
@@ -180,17 +182,9 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
             refuerzoMosquiteroMaterialId: product.refuerzoMosquiteroMaterialId ? String(product.refuerzoMosquiteroMaterialId) : "",
           });
 
-          // Un producto en edición ya trae datos: abrimos las secciones que
-          // realmente están configuradas y dejamos cerradas las que no.
-          setOpenPerfiles({
-            MARCO: true,
-            HOJA: perfiles.HOJA.enabled,
-            TAPAJAMBA: perfiles.TAPAJAMBA.enabled,
-            BATIENTE: perfiles.BATIENTE.enabled,
-            MOSQUITERO: perfiles.MOSQUITERO.enabled,
-            REFUERZOS: !!(product.refuerzoHojaMaterialId || product.refuerzoMosquiteroMaterialId),
-          });
-          setVidrioOpen(!!product.vidrio?.usesGlass);
+          // Todas las secciones arrancan cerradas también en modo edición —
+          // el usuario decide cuáles desplegar, sin importar qué traiga
+          // configurado el producto.
           setOpenAccesorios(
             Object.fromEntries((product.accesorios || []).map((_, i) => [i, false]))
           );

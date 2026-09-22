@@ -1,7 +1,8 @@
 // RUTA: src/pages/Admin/Admin.jsx
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
+import { ADMIN_GROUPS, ADMIN_TAB_IDS, findGroupForTab } from "../../config/adminNav";
 import WindowTypesTab from "./Tabs/WindowTypesTab";
 import WindowSeriesTab from "./Tabs/WindowSeriesTab";
 import WindowCategoriesTab from "./Tabs/WindowCategoriesTab";
@@ -19,54 +20,45 @@ import WindowOptionAssignTab from './Tabs/WindowOptionAssignTab';
 import ChecklistTemplateTab from './Tabs/ChecklistTemplateTab';
 import ConfiguracionTab from './Tabs/ConfiguracionTab';
 
-const TAB_IDS = [
-  "windowTypes",
-  "windowSeries",
-  "windowCategories",
-  "catalogoPerfiles",
-  "calculations",
-  "accessoryRules",
-  "materials",
-  "pvcColors",
-  "glassColors",
-  "clients",
-  "users",
-  "permissions",
-  "optionConfig",
-  "windowOptionAssign",
-  "checklists",
-  "configuracion",
-];
+const TAB_COMPONENTS = {
+  windowTypes: WindowTypesTab,
+  windowSeries: WindowSeriesTab,
+  windowCategories: WindowCategoriesTab,
+  catalogoPerfiles: CatalogoPerfilesTab,
+  calculations: CalculationsTab,
+  accessoryRules: AccessoryRulesTab,
+  materials: MaterialsTab,
+  pvcColors: PvcColorsTab,
+  glassColors: GlassColorsTab,
+  clients: ClientsTab,
+  users: UsersTab,
+  permissions: PermissionsTab,
+  optionConfig: OptionConfigTab,
+  windowOptionAssign: WindowOptionAssignTab,
+  checklists: ChecklistTemplateTab,
+  configuracion: ConfiguracionTab,
+};
 
 export default function Admin() {
   const [searchParams, setSearchParams] = useSearchParams();
-
-  const tabs = [
-    { id: "windowTypes", label: "Tipos de Ventana" },
-    { id: "windowSeries", label: "Series" },
-    { id: "windowCategories", label: "Categorías" },
-    { id: "catalogoPerfiles", label: "Catálogo de Perfiles" },
-    { id: "calculations", label: "Ajustes de Cálculo" },
-    { id: "accessoryRules", label: "Reglas de Accesorios" },
-    { id: "materials", label: "Materiales" },
-    { id: "pvcColors", label: "Colores PVC" },
-    { id: "glassColors", label: "Tipos de Vidrio" },
-    { id: "clients", label: "Clientes" },
-    { id: "users", label: "Usuarios" },
-    { id: "permissions", label: "Permisos" },
-    { id: "optionConfig", label: "Opciones del Cotizador" },
-    { id: "windowOptionAssign", label: "Asignación de Opciones" },
-    { id: "checklists", label: "✓ Checklists" },
-    { id: "configuracion", label: "⚙ Configuración" },
-  ];
 
   // Tab activo derivado de ?tab=<id> en la URL — así la navegación desde el
   // submenú del sidebar y el recargar la página mantienen la pestaña correcta.
   const tabParam = searchParams.get("tab");
   const activeTab = useMemo(
-    () => (TAB_IDS.includes(tabParam) ? tabParam : "windowTypes"),
+    () => (ADMIN_TAB_IDS.includes(tabParam) ? tabParam : "windowTypes"),
     [tabParam]
   );
+
+  const activeGroup = useMemo(() => findGroupForTab(activeTab), [activeTab]);
+
+  // Grupo actualmente "abierto" en la barra de nivel 1 — por defecto el que
+  // contiene la pestaña activa. Si el usuario hace clic en otro grupo, se
+  // muestra su primera pestaña.
+  const [openGroupId, setOpenGroupId] = useState(activeGroup.id);
+  useEffect(() => {
+    setOpenGroupId(activeGroup.id);
+  }, [activeGroup.id]);
 
   const setActiveTab = (id) => {
     setSearchParams((prev) => {
@@ -75,6 +67,16 @@ export default function Admin() {
       return next;
     });
   };
+
+  const handleGroupClick = (group) => {
+    setOpenGroupId(group.id);
+    if (!group.items.some((i) => i.id === activeTab)) {
+      setActiveTab(group.items[0].id);
+    }
+  };
+
+  const displayedGroup = ADMIN_GROUPS.find((g) => g.id === openGroupId) || activeGroup;
+  const ActiveComponent = TAB_COMPONENTS[activeTab];
 
   return (
     <div className="p-4 sm:p-6">
@@ -85,12 +87,33 @@ export default function Admin() {
         <p className="text-gray-500 text-sm">Gestiona tus catálogos y bibliotecas</p>
       </div>
 
-      {/* ── Tabs — scroll horizontal en móvil, sin wrap ── */}
+      {/* ── Nivel 1: grupos ── */}
+      <div className="flex flex-wrap gap-2 mb-3">
+        {ADMIN_GROUPS.map((group) => {
+          const isOpen = group.id === openGroupId;
+          const containsActive = group.id === activeGroup.id;
+          return (
+            <button
+              key={group.id}
+              onClick={() => handleGroupClick(group)}
+              className={`px-3.5 py-2 rounded-lg text-sm font-semibold transition-colors border ${isOpen
+                ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                : containsActive
+                  ? "bg-blue-50 text-blue-700 border-blue-200"
+                  : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300"
+                }`}
+            >
+              {group.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ── Nivel 2: pestañas del grupo abierto ── */}
       <div className="relative mb-4 sm:mb-6">
-        {/* borde inferior full-width */}
         <div className="absolute bottom-0 left-0 right-0 border-b border-gray-200" />
         <div className="flex overflow-x-auto scrollbar-none gap-0 -mb-px">
-          {tabs.map(tab => (
+          {displayedGroup.items.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
@@ -107,22 +130,7 @@ export default function Admin() {
 
       {/* Contenido */}
       <div className="bg-white p-3 sm:p-4 rounded-lg shadow-sm">
-        {activeTab === "windowTypes" && <WindowTypesTab />}
-        {activeTab === "windowSeries" && <WindowSeriesTab />}
-        {activeTab === "windowCategories" && <WindowCategoriesTab />}
-        {activeTab === "catalogoPerfiles" && <CatalogoPerfilesTab />}
-        {activeTab === "calculations" && <CalculationsTab />}
-        {activeTab === "accessoryRules" && <AccessoryRulesTab />}
-        {activeTab === "materials" && <MaterialsTab />}
-        {activeTab === "pvcColors" && <PvcColorsTab />}
-        {activeTab === "glassColors" && <GlassColorsTab />}
-        {activeTab === "clients" && <ClientsTab />}
-        {activeTab === "users" && <UsersTab />}
-        {activeTab === "permissions" && <PermissionsTab />}
-        {activeTab === "optionConfig" && <OptionConfigTab />}
-        {activeTab === "windowOptionAssign" && <WindowOptionAssignTab />}
-        {activeTab === "checklists" && <ChecklistTemplateTab />}
-        {activeTab === "configuracion" && <ConfiguracionTab />}
+        {ActiveComponent && <ActiveComponent />}
       </div>
     </div>
   );
