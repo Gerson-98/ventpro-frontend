@@ -44,9 +44,12 @@ function emptyState() {
       HOJA: { enabled: true, ...EMPTY_PERFIL },
       TAPAJAMBA: { enabled: false, ...EMPTY_PERFIL },
       BATIENTE: { enabled: false, ...EMPTY_PERFIL },
+      MOSQUITERO: { enabled: false, ...EMPTY_PERFIL },
     },
     vidrio: { usesGlass: false, cant_vidrios: 1, formulaAncho: [], formulaAlto: [] },
     accesorios: [],
+    refuerzoHojaMaterialId: "",
+    refuerzoMosquiteroMaterialId: "",
   };
 }
 
@@ -71,6 +74,7 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
   const [pvcColors, setPvcColors] = useState([]);
   const [allSeries, setAllSeries] = useState([]);
   const [allCategories, setAllCategories] = useState([]);
+  const [optionGroups, setOptionGroups] = useState([]);
 
   const [exampleWidth, setExampleWidth] = useState(100);
   const [exampleHeight, setExampleHeight] = useState(150);
@@ -82,19 +86,21 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
   useEffect(() => {
     (async () => {
       try {
-        const [perfilesRes, accesoriosRes, colorsRes, seriesRes, categoriesRes] =
+        const [perfilesRes, accesoriosRes, colorsRes, seriesRes, categoriesRes, optionGroupsRes] =
           await Promise.all([
             api.get("/materials", { params: { type: "PERFIL" } }),
             api.get("/materials", { params: { type: "ACCESORIO" } }),
             api.get("/pvc-colors"),
             api.get("/window-series"),
             api.get("/window-categories"),
+            api.get("/option-groups"),
           ]);
         setMaterials(perfilesRes.data || []);
         setAccessoryMaterials(accesoriosRes.data || []);
         setPvcColors(colorsRes.data || []);
         setAllSeries(seriesRes.data || []);
         setAllCategories(categoriesRes.data || []);
+        setOptionGroups(optionGroupsRes.data || []);
 
         if (editingId) {
           const { data: product } = await api.get(`/product-wizard/${editingId}`);
@@ -105,6 +111,7 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
           perfiles.HOJA = { ...perfiles.HOJA, enabled: false };
           perfiles.TAPAJAMBA = { ...perfiles.TAPAJAMBA, enabled: false };
           perfiles.BATIENTE = { ...perfiles.BATIENTE, enabled: false };
+          perfiles.MOSQUITERO = { ...perfiles.MOSQUITERO, enabled: false };
           for (const p of product.perfiles) {
             perfiles[p.slot] = {
               enabled: true,
@@ -131,7 +138,11 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
               material_id: String(a.material_id),
               quantity: a.quantity,
               required: a.required ?? true,
+              option_group: a.option_group || "",
+              option_key: a.option_key || "",
             })),
+            refuerzoHojaMaterialId: product.refuerzoHojaMaterialId ? String(product.refuerzoHojaMaterialId) : "",
+            refuerzoMosquiteroMaterialId: product.refuerzoMosquiteroMaterialId ? String(product.refuerzoMosquiteroMaterialId) : "",
           });
         }
       } catch (err) {
@@ -156,9 +167,9 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
   // ── Construye el DTO real que espera el backend ────────────────────────────
   const buildDto = () => {
     const perfiles = [];
-    for (const slot of ["MARCO", "HOJA", "TAPAJAMBA", "BATIENTE"]) {
+    for (const slot of ["MARCO", "HOJA", "TAPAJAMBA", "BATIENTE", "MOSQUITERO"]) {
       const p = data.perfiles[slot];
-      const isOptional = slot === "HOJA" || slot === "TAPAJAMBA" || slot === "BATIENTE";
+      const isOptional = slot !== "MARCO";
       if (isOptional && !p.enabled) continue;
       perfiles.push({
         slot,
@@ -189,7 +200,11 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
           material_id: Number(a.material_id),
           quantity: Number(a.quantity) || 1,
           required: a.required !== false,
+          option_group: a.option_group || undefined,
+          option_key: a.option_key || undefined,
         })),
+      refuerzoHojaMaterialId: data.refuerzoHojaMaterialId ? Number(data.refuerzoHojaMaterialId) : undefined,
+      refuerzoMosquiteroMaterialId: data.refuerzoMosquiteroMaterialId ? Number(data.refuerzoMosquiteroMaterialId) : undefined,
     };
   };
 
@@ -205,11 +220,14 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
       errs.push("Activaste Tapajamba pero no elegiste su perfil.");
     if (data.perfiles.BATIENTE.enabled && !data.perfiles.BATIENTE.material_id)
       errs.push("Activaste Batiente pero no elegiste su perfil.");
+    if (data.perfiles.MOSQUITERO.enabled && !data.perfiles.MOSQUITERO.material_id)
+      errs.push("Activaste Mosquitero pero no elegiste su perfil.");
     if (data.vidrio.usesGlass && (!data.vidrio.cant_vidrios || data.vidrio.cant_vidrios <= 0))
       errs.push("La cantidad de vidrios debe ser mayor a 0.");
     for (const a of data.accesorios) {
       if (!a.material_id) errs.push("Hay un accesorio sin seleccionar.");
-      else if (!a.quantity || a.quantity <= 0) errs.push(`El accesorio "${materialName(a.material_id) || ""}" necesita una cantidad mayor a 0.`);
+      else if (!a.quantity || a.quantity <= 0) errs.push(`El accesorio "${accessoryMaterials.find(m => String(m.id) === a.material_id)?.name || ""}" necesita una cantidad mayor a 0.`);
+      if (!!a.option_group !== !!a.option_key) errs.push(`El accesorio "${accessoryMaterials.find(m => String(m.id) === a.material_id)?.name || ""}" tiene una condición incompleta.`);
     }
     return errs;
   }, [data]);
@@ -552,8 +570,48 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
               </div>
               {renderPerfilCard("MARCO", "Marco", false)}
               {renderPerfilCard("HOJA", "Hoja", true)}
+              {renderPerfilCard("MOSQUITERO", "Mosquitero", true)}
               {renderPerfilCard("TAPAJAMBA", "Tapajamba", true)}
               {renderPerfilCard("BATIENTE", "Batiente", true)}
+
+              {/* ── Refuerzos: reutilizan la medida de Hoja/Mosquitero, no llevan fórmula propia ── */}
+              <div className="border border-gray-200 rounded-xl p-4 space-y-3">
+                <h4 className="font-semibold text-gray-800 text-sm">
+                  Refuerzos <span className="text-gray-400 font-normal">(opcional)</span>
+                </h4>
+                <p className="text-xs text-gray-500 -mt-2">
+                  Mismo corte que la Hoja o el Mosquitero, pero en otro material. El cotizador
+                  los ofrece como agregado opcional.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Refuerzo de Hoja</label>
+                    <select
+                      value={data.refuerzoHojaMaterialId}
+                      onChange={(e) => setData((p) => ({ ...p, refuerzoHojaMaterialId: e.target.value }))}
+                      className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    >
+                      <option value="">Sin refuerzo de hoja</option>
+                      {materials.map((m) => (
+                        <option key={m.id} value={String(m.id)}>{m.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Refuerzo de Mosquitero</label>
+                    <select
+                      value={data.refuerzoMosquiteroMaterialId}
+                      onChange={(e) => setData((p) => ({ ...p, refuerzoMosquiteroMaterialId: e.target.value }))}
+                      className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    >
+                      <option value="">Sin refuerzo de mosquitero</option>
+                      {materials.map((m) => (
+                        <option key={m.id} value={String(m.id)}>{m.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -685,6 +743,35 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
                       Opcional
                     </button>
                   </div>
+
+                  {/* ── Condición: siempre, o solo cuando el cliente elige cierta opción ── */}
+                  <div className="flex items-center gap-2 pl-0.5 pt-1 border-t border-gray-100">
+                    <select
+                      value={a.option_group || ""}
+                      onChange={(e) => {
+                        const group = e.target.value;
+                        updateAccesorio(idx, { option_group: group, option_key: "" });
+                      }}
+                      className="text-xs border border-gray-300 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    >
+                      <option value="">Siempre se agrega</option>
+                      {optionGroups.map((g) => (
+                        <option key={g.id} value={g.key}>Solo si: {g.label}</option>
+                      ))}
+                    </select>
+                    {a.option_group && (
+                      <select
+                        value={a.option_key || ""}
+                        onChange={(e) => updateAccesorio(idx, { option_key: e.target.value })}
+                        className="text-xs border border-gray-300 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-blue-500 focus:outline-none flex-1"
+                      >
+                        <option value="">Selecciona el valor...</option>
+                        {(optionGroups.find((g) => g.key === a.option_group)?.values || []).map((v) => (
+                          <option key={v.key} value={v.key}>{v.label}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -773,11 +860,20 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
                 </p>
                 <p>
                   <span className="font-medium text-gray-700">Perfiles:</span>{" "}
-                  {["MARCO", "HOJA", "TAPAJAMBA", "BATIENTE"]
+                  {["MARCO", "HOJA", "MOSQUITERO", "TAPAJAMBA", "BATIENTE"]
                     .filter((s) => s === "MARCO" || data.perfiles[s].enabled)
                     .map((s) => `${s}: ${materialName(data.perfiles[s].material_id) || "sin elegir"}`)
                     .join(" · ")}
                 </p>
+                {(data.refuerzoHojaMaterialId || data.refuerzoMosquiteroMaterialId) && (
+                  <p>
+                    <span className="font-medium text-gray-700">Refuerzos:</span>{" "}
+                    {[
+                      data.refuerzoHojaMaterialId && `Hoja: ${materialName(data.refuerzoHojaMaterialId)}`,
+                      data.refuerzoMosquiteroMaterialId && `Mosquitero: ${materialName(data.refuerzoMosquiteroMaterialId)}`,
+                    ].filter(Boolean).join(" · ")}
+                  </p>
+                )}
                 <p>
                   <span className="font-medium text-gray-700">Vidrio:</span>{" "}
                   {data.vidrio.usesGlass ? `Sí (${data.vidrio.cant_vidrios} por ventana)` : "No"}
@@ -787,7 +883,13 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
                   {data.accesorios.length === 0
                     ? "Ninguno"
                     : data.accesorios
-                        .map((a) => `${accessoryMaterials.find((m) => String(m.id) === a.material_id)?.name || "?"} x${a.quantity} (${a.required !== false ? "obligatorio" : "opcional"})`)
+                        .map((a) => {
+                          const name = accessoryMaterials.find((m) => String(m.id) === a.material_id)?.name || "?";
+                          const cond = a.option_group
+                            ? ` — solo si ${optionGroups.find((g) => g.key === a.option_group)?.label || a.option_group} = ${optionGroups.find((g) => g.key === a.option_group)?.values.find((v) => v.key === a.option_key)?.label || a.option_key}`
+                            : "";
+                          return `${name} x${a.quantity} (${a.required !== false ? "obligatorio" : "opcional"})${cond}`;
+                        })
                         .join(", ")}
                 </p>
               </div>
