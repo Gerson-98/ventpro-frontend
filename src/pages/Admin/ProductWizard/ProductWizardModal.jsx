@@ -124,6 +124,7 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
             accesorios: (product.accesorios || []).map((a) => ({
               material_id: String(a.material_id),
               quantity: a.quantity,
+              required: a.required ?? true,
             })),
           });
         }
@@ -178,7 +179,11 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
         : { usesGlass: false },
       accesorios: data.accesorios
         .filter((a) => a.material_id)
-        .map((a) => ({ material_id: Number(a.material_id), quantity: Number(a.quantity) || 1 })),
+        .map((a) => ({
+          material_id: Number(a.material_id),
+          quantity: Number(a.quantity) || 1,
+          required: a.required !== false,
+        })),
     };
   };
 
@@ -283,7 +288,7 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
   const addAccesorio = () => {
     setData((prev) => ({
       ...prev,
-      accesorios: [...prev.accesorios, { material_id: "", quantity: 1 }],
+      accesorios: [...prev.accesorios, { material_id: "", quantity: 1, required: true }],
     }));
   };
 
@@ -600,7 +605,11 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
           {step === 4 && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <p className="text-sm text-gray-500">Accesorios que se agregan automáticamente con este producto (bisagras, cerraduras, felpa, etc).</p>
+                <p className="text-sm text-gray-500">
+                  Accesorios de este producto (bisagras, cerraduras, felpa, etc). Marca
+                  cada uno como <span className="font-medium text-emerald-600">obligatorio</span> (siempre se agrega)
+                  o <span className="font-medium text-amber-600">opcional</span> (se ofrece pero no es forzoso).
+                </p>
                 <button
                   type="button"
                   onClick={addAccesorio}
@@ -615,34 +624,60 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
               )}
 
               {data.accesorios.map((a, idx) => (
-                <div key={idx} className="flex items-center gap-2 border border-gray-200 rounded-lg p-2">
-                  <select
-                    value={a.material_id}
-                    onChange={(e) => updateAccesorio(idx, { material_id: e.target.value })}
-                    className="flex-1 border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  >
-                    <option value="">Selecciona un accesorio...</option>
-                    {accessoryMaterials.map((m) => (
-                      <option key={m.id} value={String(m.id)}>
-                        {m.name}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    type="number"
-                    min={1}
-                    value={a.quantity}
-                    onChange={(e) => updateAccesorio(idx, { quantity: parseInt(e.target.value, 10) || 1 })}
-                    className="w-20 border border-gray-300 rounded-lg p-2 text-sm text-center focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    title="Cantidad por ventana"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeAccesorio(idx)}
-                    className="text-red-400 hover:text-red-600 flex-shrink-0"
-                  >
-                    <FaTrashAlt size={13} />
-                  </button>
+                <div key={idx} className="border border-gray-200 rounded-lg p-2 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={a.material_id}
+                      onChange={(e) => updateAccesorio(idx, { material_id: e.target.value })}
+                      className="flex-1 border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    >
+                      <option value="">Selecciona un accesorio...</option>
+                      {accessoryMaterials.map((m) => (
+                        <option key={m.id} value={String(m.id)}>
+                          {m.name}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="number"
+                      min={1}
+                      value={a.quantity}
+                      onChange={(e) => updateAccesorio(idx, { quantity: parseInt(e.target.value, 10) || 1 })}
+                      className="w-20 border border-gray-300 rounded-lg p-2 text-sm text-center focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      title="Cantidad por ventana"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeAccesorio(idx)}
+                      className="text-red-400 hover:text-red-600 flex-shrink-0"
+                    >
+                      <FaTrashAlt size={13} />
+                    </button>
+                  </div>
+                  <div className="flex gap-1.5 pl-0.5">
+                    <button
+                      type="button"
+                      onClick={() => updateAccesorio(idx, { required: true })}
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
+                        a.required !== false
+                          ? "bg-emerald-600 text-white border-emerald-600"
+                          : "bg-white text-gray-500 border-gray-300"
+                      }`}
+                    >
+                      Obligatorio
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateAccesorio(idx, { required: false })}
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
+                        a.required === false
+                          ? "bg-amber-500 text-white border-amber-500"
+                          : "bg-white text-gray-500 border-gray-300"
+                      }`}
+                    >
+                      Opcional
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -745,7 +780,7 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
                   {data.accesorios.length === 0
                     ? "Ninguno"
                     : data.accesorios
-                        .map((a) => `${accessoryMaterials.find((m) => String(m.id) === a.material_id)?.name || "?"} x${a.quantity}`)
+                        .map((a) => `${accessoryMaterials.find((m) => String(m.id) === a.material_id)?.name || "?"} x${a.quantity} (${a.required !== false ? "obligatorio" : "opcional"})`)
                         .join(", ")}
                 </p>
               </div>

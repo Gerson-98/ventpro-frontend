@@ -77,7 +77,10 @@ export function CatalogProvider({ children }) {
           api.get("/clients"),
         ]);
         if (cancelled) return;
-        const wt = Array.isArray(types.data) ? types.data : [];
+        // Los tipos desactivados (active === false) no deben ofrecerse al
+        // armar cotizaciones/pedidos nuevos — siguen existiendo para no
+        // romper el historial, solo se ocultan de este selector.
+        const wt = (Array.isArray(types.data) ? types.data : []).filter((t) => t.active !== false);
         const pc = Array.isArray(pvc.data) ? pvc.data : [];
         const gc = Array.isArray(glass.data) ? glass.data : [];
         const cl = Array.isArray(cli.data) ? cli.data : [];

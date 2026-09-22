@@ -1,7 +1,7 @@
 // RUTA: src/pages/Admin/Tabs/WindowTypesTab.jsx
 
 import { useEffect, useState, useMemo } from "react";
-import { FaPlus, FaTrashAlt, FaEdit, FaSearch, FaExclamationTriangle, FaMagic } from "react-icons/fa";
+import { FaPlus, FaTrashAlt, FaEdit, FaSearch, FaExclamationTriangle, FaMagic, FaCopy, FaPowerOff } from "react-icons/fa";
 import api from "@/services/api";
 import ProductWizardModal from "../ProductWizard/ProductWizardModal";
 
@@ -124,6 +124,33 @@ export default function WindowTypesTab() {
       console.error("Error guardando:", err);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDuplicate = async (type) => {
+    const name = window.prompt(
+      `¿Cómo se llamará el producto duplicado?`,
+      `${type.name} (copia)`
+    );
+    if (!name || !name.trim()) return;
+    try {
+      await api.post(`/product-wizard/${type.id}/duplicate`, { name: name.trim() });
+      fetchData();
+    } catch (err) {
+      const msg = err?.response?.data?.message || "No se pudo duplicar el producto.";
+      alert(Array.isArray(msg) ? msg.join(", ") : msg);
+    }
+  };
+
+  const handleToggleActive = async (type) => {
+    const nextActive = !(type.active !== false);
+    if (!confirm(nextActive ? "¿Reactivar este producto en el cotizador?" : "¿Desactivar este producto? Dejará de aparecer al crear cotizaciones nuevas, pero no se borra ni afecta lo ya cotizado.")) return;
+    try {
+      await api.patch(`/product-wizard/${type.id}/active`, { active: nextActive });
+      fetchData();
+    } catch (err) {
+      const msg = err?.response?.data?.message || "No se pudo cambiar el estado.";
+      alert(Array.isArray(msg) ? msg.join(", ") : msg);
     }
   };
 
@@ -274,6 +301,11 @@ export default function WindowTypesTab() {
                           <FaMagic size={8} /> Asistente
                         </span>
                       )}
+                      {t.active === false && (
+                        <span className="ml-2 inline-flex items-center px-1.5 py-0.5 text-[10px] rounded-full bg-gray-100 text-gray-500 border border-gray-200">
+                          Inactivo
+                        </span>
+                      )}
                     </td>
                     <td className="py-2.5 px-4">
                       {t.displayName ? (
@@ -316,6 +348,18 @@ export default function WindowTypesTab() {
                         <button onClick={() => openEdit(t)} className="text-blue-500 hover:text-blue-700 transition-colors" title="Editar">
                           <FaEdit size={14} />
                         </button>
+                        {t.calc_engine === "formula" && (
+                          <button onClick={() => handleDuplicate(t)} className="text-purple-500 hover:text-purple-700 transition-colors" title="Duplicar">
+                            <FaCopy size={13} />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleToggleActive(t)}
+                          className={`transition-colors ${t.active === false ? "text-emerald-500 hover:text-emerald-700" : "text-amber-500 hover:text-amber-700"}`}
+                          title={t.active === false ? "Reactivar" : "Desactivar"}
+                        >
+                          <FaPowerOff size={13} />
+                        </button>
                         <button onClick={() => handleDelete(t.id)} className="text-red-400 hover:text-red-600 transition-colors" title="Eliminar">
                           <FaTrashAlt size={13} />
                         </button>
@@ -339,10 +383,27 @@ export default function WindowTypesTab() {
                         <FaMagic size={8} /> Asistente
                       </span>
                     )}
+                    {t.active === false && (
+                      <span className="ml-2 inline-flex items-center px-1.5 py-0.5 text-[10px] rounded-full bg-gray-100 text-gray-500 border border-gray-200 align-middle">
+                        Inactivo
+                      </span>
+                    )}
                   </p>
                   <div className="flex items-center gap-1.5 flex-shrink-0">
                     <button onClick={() => openEdit(t)} className="text-blue-500 p-1.5 rounded-lg border border-blue-100 active:bg-blue-50" title="Editar">
                       <FaEdit size={13} />
+                    </button>
+                    {t.calc_engine === "formula" && (
+                      <button onClick={() => handleDuplicate(t)} className="text-purple-500 p-1.5 rounded-lg border border-purple-100 active:bg-purple-50" title="Duplicar">
+                        <FaCopy size={12} />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleToggleActive(t)}
+                      className={`p-1.5 rounded-lg border ${t.active === false ? "text-emerald-500 border-emerald-100 active:bg-emerald-50" : "text-amber-500 border-amber-100 active:bg-amber-50"}`}
+                      title={t.active === false ? "Reactivar" : "Desactivar"}
+                    >
+                      <FaPowerOff size={12} />
                     </button>
                     <button onClick={() => handleDelete(t.id)} className="text-red-400 p-1.5 rounded-lg border border-red-100 active:bg-red-50" title="Eliminar">
                       <FaTrashAlt size={12} />
