@@ -30,7 +30,7 @@ const STEPS = [
   { id: 6, label: "Guardar" },
 ];
 
-const EMPTY_PERFIL = { material_id: "", piezasAncho: 2, piezasAlto: 2, formulaAncho: [], formulaAlto: [] };
+const EMPTY_PERFIL = { material_id: "", piezasAncho: 2, piezasAlto: 2, formulaAncho: [], formulaAlto: [], variantes: [] };
 
 function emptyState() {
   return {
@@ -46,7 +46,7 @@ function emptyState() {
       BATIENTE: { enabled: false, ...EMPTY_PERFIL },
       MOSQUITERO: { enabled: false, ...EMPTY_PERFIL },
     },
-    vidrio: { usesGlass: false, cant_vidrios: 1, formulaAncho: [], formulaAlto: [] },
+    vidrio: { usesGlass: false, cant_vidrios: 1, formulaAncho: [], formulaAlto: [], variantes: [] },
     accesorios: [],
     refuerzoHojaMaterialId: "",
     refuerzoMosquiteroMaterialId: "",
@@ -120,6 +120,14 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
               piezasAlto: p.piezasAlto ?? 0,
               formulaAncho: p.formulaAncho || [],
               formulaAlto: p.formulaAlto || [],
+              variantes: (p.variantes || []).map((v) => ({
+                option_group: v.option_group,
+                option_key: v.option_key,
+                piezasAncho: v.piezasAncho,
+                piezasAlto: v.piezasAlto,
+                formulaAncho: v.formulaAncho || [],
+                formulaAlto: v.formulaAlto || [],
+              })),
             };
           }
           setData({
@@ -134,6 +142,14 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
               cant_vidrios: product.vidrio?.cant_vidrios ?? 1,
               formulaAncho: product.vidrio?.formulaAncho || [],
               formulaAlto: product.vidrio?.formulaAlto || [],
+              variantes: (product.vidrio?.variantes || []).map((v) => ({
+                option_group: v.option_group,
+                option_key: v.option_key,
+                piezasAncho: v.piezasAncho,
+                piezasAlto: v.piezasAlto,
+                formulaAncho: v.formulaAncho || [],
+                formulaAlto: v.formulaAlto || [],
+              })),
             },
             accesorios: (product.accesorios || []).map((a) => ({
               material_id: String(a.material_id),
@@ -182,6 +198,16 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
         piezasAlto: Number(p.piezasAlto) || 0,
         formulaAncho: p.formulaAncho || [],
         formulaAlto: p.formulaAlto || [],
+        variantes: (p.variantes || [])
+          .filter((v) => v.option_group && v.option_key)
+          .map((v) => ({
+            option_group: v.option_group,
+            option_key: v.option_key,
+            piezasAncho: v.piezasAncho != null ? Number(v.piezasAncho) : undefined,
+            piezasAlto: v.piezasAlto != null ? Number(v.piezasAlto) : undefined,
+            formulaAncho: v.formulaAncho,
+            formulaAlto: v.formulaAlto,
+          })),
       });
     }
     return {
@@ -197,6 +223,16 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
             cant_vidrios: Number(data.vidrio.cant_vidrios) || 1,
             formulaAncho: data.vidrio.formulaAncho || [],
             formulaAlto: data.vidrio.formulaAlto || [],
+            variantes: (data.vidrio.variantes || [])
+              .filter((v) => v.option_group && v.option_key)
+              .map((v) => ({
+                option_group: v.option_group,
+                option_key: v.option_key,
+                piezasAncho: v.piezasAncho != null ? Number(v.piezasAncho) : undefined,
+                piezasAlto: v.piezasAlto != null ? Number(v.piezasAlto) : undefined,
+                formulaAncho: v.formulaAncho,
+                formulaAlto: v.formulaAlto,
+              })),
           }
         : { usesGlass: false },
       accesorios: data.accesorios
@@ -241,6 +277,14 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
         errs.push(`El accesorio "${accName}" necesita una cantidad mayor a 0.`);
       }
       if (!!a.option_group !== !!a.option_key) errs.push(`El accesorio "${accName}" tiene una condición incompleta.`);
+    }
+    for (const slot of Object.keys(data.perfiles)) {
+      for (const v of data.perfiles[slot].variantes || []) {
+        if (!v.option_group || !v.option_key) errs.push(`"${slot}" tiene una variante sin grupo u opción seleccionada.`);
+      }
+    }
+    for (const v of data.vidrio.variantes || []) {
+      if (!v.option_group || !v.option_key) errs.push('El vidrio tiene una variante sin grupo u opción seleccionada.');
     }
     return errs;
   }, [data]);
@@ -310,6 +354,30 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
     }));
   };
 
+  // ── Variantes condicionales (perfiles y vidrio comparten esta lógica) ─────
+  // target = { slot: "MARCO" } para un perfil, o { slot: null } para el vidrio.
+  const getVariantes = (target) => (target.slot ? data.perfiles[target.slot].variantes : data.vidrio.variantes) || [];
+
+  const setVariantes = (target, next) => {
+    if (target.slot) {
+      updatePerfil(target.slot, { variantes: next });
+    } else {
+      setData((prev) => ({ ...prev, vidrio: { ...prev.vidrio, variantes: next } }));
+    }
+  };
+
+  const addVariante = (target) => {
+    setVariantes(target, [...getVariantes(target), { option_group: "", option_key: "", formulaAncho: [], formulaAlto: [] }]);
+  };
+
+  const updateVariante = (target, idx, patch) => {
+    setVariantes(target, getVariantes(target).map((v, i) => (i === idx ? { ...v, ...patch } : v)));
+  };
+
+  const removeVariante = (target, idx) => {
+    setVariantes(target, getVariantes(target).filter((_, i) => i !== idx));
+  };
+
   const togglePvcColor = (id) => {
     setData((prev) => {
       const idStr = String(id);
@@ -339,6 +407,79 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
 
   const removeAccesorio = (idx) => {
     setData((prev) => ({ ...prev, accesorios: prev.accesorios.filter((_, i) => i !== idx) }));
+  };
+
+  // Sección "Variantes por opción" — reutilizada por cada perfil y por el
+  // vidrio. Cada variante reemplaza la fórmula por defecto SOLO cuando el
+  // cliente elige esa opción en el cotizador (ej. "con 2 hojas divide entre
+  // 2, con 1 hoja no divide").
+  const renderVariantesSection = (target, defaultFormulaAncho, defaultFormulaAlto) => {
+    const variantes = getVariantes(target);
+    return (
+      <div className="border border-amber-200 bg-amber-50 rounded-lg p-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-semibold text-amber-800">
+            Variantes por opción <span className="font-normal text-amber-600">(opcional)</span>
+          </p>
+          <button
+            type="button"
+            onClick={() => addVariante(target)}
+            className="flex items-center gap-1 text-xs text-amber-700 hover:text-amber-900 font-medium"
+          >
+            <FaPlus size={9} /> Añadir variante
+          </button>
+        </div>
+        <p className="text-[11px] text-amber-700">
+          Usa esto solo si la fórmula cambia según una opción del cotizador (ej. "cantidad de hojas": con 1
+          no se divide, con 2 sí). Si no aplica, ignora esta sección.
+        </p>
+        {variantes.map((v, idx) => (
+          <div key={idx} className="bg-white border border-amber-200 rounded-lg p-2 space-y-2">
+            <div className="flex items-center gap-2">
+              <select
+                value={v.option_group || ""}
+                onChange={(e) => updateVariante(target, idx, { option_group: e.target.value, option_key: "" })}
+                className="text-xs border border-gray-300 rounded-lg px-2 py-1.5 flex-1"
+              >
+                <option value="">Selecciona el grupo de opción...</option>
+                {optionGroups.map((g) => (
+                  <option key={g.id} value={g.key}>{g.label}</option>
+                ))}
+              </select>
+              {v.option_group && (
+                <select
+                  value={v.option_key || ""}
+                  onChange={(e) => updateVariante(target, idx, { option_key: e.target.value })}
+                  className="text-xs border border-gray-300 rounded-lg px-2 py-1.5 flex-1"
+                >
+                  <option value="">Selecciona el valor...</option>
+                  {(optionGroups.find((g) => g.key === v.option_group)?.values || []).map((val) => (
+                    <option key={val.key} value={val.key}>{val.label}</option>
+                  ))}
+                </select>
+              )}
+              <button type="button" onClick={() => removeVariante(target, idx)} className="text-red-400 hover:text-red-600 flex-shrink-0">
+                <FaTrashAlt size={12} />
+              </button>
+            </div>
+            <FormulaBuilder
+              label="Fórmula de ancho para esta variante"
+              origenLabel="Ancho"
+              steps={v.formulaAncho ?? defaultFormulaAncho}
+              onChange={(steps) => updateVariante(target, idx, { formulaAncho: steps })}
+              exampleBase={Number(exampleWidth) || 100}
+            />
+            <FormulaBuilder
+              label="Fórmula de alto para esta variante"
+              origenLabel="Alto"
+              steps={v.formulaAlto ?? defaultFormulaAlto}
+              onChange={(steps) => updateVariante(target, idx, { formulaAlto: steps })}
+              exampleBase={Number(exampleHeight) || 150}
+            />
+          </div>
+        ))}
+      </div>
+    );
   };
 
   const renderPerfilCard = (slot, title, optional) => {
@@ -444,6 +585,7 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
                 exampleBase={Number(exampleHeight) || 150}
               />
             )}
+            {renderVariantesSection({ slot }, p.formulaAncho, p.formulaAlto)}
           </>
         )}
       </div>
@@ -712,6 +854,7 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
                     onChange={(steps) => setData((p) => ({ ...p, vidrio: { ...p.vidrio, formulaAlto: steps } }))}
                     exampleBase={Number(exampleHeight) || 150}
                   />
+                  {renderVariantesSection({ slot: null }, data.vidrio.formulaAncho, data.vidrio.formulaAlto)}
                 </div>
               )}
             </div>
