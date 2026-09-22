@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Outlet, Link, useLocation } from "react-router-dom";
+import { Outlet, Link, useLocation, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { usePermissions } from "../../context/PermissionsContext";
 
@@ -15,6 +15,7 @@ const icons = {
   consolidado: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" /></svg>,
   ganancias: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941" /></svg>,
   hamburger: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>,
+  chevron: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5"><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>,
   close: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>,
 };
 
@@ -34,6 +35,119 @@ function NavLink({ to, label, icon, active, onClick }) {
   );
 }
 
+// Grupos del submenú de Administración — deben reflejar los `tab.id` reales
+// definidos en src/pages/Admin/Admin.jsx.
+const ADMIN_GROUPS = [
+  {
+    label: "Catálogo de producto",
+    items: [
+      { id: "windowTypes", label: "Tipos de Ventana" },
+      { id: "windowSeries", label: "Series" },
+      { id: "windowCategories", label: "Categorías" },
+      { id: "catalogoPerfiles", label: "Catálogo de Perfiles" },
+    ],
+  },
+  {
+    label: "Cálculo y fabricación",
+    items: [
+      { id: "calculations", label: "Ajustes de Cálculo" },
+      { id: "accessoryRules", label: "Reglas de Accesorios" },
+      { id: "materials", label: "Materiales" },
+    ],
+  },
+  {
+    label: "Colores y vidrio",
+    items: [
+      { id: "pvcColors", label: "Colores PVC" },
+      { id: "glassColors", label: "Tipos de Vidrio" },
+    ],
+  },
+  {
+    label: "Opciones del cotizador",
+    items: [
+      { id: "optionConfig", label: "Opciones del Cotizador" },
+      { id: "windowOptionAssign", label: "Asignación de Opciones" },
+    ],
+  },
+  {
+    label: "Personas",
+    items: [
+      { id: "clients", label: "Clientes" },
+      { id: "users", label: "Usuarios" },
+      { id: "permissions", label: "Permisos" },
+    ],
+  },
+  {
+    label: "Sistema",
+    items: [
+      { id: "checklists", label: "Checklists" },
+      { id: "configuracion", label: "Configuración" },
+    ],
+  },
+];
+
+function AdminNavGroup({ active, currentSearch, onNavigate }) {
+  const [expanded, setExpanded] = useState(active);
+
+  return (
+    <div>
+      <div
+        className={`flex items-center gap-1 rounded-lg text-sm font-medium transition-all duration-150 ${active ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-white hover:bg-white/10"
+          }`}
+      >
+        <Link
+          to="/admin"
+          onClick={onNavigate}
+          className="flex items-center gap-3 flex-1 min-w-0 px-3 py-2"
+        >
+          <span className={active ? "text-blue-600" : ""}>{icons.admin}</span>
+          Panel Admin
+        </Link>
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className={`px-2 py-2 flex-shrink-0 ${active ? "text-slate-500 hover:text-slate-800" : "text-slate-400 hover:text-white"}`}
+          aria-label={expanded ? "Contraer submenú de administración" : "Expandir submenú de administración"}
+        >
+          <span className={`inline-block transition-transform duration-200 ${expanded ? "rotate-90" : ""}`}>
+            {icons.chevron}
+          </span>
+        </button>
+      </div>
+
+      {expanded && (
+        <div className="mt-1 ml-3 pl-3 border-l border-slate-800 space-y-2.5">
+          {ADMIN_GROUPS.map((group) => (
+            <div key={group.label}>
+              <p className="px-2 mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                {group.label}
+              </p>
+              <div className="space-y-0.5">
+                {group.items.map((item) => {
+                  const isActive = active && currentSearch === item.id;
+                  return (
+                    <Link
+                      key={item.id}
+                      to={`/admin?tab=${item.id}`}
+                      onClick={onNavigate}
+                      className={`block px-2 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 truncate ${isActive
+                        ? "bg-white text-slate-900 shadow-sm"
+                        : "text-slate-400 hover:text-white hover:bg-white/10"
+                        }`}
+                    >
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function NavSection({ label, children }) {
   return (
     <div className="mt-5">
@@ -48,6 +162,7 @@ function NavSection({ label, children }) {
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { user, logout } = useAuth();
   const { hasPermission } = usePermissions();
 
@@ -128,7 +243,11 @@ export default function Layout() {
 
         {isAdmin && (
           <NavSection label="Administración">
-            <NavLink to="/admin" label="Panel Admin" icon={icons.admin} active={p.startsWith("/admin")} onClick={closeSidebar} />
+            <AdminNavGroup
+              active={p.startsWith("/admin")}
+              currentSearch={searchParams.get("tab")}
+              onNavigate={closeSidebar}
+            />
             <NavLink to="/materiales-consolidado" label="Consolidado" icon={icons.consolidado} active={p === "/materiales-consolidado"} onClick={closeSidebar} />
             <NavLink to="/ganancias" label="Ganancias" icon={icons.ganancias} active={p === "/ganancias"} onClick={closeSidebar} />
           </NavSection>

@@ -1,6 +1,7 @@
 // RUTA: src/pages/Admin/Admin.jsx
 
-import React, { useState } from "react";
+import React, { useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import WindowTypesTab from "./Tabs/WindowTypesTab";
 import WindowSeriesTab from "./Tabs/WindowSeriesTab";
 import WindowCategoriesTab from "./Tabs/WindowCategoriesTab";
@@ -18,8 +19,27 @@ import WindowOptionAssignTab from './Tabs/WindowOptionAssignTab';
 import ChecklistTemplateTab from './Tabs/ChecklistTemplateTab';
 import ConfiguracionTab from './Tabs/ConfiguracionTab';
 
+const TAB_IDS = [
+  "windowTypes",
+  "windowSeries",
+  "windowCategories",
+  "catalogoPerfiles",
+  "calculations",
+  "accessoryRules",
+  "materials",
+  "pvcColors",
+  "glassColors",
+  "clients",
+  "users",
+  "permissions",
+  "optionConfig",
+  "windowOptionAssign",
+  "checklists",
+  "configuracion",
+];
+
 export default function Admin() {
-  const [activeTab, setActiveTab] = useState("windowTypes");
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const tabs = [
     { id: "windowTypes", label: "Tipos de Ventana" },
@@ -39,6 +59,22 @@ export default function Admin() {
     { id: "checklists", label: "✓ Checklists" },
     { id: "configuracion", label: "⚙ Configuración" },
   ];
+
+  // Tab activo derivado de ?tab=<id> en la URL — así la navegación desde el
+  // submenú del sidebar y el recargar la página mantienen la pestaña correcta.
+  const tabParam = searchParams.get("tab");
+  const activeTab = useMemo(
+    () => (TAB_IDS.includes(tabParam) ? tabParam : "windowTypes"),
+    [tabParam]
+  );
+
+  const setActiveTab = (id) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("tab", id);
+      return next;
+    });
+  };
 
   return (
     <div className="p-4 sm:p-6">

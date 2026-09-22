@@ -20,6 +20,7 @@ import {
 } from "react-icons/fa";
 import api from "@/services/api";
 import FormulaBuilder from "./FormulaBuilder";
+import CollapsibleSection, { CollapsibleChevron } from "./CollapsibleSection";
 
 const STEPS = [
   { id: 1, label: "Datos básicos" },
@@ -81,6 +82,20 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
   const [previewResult, setPreviewResult] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState("");
+
+  // ── Estado de secciones plegables (paso 2/3/4) ─────────────────────────────
+  const [openPerfiles, setOpenPerfiles] = useState({
+    MARCO: true,
+    HOJA: true,
+    TAPAJAMBA: false,
+    BATIENTE: false,
+    MOSQUITERO: false,
+    REFUERZOS: false,
+  });
+  const [vidrioOpen, setVidrioOpen] = useState(false);
+  const [openAccesorios, setOpenAccesorios] = useState({});
+
+  const setPerfilOpen = (slot, val) => setOpenPerfiles((prev) => ({ ...prev, [slot]: val }));
 
   // ── Carga inicial: catálogos + (si aplica) producto a editar ──────────────
   useEffect(() => {
@@ -164,6 +179,21 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
             refuerzoHojaMaterialId: product.refuerzoHojaMaterialId ? String(product.refuerzoHojaMaterialId) : "",
             refuerzoMosquiteroMaterialId: product.refuerzoMosquiteroMaterialId ? String(product.refuerzoMosquiteroMaterialId) : "",
           });
+
+          // Un producto en edición ya trae datos: abrimos las secciones que
+          // realmente están configuradas y dejamos cerradas las que no.
+          setOpenPerfiles({
+            MARCO: true,
+            HOJA: perfiles.HOJA.enabled,
+            TAPAJAMBA: perfiles.TAPAJAMBA.enabled,
+            BATIENTE: perfiles.BATIENTE.enabled,
+            MOSQUITERO: perfiles.MOSQUITERO.enabled,
+            REFUERZOS: !!(product.refuerzoHojaMaterialId || product.refuerzoMosquiteroMaterialId),
+          });
+          setVidrioOpen(!!product.vidrio?.usesGlass);
+          setOpenAccesorios(
+            Object.fromEntries((product.accesorios || []).map((_, i) => [i, false]))
+          );
         }
       } catch (err) {
         console.error(err);
@@ -392,10 +422,14 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
   };
 
   const addAccesorio = () => {
-    setData((prev) => ({
-      ...prev,
-      accesorios: [...prev.accesorios, { material_id: "", quantity: 1, required: true }],
-    }));
+    setData((prev) => {
+      const idx = prev.accesorios.length;
+      setOpenAccesorios((o) => ({ ...o, [idx]: true }));
+      return {
+        ...prev,
+        accesorios: [...prev.accesorios, { material_id: "", quantity: 1, required: true }],
+      };
+    });
   };
 
   const updateAccesorio = (idx, patch) => {
@@ -485,26 +519,36 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
   const renderPerfilCard = (slot, title, optional) => {
     const p = data.perfiles[slot];
     const disabled = optional && !p.enabled;
+    const isOpen = openPerfiles[slot];
     return (
       <div className="border border-gray-200 rounded-xl p-4 space-y-3">
         <div className="flex items-center justify-between">
           <h4 className="font-semibold text-gray-800 text-sm">
             {title} {!optional && <span className="text-red-500">*</span>}
           </h4>
-          {optional && (
-            <label className="flex items-center gap-2 text-xs text-gray-600">
-              <input
-                type="checkbox"
-                checked={!!p.enabled}
-                onChange={(e) => updatePerfil(slot, { enabled: e.target.checked })}
-              />
-              Este producto usa {title.toLowerCase()}
-            </label>
-          )}
+          <div className="flex items-center gap-3">
+            {optional && (
+              <label className="flex items-center gap-2 text-xs text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={!!p.enabled}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    updatePerfil(slot, { enabled: checked });
+                    if (checked) setPerfilOpen(slot, true);
+                  }}
+                />
+                Este producto usa {title.toLowerCase()}
+              </label>
+            )}
+            {!disabled && (
+              <CollapsibleChevron open={isOpen} onClick={() => setPerfilOpen(slot, !isOpen)} />
+            )}
+          </div>
         </div>
 
         {!disabled && (
-          <>
+          <CollapsibleSection open={isOpen} onToggle={(v) => setPerfilOpen(slot, v)}>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Perfil / material</label>
@@ -586,7 +630,7 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
               />
             )}
             {renderVariantesSection({ slot }, p.formulaAncho, p.formulaAlto)}
-          </>
+          </CollapsibleSection>
         )}
       </div>
     );
@@ -768,41 +812,49 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
 
               {/* ── Refuerzos: reutilizan la medida de Hoja/Mosquitero, no llevan fórmula propia ── */}
               <div className="border border-gray-200 rounded-xl p-4 space-y-3">
-                <h4 className="font-semibold text-gray-800 text-sm">
-                  Refuerzos <span className="text-gray-400 font-normal">(opcional)</span>
-                </h4>
-                <p className="text-xs text-gray-500 -mt-2">
-                  Mismo corte que la Hoja o el Mosquitero, pero en otro material. El cotizador
-                  los ofrece como agregado opcional.
-                </p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Refuerzo de Hoja</label>
-                    <select
-                      value={data.refuerzoHojaMaterialId}
-                      onChange={(e) => setData((p) => ({ ...p, refuerzoHojaMaterialId: e.target.value }))}
-                      className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    >
-                      <option value="">Sin refuerzo de hoja</option>
-                      {materials.map((m) => (
-                        <option key={m.id} value={String(m.id)}>{m.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Refuerzo de Mosquitero</label>
-                    <select
-                      value={data.refuerzoMosquiteroMaterialId}
-                      onChange={(e) => setData((p) => ({ ...p, refuerzoMosquiteroMaterialId: e.target.value }))}
-                      className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    >
-                      <option value="">Sin refuerzo de mosquitero</option>
-                      {materials.map((m) => (
-                        <option key={m.id} value={String(m.id)}>{m.name}</option>
-                      ))}
-                    </select>
-                  </div>
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold text-gray-800 text-sm">
+                    Refuerzos <span className="text-gray-400 font-normal">(opcional)</span>
+                  </h4>
+                  <CollapsibleChevron
+                    open={openPerfiles.REFUERZOS}
+                    onClick={() => setPerfilOpen("REFUERZOS", !openPerfiles.REFUERZOS)}
+                  />
                 </div>
+                <CollapsibleSection open={openPerfiles.REFUERZOS} onToggle={(v) => setPerfilOpen("REFUERZOS", v)}>
+                  <p className="text-xs text-gray-500">
+                    Mismo corte que la Hoja o el Mosquitero, pero en otro material. El cotizador
+                    los ofrece como agregado opcional.
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Refuerzo de Hoja</label>
+                      <select
+                        value={data.refuerzoHojaMaterialId}
+                        onChange={(e) => setData((p) => ({ ...p, refuerzoHojaMaterialId: e.target.value }))}
+                        className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      >
+                        <option value="">Sin refuerzo de hoja</option>
+                        {materials.map((m) => (
+                          <option key={m.id} value={String(m.id)}>{m.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Refuerzo de Mosquitero</label>
+                      <select
+                        value={data.refuerzoMosquiteroMaterialId}
+                        onChange={(e) => setData((p) => ({ ...p, refuerzoMosquiteroMaterialId: e.target.value }))}
+                        className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      >
+                        <option value="">Sin refuerzo de mosquitero</option>
+                        {materials.map((m) => (
+                          <option key={m.id} value={String(m.id)}>{m.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </CollapsibleSection>
               </div>
             </div>
           )}
@@ -810,51 +862,60 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
           {step === 3 && (
             <div className="space-y-4">
               <p className="text-sm text-gray-500">¿Este producto lleva vidrio?</p>
-              <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                <input
-                  type="checkbox"
-                  checked={data.vidrio.usesGlass}
-                  onChange={(e) =>
-                    setData((p) => ({ ...p, vidrio: { ...p.vidrio, usesGlass: e.target.checked } }))
-                  }
-                />
-                Sí, este producto lleva vidrio
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={data.vidrio.usesGlass}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setData((p) => ({ ...p, vidrio: { ...p.vidrio, usesGlass: checked } }));
+                      if (checked) setVidrioOpen(true);
+                    }}
+                  />
+                  Sí, este producto lleva vidrio
+                </label>
+                {data.vidrio.usesGlass && (
+                  <CollapsibleChevron open={vidrioOpen} onClick={() => setVidrioOpen((v) => !v)} />
+                )}
+              </div>
 
               {data.vidrio.usesGlass && (
                 <div className="border border-gray-200 rounded-xl p-4 space-y-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                      Cantidad de vidrios por ventana
-                    </label>
-                    <input
-                      type="number"
-                      min={1}
-                      value={data.vidrio.cant_vidrios}
-                      onChange={(e) =>
-                        setData((p) => ({
-                          ...p,
-                          vidrio: { ...p.vidrio, cant_vidrios: parseInt(e.target.value, 10) || 1 },
-                        }))
-                      }
-                      className="w-32 border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  <CollapsibleSection open={vidrioOpen} onToggle={setVidrioOpen}>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Cantidad de vidrios por ventana
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={data.vidrio.cant_vidrios}
+                        onChange={(e) =>
+                          setData((p) => ({
+                            ...p,
+                            vidrio: { ...p.vidrio, cant_vidrios: parseInt(e.target.value, 10) || 1 },
+                          }))
+                        }
+                        className="w-32 border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      />
+                    </div>
+                    <FormulaBuilder
+                      label="Fórmula de ancho del vidrio"
+                      origenLabel="Ancho"
+                      steps={data.vidrio.formulaAncho}
+                      onChange={(steps) => setData((p) => ({ ...p, vidrio: { ...p.vidrio, formulaAncho: steps } }))}
+                      exampleBase={Number(exampleWidth) || 100}
                     />
-                  </div>
-                  <FormulaBuilder
-                    label="Fórmula de ancho del vidrio"
-                    origenLabel="Ancho"
-                    steps={data.vidrio.formulaAncho}
-                    onChange={(steps) => setData((p) => ({ ...p, vidrio: { ...p.vidrio, formulaAncho: steps } }))}
-                    exampleBase={Number(exampleWidth) || 100}
-                  />
-                  <FormulaBuilder
-                    label="Fórmula de alto del vidrio"
-                    origenLabel="Alto"
-                    steps={data.vidrio.formulaAlto}
-                    onChange={(steps) => setData((p) => ({ ...p, vidrio: { ...p.vidrio, formulaAlto: steps } }))}
-                    exampleBase={Number(exampleHeight) || 150}
-                  />
-                  {renderVariantesSection({ slot: null }, data.vidrio.formulaAncho, data.vidrio.formulaAlto)}
+                    <FormulaBuilder
+                      label="Fórmula de alto del vidrio"
+                      origenLabel="Alto"
+                      steps={data.vidrio.formulaAlto}
+                      onChange={(steps) => setData((p) => ({ ...p, vidrio: { ...p.vidrio, formulaAlto: steps } }))}
+                      exampleBase={Number(exampleHeight) || 150}
+                    />
+                    {renderVariantesSection({ slot: null }, data.vidrio.formulaAncho, data.vidrio.formulaAlto)}
+                  </CollapsibleSection>
                 </div>
               )}
             </div>
@@ -883,6 +944,8 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
 
               {data.accesorios.map((a, idx) => {
                 const usesFormula = !!a.formula_type;
+                const isOpen = openAccesorios[idx] ?? false;
+                const setOpen = (v) => setOpenAccesorios((o) => ({ ...o, [idx]: v }));
                 return (
                 <div key={idx} className="border border-gray-200 rounded-lg p-2 space-y-2">
                   <div className="flex items-center gap-2">
@@ -908,6 +971,7 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
                         title="Cantidad por ventana"
                       />
                     )}
+                    <CollapsibleChevron open={isOpen} onClick={() => setOpen(!isOpen)} />
                     <button
                       type="button"
                       onClick={() => removeAccesorio(idx)}
@@ -917,6 +981,7 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
                     </button>
                   </div>
 
+                  <CollapsibleSection open={isOpen} onToggle={setOpen}>
                   {/* ── Cantidad: fija, o calculada según cuánto material lleve otra pieza ── */}
                   <div className="flex items-center gap-1.5 pl-0.5">
                     <button
@@ -1026,6 +1091,7 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
                       </select>
                     )}
                   </div>
+                  </CollapsibleSection>
                 </div>
               );})}
             </div>
