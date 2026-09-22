@@ -402,6 +402,113 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
     setVariantes(target, getVariantes(target).filter((_, i) => i !== idx));
   };
 
+  // ── Crear un grupo de opción nuevo sin salir del asistente ─────────────────
+  // Antes había que ir primero a "Opciones del Cotizador" a crear el grupo y
+  // sus valores, y luego a "Asignación de Opciones" para que apareciera en el
+  // cotizador de este tipo — dos pantallas aparte solo para poder referenciarlo
+  // acá. Ahora se crea al vuelo: se guarda de inmediato en el catálogo global
+  // (para poder reutilizarse en otros productos) y la asignación al tipo de
+  // ventana queda implícita al guardar el producto (ver
+  // ProductWizardService.syncOptionGroupAssignments en el backend).
+  const slugify = (s) =>
+    (s || "")
+      .toString()
+      .normalize("NFD").replace(/[̀-ͯ]/g, "") // quitar acentos
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+
+  const [newGroupDrafts, setNewGroupDrafts] = useState({});
+  const [newGroupSaving, setNewGroupSaving] = useState({});
+  const [newGroupError, setNewGroupError] = useState({});
+
+  const varianteKey = (target, idx) => `${target.slot || "VIDRIO"}:${idx}`;
+
+  const startNewGroup = (target, idx) => {
+    const k = varianteKey(target, idx);
+    setNewGroupDrafts((prev) => ({ ...prev, [k]: { label: "", values: [{ label: "" }, { label: "" }] } }));
+    setNewGroupError((prev) => ({ ...prev, [k]: "" }));
+  };
+
+  const cancelNewGroup = (target, idx) => {
+    const k = varianteKey(target, idx);
+    setNewGroupDrafts((prev) => {
+      const next = { ...prev };
+      delete next[k];
+      return next;
+    });
+  };
+
+  const updateNewGroupDraft = (target, idx, patch) => {
+    const k = varianteKey(target, idx);
+    setNewGroupDrafts((prev) => ({ ...prev, [k]: { ...prev[k], ...patch } }));
+  };
+
+  const updateNewGroupValue = (target, idx, valIdx, label) => {
+    const k = varianteKey(target, idx);
+    setNewGroupDrafts((prev) => ({
+      ...prev,
+      [k]: { ...prev[k], values: prev[k].values.map((v, i) => (i === valIdx ? { label } : v)) },
+    }));
+  };
+
+  const addNewGroupValue = (target, idx) => {
+    const k = varianteKey(target, idx);
+    setNewGroupDrafts((prev) => ({ ...prev, [k]: { ...prev[k], values: [...prev[k].values, { label: "" }] } }));
+  };
+
+  const removeNewGroupValue = (target, idx, valIdx) => {
+    const k = varianteKey(target, idx);
+    setNewGroupDrafts((prev) => ({ ...prev, [k]: { ...prev[k], values: prev[k].values.filter((_, i) => i !== valIdx) } }));
+  };
+
+  const saveNewGroup = async (target, idx) => {
+    const k = varianteKey(target, idx);
+    const draft = newGroupDrafts[k];
+    if (!draft) return;
+
+    const label = draft.label.trim();
+    const values = draft.values.map((v) => v.label.trim()).filter(Boolean);
+    if (!label) {
+      setNewGroupError((prev) => ({ ...prev, [k]: "Ponle un nombre al grupo." }));
+      return;
+    }
+    if (values.length < 2) {
+      setNewGroupError((prev) => ({ ...prev, [k]: "Agrega al menos 2 valores para elegir entre ellos." }));
+      return;
+    }
+    const key = slugify(label);
+    if (!key) {
+      setNewGroupError((prev) => ({ ...prev, [k]: "Ese nombre no genera un identificador válido, prueba con otro." }));
+      return;
+    }
+
+    setNewGroupSaving((prev) => ({ ...prev, [k]: true }));
+    setNewGroupError((prev) => ({ ...prev, [k]: "" }));
+    try {
+      const { data: group } = await api.post("/option-groups", { key, label });
+      const createdValues = [];
+      for (const vLabel of values) {
+        const { data: val } = await api.post("/option-values", {
+          group_id: group.id,
+          key: slugify(vLabel),
+          label: vLabel,
+        });
+        createdValues.push(val);
+      }
+      const fullGroup = { ...group, values: createdValues };
+      setOptionGroups((prev) => [...prev, fullGroup]);
+      updateVariante(target, idx, { option_group: fullGroup.key, option_key: "" });
+      cancelNewGroup(target, idx);
+    } catch (err) {
+      const msg = err?.response?.data?.message || "No se pudo crear el grupo.";
+      setNewGroupError((prev) => ({ ...prev, [k]: Array.isArray(msg) ? msg.join(", ") : msg }));
+    } finally {
+      setNewGroupSaving((prev) => ({ ...prev, [k]: false }));
+    }
+  };
+
   const togglePvcColor = (id) => {
     setData((prev) => {
       const idStr = String(id);
@@ -461,35 +568,109 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
           Usa esto solo si la fórmula cambia según una opción del cotizador (ej. "cantidad de hojas": con 1
           no se divide, con 2 sí). Si no aplica, ignora esta sección.
         </p>
-        {variantes.map((v, idx) => (
+        {variantes.map((v, idx) => {
+          const k = varianteKey(target, idx);
+          const draft = newGroupDrafts[k];
+          return (
           <div key={idx} className="bg-white border border-amber-200 rounded-lg p-2 space-y-2">
-            <div className="flex items-center gap-2">
-              <select
-                value={v.option_group || ""}
-                onChange={(e) => updateVariante(target, idx, { option_group: e.target.value, option_key: "" })}
-                className="text-xs border border-gray-300 rounded-lg px-2 py-1.5 flex-1"
-              >
-                <option value="">Selecciona el grupo de opción...</option>
-                {optionGroups.map((g) => (
-                  <option key={g.id} value={g.key}>{g.label}</option>
-                ))}
-              </select>
-              {v.option_group && (
+            {draft ? (
+              <div className="border border-amber-300 bg-amber-50/60 rounded-lg p-2.5 space-y-2">
+                <p className="text-xs font-semibold text-amber-800">Nuevo grupo de opción</p>
+                <div>
+                  <label className="block text-[11px] text-gray-500 mb-0.5">Nombre del grupo (ej. "Tipo de Cierre")</label>
+                  <input
+                    type="text"
+                    value={draft.label}
+                    onChange={(e) => updateNewGroupDraft(target, idx, { label: e.target.value })}
+                    placeholder="Nombre del grupo"
+                    className="w-full text-xs border border-gray-300 rounded-lg px-2 py-1.5"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] text-gray-500 mb-0.5">Valores que el vendedor podrá elegir</label>
+                  <div className="space-y-1">
+                    {draft.values.map((val, vIdx) => (
+                      <div key={vIdx} className="flex items-center gap-1.5">
+                        <input
+                          type="text"
+                          value={val.label}
+                          onChange={(e) => updateNewGroupValue(target, idx, vIdx, e.target.value)}
+                          placeholder={`Valor ${vIdx + 1}`}
+                          className="flex-1 text-xs border border-gray-300 rounded-lg px-2 py-1.5"
+                        />
+                        {draft.values.length > 2 && (
+                          <button type="button" onClick={() => removeNewGroupValue(target, idx, vIdx)} className="text-red-400 hover:text-red-600 flex-shrink-0">
+                            <FaTrashAlt size={11} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => addNewGroupValue(target, idx)}
+                    className="mt-1 flex items-center gap-1 text-[11px] text-amber-700 hover:text-amber-900 font-medium"
+                  >
+                    <FaPlus size={8} /> Añadir valor
+                  </button>
+                </div>
+                {newGroupError[k] && (
+                  <p className="text-[11px] text-red-600">{newGroupError[k]}</p>
+                )}
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    disabled={newGroupSaving[k]}
+                    onClick={() => saveNewGroup(target, idx)}
+                    className="text-xs font-semibold text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50 px-3 py-1.5 rounded-lg"
+                  >
+                    {newGroupSaving[k] ? "Creando..." : "Crear grupo"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => cancelNewGroup(target, idx)}
+                    className="text-xs font-medium text-gray-500 hover:text-gray-700 px-2 py-1.5"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
                 <select
-                  value={v.option_key || ""}
-                  onChange={(e) => updateVariante(target, idx, { option_key: e.target.value })}
+                  value={v.option_group || ""}
+                  onChange={(e) => {
+                    if (e.target.value === "__new__") {
+                      startNewGroup(target, idx);
+                      return;
+                    }
+                    updateVariante(target, idx, { option_group: e.target.value, option_key: "" });
+                  }}
                   className="text-xs border border-gray-300 rounded-lg px-2 py-1.5 flex-1"
                 >
-                  <option value="">Selecciona el valor...</option>
-                  {(optionGroups.find((g) => g.key === v.option_group)?.values || []).map((val) => (
-                    <option key={val.key} value={val.key}>{val.label}</option>
+                  <option value="">Selecciona el grupo de opción...</option>
+                  {optionGroups.map((g) => (
+                    <option key={g.id} value={g.key}>{g.label}</option>
                   ))}
+                  <option value="__new__">+ Crear grupo nuevo...</option>
                 </select>
-              )}
-              <button type="button" onClick={() => removeVariante(target, idx)} className="text-red-400 hover:text-red-600 flex-shrink-0">
-                <FaTrashAlt size={12} />
-              </button>
-            </div>
+                {v.option_group && (
+                  <select
+                    value={v.option_key || ""}
+                    onChange={(e) => updateVariante(target, idx, { option_key: e.target.value })}
+                    className="text-xs border border-gray-300 rounded-lg px-2 py-1.5 flex-1"
+                  >
+                    <option value="">Selecciona el valor...</option>
+                    {(optionGroups.find((g) => g.key === v.option_group)?.values || []).map((val) => (
+                      <option key={val.key} value={val.key}>{val.label}</option>
+                    ))}
+                  </select>
+                )}
+                <button type="button" onClick={() => removeVariante(target, idx)} className="text-red-400 hover:text-red-600 flex-shrink-0">
+                  <FaTrashAlt size={12} />
+                </button>
+              </div>
+            )}
             <FormulaBuilder
               label="Fórmula de ancho para esta variante"
               origenLabel="Ancho"
@@ -505,7 +686,8 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
               exampleBase={Number(exampleHeight) || 150}
             />
           </div>
-        ))}
+          );
+        })}
       </div>
     );
   };
