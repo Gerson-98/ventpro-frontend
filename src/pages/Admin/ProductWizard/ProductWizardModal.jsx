@@ -97,8 +97,17 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
   });
   const [vidrioOpen, setVidrioOpen] = useState(false);
   const [openAccesorios, setOpenAccesorios] = useState({});
+  // Bloques colapsables del Paso 4, uno por option_group (más "Siempre
+  // incluidos"). Sin entrada todavía -> se decide en el render: cerrado si
+  // estamos editando un tipo ya existente (para no abrumar con 20 bloques
+  // abiertos), abierto si es la primera vez que aparece ese grupo (alta nueva).
+  const [openAccesorioGroups, setOpenAccesorioGroups] = useState({});
 
   const setPerfilOpen = (slot, val) => setOpenPerfiles((prev) => ({ ...prev, [slot]: val }));
+  const isAccesorioGroupOpen = (key) =>
+    openAccesorioGroups[key] ?? (key === "_always" ? true : !editingId);
+  const setAccesorioGroupOpen = (key, val) =>
+    setOpenAccesorioGroups((prev) => ({ ...prev, [key]: val }));
 
   // ── Carga inicial: catálogos + (si aplica) producto a editar ──────────────
   useEffect(() => {
@@ -889,6 +898,191 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
     );
   };
 
+  // Fila individual de un accesorio (Paso 4). Recibe el ÍNDICE del array
+  // original data.accesorios — nunca un índice relativo a un grupo — para
+  // que updateAccesorio/removeAccesorio sigan apuntando a la fila correcta
+  // sin importar en qué bloque colapsable se esté mostrando visualmente.
+  const renderAccesorioRow = (idx) => {
+    const a = data.accesorios[idx];
+    const usesFormula = !!a.formula_type;
+    const isOpen = openAccesorios[idx] ?? false;
+    const setOpen = (v) => setOpenAccesorios((o) => ({ ...o, [idx]: v }));
+
+    // Etiqueta visible sin tener que expandir la fila: aclara si esta
+    // condición es "por categoría" (agrupa varios valores, ej. CREMONA) o
+    // "por un valor puntual" (ej. cada chapa específica) — para que se note
+    // a simple vista cuál es cuál.
+    const condGroup = optionGroups.find((g) => g.key === a.option_group);
+    const condBadge = a.option_group ? (
+      a.option_category ? (
+        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex-shrink-0">
+          categoría: {a.option_category}
+          <InfoTip text={`Este accesorio se agrega para CUALQUIER valor de "${condGroup?.label || a.option_group}" que esté etiquetado con la categoría "${a.option_category}" — agrupa varios valores a la vez (ej. varios tipos de chapa que cuentan como "2 hojas").`} />
+        </span>
+      ) : (
+        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded-full bg-gray-100 text-gray-600 border border-gray-200 flex-shrink-0">
+          valor: {condGroup?.values.find((v) => v.key === a.option_key)?.label || a.option_key}
+          <InfoTip text={`Este accesorio se agrega SOLO cuando "${condGroup?.label || a.option_group}" es exactamente "${condGroup?.values.find((v) => v.key === a.option_key)?.label || a.option_key}" — un único valor puntual, no una categoría.`} />
+        </span>
+      )
+    ) : null;
+
+    return (
+      <div key={idx} className="border border-gray-200 rounded-lg p-2 space-y-2 bg-white">
+        {condBadge && <div className="flex">{condBadge}</div>}
+        <div className="flex items-center gap-2">
+          <select
+            value={a.material_id}
+            onChange={(e) => updateAccesorio(idx, { material_id: e.target.value })}
+            className="flex-1 border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+          >
+            <option value="">Selecciona un accesorio...</option>
+            {accessoryMaterials.map((m) => (
+              <option key={m.id} value={String(m.id)}>
+                {m.name}
+              </option>
+            ))}
+          </select>
+          {!usesFormula && (
+            <input
+              type="number"
+              min={1}
+              value={a.quantity}
+              onChange={(e) => updateAccesorio(idx, { quantity: parseInt(e.target.value, 10) || 1 })}
+              className="w-20 border border-gray-300 rounded-lg p-2 text-sm text-center focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              title="Cantidad por ventana"
+            />
+          )}
+          <CollapsibleChevron open={isOpen} onClick={() => setOpen(!isOpen)} />
+          <button
+            type="button"
+            onClick={() => removeAccesorio(idx)}
+            className="text-red-400 hover:text-red-600 flex-shrink-0"
+          >
+            <FaTrashAlt size={13} />
+          </button>
+        </div>
+
+        <CollapsibleSection open={isOpen} onToggle={setOpen}>
+          {/* ── Cantidad: fija, o calculada según cuánto material lleve otra pieza ── */}
+          <div className="flex items-center gap-1.5 pl-0.5">
+            <button
+              type="button"
+              onClick={() => updateAccesorio(idx, { formula_type: undefined, formula_slot: undefined, formula_factor: undefined, quantity: a.quantity || 1 })}
+              className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
+                !usesFormula ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-500 border-gray-300"
+              }`}
+            >
+              Cantidad fija
+            </button>
+            <button
+              type="button"
+              onClick={() => updateAccesorio(idx, { formula_type: 'PER_BARRA', formula_slot: 'hoja', formula_factor: 1 })}
+              className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
+                usesFormula ? "bg-purple-600 text-white border-purple-600" : "bg-white text-gray-500 border-gray-300"
+              }`}
+            >
+              Por fórmula
+            </button>
+          </div>
+          {usesFormula && (
+            <div className="flex items-center gap-2 pl-0.5 flex-wrap text-xs bg-purple-50 border border-purple-100 rounded-lg p-2">
+              <span className="text-purple-700">Cantidad =</span>
+              <select
+                value={a.formula_type}
+                onChange={(e) => updateAccesorio(idx, { formula_type: e.target.value })}
+                className="border border-purple-200 rounded px-1.5 py-1"
+              >
+                <option value="PER_BARRA">barras</option>
+                <option value="PER_M2">m²</option>
+              </select>
+              <span className="text-purple-700">de</span>
+              <select
+                value={a.formula_slot}
+                onChange={(e) => updateAccesorio(idx, { formula_slot: e.target.value })}
+                className="border border-purple-200 rounded px-1.5 py-1"
+              >
+                <option value="marco">Marco</option>
+                <option value="hoja">Hoja</option>
+                <option value="mosquitero">Mosquitero</option>
+                <option value="batiente">Batiente</option>
+                <option value="tapajamba">Tapajamba</option>
+              </select>
+              <span className="text-purple-700">×</span>
+              <input
+                type="number"
+                step="any"
+                value={a.formula_factor}
+                onChange={(e) => updateAccesorio(idx, { formula_factor: parseFloat(e.target.value) || 0 })}
+                className="w-16 border border-purple-200 rounded px-1.5 py-1 text-center"
+              />
+              <span className="text-purple-700">(redondeado hacia arriba)</span>
+            </div>
+          )}
+
+          <div className="flex gap-1.5 pl-0.5">
+            <button
+              type="button"
+              onClick={() => updateAccesorio(idx, { required: true })}
+              className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
+                a.required !== false
+                  ? "bg-emerald-600 text-white border-emerald-600"
+                  : "bg-white text-gray-500 border-gray-300"
+              }`}
+            >
+              Obligatorio
+            </button>
+            <button
+              type="button"
+              onClick={() => updateAccesorio(idx, { required: false })}
+              className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
+                a.required === false
+                  ? "bg-amber-500 text-white border-amber-500"
+                  : "bg-white text-gray-500 border-gray-300"
+              }`}
+            >
+              Opcional
+            </button>
+          </div>
+
+          {/* ── Condición: siempre, o solo cuando el cliente elige cierta opción ── */}
+          <div className="flex items-start gap-2 pl-0.5 pt-1 border-t border-gray-100">
+            <select
+              value={a.option_group || ""}
+              onChange={(e) => {
+                const group = e.target.value;
+                updateAccesorio(idx, { option_group: group, option_key: "", option_category: "" });
+              }}
+              className="text-xs border border-gray-300 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            >
+              <option value="">Siempre se agrega</option>
+              {optionGroups.map((g) => (
+                <option key={g.id} value={g.key}>Solo si: {g.label}</option>
+              ))}
+            </select>
+            {a.option_group && (
+              <div className="flex-1 space-y-1">
+                {renderValueOrCategorySelect({
+                  groupKey: a.option_group,
+                  mode: a._mode || (a.option_category ? "category" : "value"),
+                  valueVal: a.option_key,
+                  categoryVal: a.option_category,
+                  onModeChange: (mode) =>
+                    updateAccesorio(idx, mode === "value"
+                      ? { _mode: "value", option_category: "" }
+                      : { _mode: "category", option_key: "" }),
+                  onValueChange: (key) => updateAccesorio(idx, { option_key: key, option_category: "", _mode: "value" }),
+                  onCategoryChange: (cat) => updateAccesorio(idx, { option_category: cat, option_key: "", _mode: "category" }),
+                })}
+                {renderCategoryEditor(a.option_group)}
+              </div>
+            )}
+          </div>
+        </CollapsibleSection>
+      </div>
+    );
+  };
+
   const renderPerfilCard = (slot, title, optional) => {
     const p = data.perfiles[slot];
     const disabled = optional && !p.enabled;
@@ -1318,187 +1512,57 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
                 <p className="text-xs text-gray-400 italic">Sin accesorios configurados.</p>
               )}
 
-              {data.accesorios.map((a, idx) => {
-                const usesFormula = !!a.formula_type;
-                const isOpen = openAccesorios[idx] ?? false;
-                const setOpen = (v) => setOpenAccesorios((o) => ({ ...o, [idx]: v }));
+              {(() => {
+                // Agrupamos por ÍNDICE del array original (no los objetos),
+                // así updateAccesorio(idx, ...) / removeAccesorio(idx) siguen
+                // apuntando a la fila correcta sin importar en qué bloque se
+                // muestre visualmente. Una fila sin option_group cae en
+                // "Siempre incluidos"; en cuanto se le asigna un grupo, en el
+                // siguiente render "salta" sola al bloque de ese grupo.
+                const alwaysIdxs = [];
+                const groupedIdxs = {};
+                data.accesorios.forEach((a, idx) => {
+                  if (a.option_group) {
+                    if (!groupedIdxs[a.option_group]) groupedIdxs[a.option_group] = [];
+                    groupedIdxs[a.option_group].push(idx);
+                  } else {
+                    alwaysIdxs.push(idx);
+                  }
+                });
 
-                // Etiqueta visible sin tener que expandir la fila: aclara si
-                // esta condición es "por categoría" (agrupa varios valores,
-                // ej. CREMONA) o "por un valor puntual" (ej. cada chapa
-                // específica) — para que se note a simple vista cuál es cuál.
-                const condGroup = optionGroups.find((g) => g.key === a.option_group);
-                const condBadge = a.option_group ? (
-                  a.option_category ? (
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex-shrink-0">
-                      categoría: {a.option_category}
-                      <InfoTip text={`Este accesorio se agrega para CUALQUIER valor de "${condGroup?.label || a.option_group}" que esté etiquetado con la categoría "${a.option_category}" — agrupa varios valores a la vez (ej. varios tipos de chapa que cuentan como "2 hojas").`} />
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded-full bg-gray-100 text-gray-600 border border-gray-200 flex-shrink-0">
-                      valor: {condGroup?.values.find((v) => v.key === a.option_key)?.label || a.option_key}
-                      <InfoTip text={`Este accesorio se agrega SOLO cuando "${condGroup?.label || a.option_group}" es exactamente "${condGroup?.values.find((v) => v.key === a.option_key)?.label || a.option_key}" — un único valor puntual, no una categoría.`} />
-                    </span>
-                  )
-                ) : null;
+                const blocks = [
+                  { key: "_always", label: "Siempre incluidos", idxs: alwaysIdxs },
+                  ...Object.keys(groupedIdxs).map((groupKey) => {
+                    const g = optionGroups.find((og) => og.key === groupKey);
+                    return { key: groupKey, label: g?.label || groupKey, idxs: groupedIdxs[groupKey] };
+                  }),
+                ].filter((block) => block.idxs.length > 0);
 
-                return (
-                <div key={idx} className="border border-gray-200 rounded-lg p-2 space-y-2">
-                  {condBadge && <div className="flex">{condBadge}</div>}
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={a.material_id}
-                      onChange={(e) => updateAccesorio(idx, { material_id: e.target.value })}
-                      className="flex-1 border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    >
-                      <option value="">Selecciona un accesorio...</option>
-                      {accessoryMaterials.map((m) => (
-                        <option key={m.id} value={String(m.id)}>
-                          {m.name}
-                        </option>
-                      ))}
-                    </select>
-                    {!usesFormula && (
-                      <input
-                        type="number"
-                        min={1}
-                        value={a.quantity}
-                        onChange={(e) => updateAccesorio(idx, { quantity: parseInt(e.target.value, 10) || 1 })}
-                        className="w-20 border border-gray-300 rounded-lg p-2 text-sm text-center focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        title="Cantidad por ventana"
-                      />
-                    )}
-                    <CollapsibleChevron open={isOpen} onClick={() => setOpen(!isOpen)} />
-                    <button
-                      type="button"
-                      onClick={() => removeAccesorio(idx)}
-                      className="text-red-400 hover:text-red-600 flex-shrink-0"
-                    >
-                      <FaTrashAlt size={13} />
-                    </button>
-                  </div>
-
-                  <CollapsibleSection open={isOpen} onToggle={setOpen}>
-                  {/* ── Cantidad: fija, o calculada según cuánto material lleve otra pieza ── */}
-                  <div className="flex items-center gap-1.5 pl-0.5">
-                    <button
-                      type="button"
-                      onClick={() => updateAccesorio(idx, { formula_type: undefined, formula_slot: undefined, formula_factor: undefined, quantity: a.quantity || 1 })}
-                      className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
-                        !usesFormula ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-500 border-gray-300"
-                      }`}
-                    >
-                      Cantidad fija
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateAccesorio(idx, { formula_type: 'PER_BARRA', formula_slot: 'hoja', formula_factor: 1 })}
-                      className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
-                        usesFormula ? "bg-purple-600 text-white border-purple-600" : "bg-white text-gray-500 border-gray-300"
-                      }`}
-                    >
-                      Por fórmula
-                    </button>
-                  </div>
-                  {usesFormula && (
-                    <div className="flex items-center gap-2 pl-0.5 flex-wrap text-xs bg-purple-50 border border-purple-100 rounded-lg p-2">
-                      <span className="text-purple-700">Cantidad =</span>
-                      <select
-                        value={a.formula_type}
-                        onChange={(e) => updateAccesorio(idx, { formula_type: e.target.value })}
-                        className="border border-purple-200 rounded px-1.5 py-1"
-                      >
-                        <option value="PER_BARRA">barras</option>
-                        <option value="PER_M2">m²</option>
-                      </select>
-                      <span className="text-purple-700">de</span>
-                      <select
-                        value={a.formula_slot}
-                        onChange={(e) => updateAccesorio(idx, { formula_slot: e.target.value })}
-                        className="border border-purple-200 rounded px-1.5 py-1"
-                      >
-                        <option value="marco">Marco</option>
-                        <option value="hoja">Hoja</option>
-                        <option value="mosquitero">Mosquitero</option>
-                        <option value="batiente">Batiente</option>
-                        <option value="tapajamba">Tapajamba</option>
-                      </select>
-                      <span className="text-purple-700">×</span>
-                      <input
-                        type="number"
-                        step="any"
-                        value={a.formula_factor}
-                        onChange={(e) => updateAccesorio(idx, { formula_factor: parseFloat(e.target.value) || 0 })}
-                        className="w-16 border border-purple-200 rounded px-1.5 py-1 text-center"
-                      />
-                      <span className="text-purple-700">(redondeado hacia arriba)</span>
-                    </div>
-                  )}
-
-                  <div className="flex gap-1.5 pl-0.5">
-                    <button
-                      type="button"
-                      onClick={() => updateAccesorio(idx, { required: true })}
-                      className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
-                        a.required !== false
-                          ? "bg-emerald-600 text-white border-emerald-600"
-                          : "bg-white text-gray-500 border-gray-300"
-                      }`}
-                    >
-                      Obligatorio
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateAccesorio(idx, { required: false })}
-                      className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
-                        a.required === false
-                          ? "bg-amber-500 text-white border-amber-500"
-                          : "bg-white text-gray-500 border-gray-300"
-                      }`}
-                    >
-                      Opcional
-                    </button>
-                  </div>
-
-                  {/* ── Condición: siempre, o solo cuando el cliente elige cierta opción ── */}
-                  <div className="flex items-start gap-2 pl-0.5 pt-1 border-t border-gray-100">
-                    <select
-                      value={a.option_group || ""}
-                      onChange={(e) => {
-                        const group = e.target.value;
-                        updateAccesorio(idx, { option_group: group, option_key: "", option_category: "" });
-                      }}
-                      className="text-xs border border-gray-300 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    >
-                      <option value="">Siempre se agrega</option>
-                      {optionGroups.map((g) => (
-                        <option key={g.id} value={g.key}>Solo si: {g.label}</option>
-                      ))}
-                    </select>
-                    {a.option_group && (
-                      <div className="flex-1 space-y-1">
-                        {renderValueOrCategorySelect({
-                          groupKey: a.option_group,
-                          mode: a._mode || (a.option_category ? "category" : "value"),
-                          valueVal: a.option_key,
-                          categoryVal: a.option_category,
-                          onModeChange: (mode) =>
-                            updateAccesorio(idx, mode === "value"
-                              ? { _mode: "value", option_category: "" }
-                              : { _mode: "category", option_key: "" }),
-                          onValueChange: (key) => updateAccesorio(idx, { option_key: key, option_category: "", _mode: "value" }),
-                          onCategoryChange: (cat) => updateAccesorio(idx, { option_category: cat, option_key: "", _mode: "category" }),
-                        })}
-                        {renderCategoryEditor(a.option_group)}
+                return blocks.map((block) => {
+                  const blockOpen = isAccesorioGroupOpen(block.key);
+                  return (
+                    <div key={block.key} className="border border-gray-200 rounded-xl p-3 space-y-2 bg-gray-50/50">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-semibold text-gray-700 text-xs">
+                          {block.label}
+                          <span className="text-gray-400 font-normal"> — {block.idxs.length} accesorio{block.idxs.length === 1 ? "" : "s"}</span>
+                        </h4>
+                        <CollapsibleChevron
+                          open={blockOpen}
+                          onClick={() => setAccesorioGroupOpen(block.key, !blockOpen)}
+                        />
                       </div>
-                    )}
-                  </div>
-                  </CollapsibleSection>
-                </div>
-              );})}
+                      <CollapsibleSection open={blockOpen} onToggle={(v) => setAccesorioGroupOpen(block.key, v)}>
+                        <div className="space-y-2">
+                          {block.idxs.map((idx) => renderAccesorioRow(idx))}
+                        </div>
+                      </CollapsibleSection>
+                    </div>
+                  );
+                });
+              })()}
             </div>
           )}
-
           {step === 5 && (
             <div className="space-y-4">
               <p className="text-sm text-gray-500">
