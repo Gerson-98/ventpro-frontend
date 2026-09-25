@@ -1604,6 +1604,25 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
                 </div>
               )}
 
+              {previewResult && previewResult.warnings && previewResult.warnings.length > 0 && (
+                <div className="border border-amber-200 bg-amber-50 rounded-lg p-3 space-y-2">
+                  <p className="text-xs font-semibold text-amber-800 flex items-center gap-1.5">
+                    <FaExclamationTriangle size={12} /> Revisar: posibles huecos de configuración
+                  </p>
+                  <p className="text-[11px] text-amber-700">
+                    El sistema detectó posibles huecos de configuración — pueden ser errores reales
+                    (como pasó antes con un accesorio que faltaba en una combinación) o normales (ej.
+                    varios productos físicos distintos que a propósito solo cubren parte de una
+                    categoría cada uno). Revísalos y usa tu criterio.
+                  </p>
+                  <ul className="list-disc list-inside space-y-1 text-[11px] text-amber-800">
+                    {previewResult.warnings.map((w, wIdx) => (
+                      <li key={wIdx}>{w.message}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               {previewResult && (
                 <div className="space-y-3">
                   {(previewResult.scenarios && previewResult.scenarios.length > 0
@@ -1652,6 +1671,30 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
                           </tbody>
                         </table>
                       </div>
+                      {scenario.accesorios && scenario.accesorios.length > 0 && (
+                        <div className="border-t border-gray-100 px-3 py-2 space-y-1">
+                          <p className="text-[11px] font-semibold text-gray-500">Accesorios en este escenario</p>
+                          <ul className="text-xs text-gray-600 space-y-0.5">
+                            {scenario.accesorios.map((acc, aIdx) => (
+                              <li key={aIdx} className="flex items-center gap-1.5">
+                                <span className="font-medium text-gray-700">{acc.materialName}</span>
+                                <span className="text-gray-400">
+                                  {typeof acc.quantity === "number" ? `x${acc.quantity}` : acc.quantity}
+                                </span>
+                                <span
+                                  className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium border ${
+                                    acc.required !== false
+                                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                      : "bg-amber-50 text-amber-700 border-amber-200"
+                                  }`}
+                                >
+                                  {acc.required !== false ? "obligatorio" : "opcional"}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
