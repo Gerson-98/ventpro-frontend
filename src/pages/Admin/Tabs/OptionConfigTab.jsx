@@ -113,11 +113,14 @@ export default function OptionConfigTab() {
     };
 
     const handleDeleteGroup = async (group) => {
-        if (!confirm(`¿Eliminar el grupo "${group.label}"? Se eliminarán también todas sus opciones.`)) return;
+        if (!confirm(`¿Eliminar el grupo "${group.label}"? Esta acción no se puede deshacer.`)) return;
         try {
             await api.delete(`/option-groups/${group.id}`);
             loadGroups();
-        } catch { alert('No se pudo eliminar el grupo.'); }
+        } catch (err) {
+            const msg = err?.response?.data?.message || 'No se pudo eliminar el grupo.';
+            alert(Array.isArray(msg) ? msg.join(', ') : msg);
+        }
     };
 
     // ── CRUD Valor ────────────────────────────────────────────────────────────
@@ -170,7 +173,10 @@ export default function OptionConfigTab() {
         try {
             await api.delete(`/option-values/${value.id}`);
             loadGroups();
-        } catch { alert('No se pudo eliminar la opción.'); }
+        } catch (err) {
+            const msg = err?.response?.data?.message || 'No se pudo eliminar la opción.';
+            alert(Array.isArray(msg) ? msg.join(', ') : msg);
+        }
     };
 
     // ── Form compartido: campos key + label ───────────────────────────────────

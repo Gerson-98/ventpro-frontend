@@ -54,7 +54,8 @@ export default function PvcColorsTab() {
       await api.delete(`/pvc-colors/${id}`);
       loadColors();
     } catch (err) {
-      alert("Error al eliminar el color.");
+      const msg = err?.response?.data?.message || "Error al eliminar el color.";
+      alert(Array.isArray(msg) ? msg.join(", ") : msg);
     }
   };
 

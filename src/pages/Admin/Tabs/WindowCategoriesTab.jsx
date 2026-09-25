@@ -78,7 +78,7 @@ export default function WindowCategoriesTab() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm("¿Seguro que deseas eliminar esta categoría?\nLos tipos de ventana que la usen quedarán sin categoría.")) return;
+    if (!confirm("¿Seguro que deseas eliminar esta categoría?\nEsta acción no se puede deshacer.")) return;
     try {
       await api.delete(`/window-categories/${id}`);
       fetchData();

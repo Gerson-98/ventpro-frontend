@@ -139,7 +139,7 @@ export default function WindowSeriesTab() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm("¿Seguro que deseas eliminar esta serie?\nSe desvincularán todos sus tipos de ventana (quedarán sin serie).")) return;
+    if (!confirm("¿Seguro que deseas eliminar esta serie?\nEsta acción no se puede deshacer.")) return;
     try {
       await api.delete(`/window-series/${id}`);
       fetchData();
