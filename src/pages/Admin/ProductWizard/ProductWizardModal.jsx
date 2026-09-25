@@ -1322,8 +1322,27 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
                 const usesFormula = !!a.formula_type;
                 const isOpen = openAccesorios[idx] ?? false;
                 const setOpen = (v) => setOpenAccesorios((o) => ({ ...o, [idx]: v }));
+
+                // Etiqueta visible sin tener que expandir la fila: aclara si
+                // esta condición es "por categoría" (agrupa varios valores,
+                // ej. CREMONA) o "por un valor puntual" (ej. cada chapa
+                // específica) — para que se note a simple vista cuál es cuál.
+                const condGroup = optionGroups.find((g) => g.key === a.option_group);
+                const condBadge = a.option_group ? (
+                  a.option_category ? (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex-shrink-0" title={`Se agrega si "${condGroup?.label || a.option_group}" está en la categoría "${a.option_category}" (agrupa varios valores)`}>
+                      categoría: {a.option_category}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded-full bg-gray-100 text-gray-600 border border-gray-200 flex-shrink-0" title={`Se agrega solo si "${condGroup?.label || a.option_group}" = "${condGroup?.values.find((v) => v.key === a.option_key)?.label || a.option_key}" (un valor puntual)`}>
+                      valor: {condGroup?.values.find((v) => v.key === a.option_key)?.label || a.option_key}
+                    </span>
+                  )
+                ) : null;
+
                 return (
                 <div key={idx} className="border border-gray-200 rounded-lg p-2 space-y-2">
+                  {condBadge && <div className="flex">{condBadge}</div>}
                   <div className="flex items-center gap-2">
                     <select
                       value={a.material_id}
