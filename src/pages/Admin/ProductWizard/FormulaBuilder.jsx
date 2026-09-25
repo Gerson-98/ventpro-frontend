@@ -7,6 +7,7 @@
 
 import { FaPlus, FaTrashAlt, FaArrowUp, FaArrowDown } from "react-icons/fa";
 import { OPS, opSymbol, evaluateFormula } from "@/utils/formulaEngine";
+import InfoTip from "./InfoTip";
 
 export default function FormulaBuilder({
   label,
@@ -41,7 +42,10 @@ export default function FormulaBuilder({
   return (
     <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
       <div className="flex items-center justify-between mb-2">
-        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">{label}</p>
+        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide flex items-center">
+          {label}
+          <InfoTip text={`Cómo se convierte la medida de la ventana en la medida real de corte de esta pieza. Vas encadenando operaciones sobre el ${origenLabel?.toLowerCase() || "valor"} — ej. "restar 8.5" significa que el corte final es 8.5 cm menos que el ${origenLabel?.toLowerCase() || "valor"} de la ventana. Si no agregas ningún paso, se corta exactamente igual.`} />
+        </p>
         <button
           type="button"
           onClick={addStep}

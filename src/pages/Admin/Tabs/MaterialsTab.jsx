@@ -1,6 +1,7 @@
 // RUTA: src/pages/Admin/Tabs/MaterialsTab.jsx
 
 import { useEffect, useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { FaPlus, FaTrashAlt, FaEdit, FaSearch, FaFilter } from "react-icons/fa";
 import api from "@/services/api";
 
@@ -64,6 +65,7 @@ export default function MaterialsTab() {
     const [deleteTarget, setDeleteTarget] = useState(null); // { id, name }
     const [deleteError, setDeleteError] = useState("");
     const [deleting, setDeleting] = useState(false);
+    const navigate = useNavigate();
 
     // ── Carga de datos ────────────────────────────────────────────────────────
     const fetchMaterials = async () => {
@@ -409,6 +411,12 @@ export default function MaterialsTab() {
                                 <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm leading-relaxed">
                                     <p className="font-semibold mb-1">No se puede eliminar</p>
                                     <p>{deleteError}</p>
+                                    <button
+                                        onClick={() => { closeDeleteConfirm(); navigate("/admin?tab=windowTypes"); }}
+                                        className="mt-2 text-xs font-semibold text-blue-700 hover:text-blue-900 underline"
+                                    >
+                                        Ir a Tipos de Ventana →
+                                    </button>
                                 </div>
                             )}
 

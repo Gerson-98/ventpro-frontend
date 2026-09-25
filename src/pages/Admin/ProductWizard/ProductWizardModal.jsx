@@ -21,6 +21,7 @@ import {
 import api from "@/services/api";
 import FormulaBuilder from "./FormulaBuilder";
 import CollapsibleSection, { CollapsibleChevron } from "./CollapsibleSection";
+import InfoTip from "./InfoTip";
 
 const STEPS = [
   { id: 1, label: "Datos básicos" },
@@ -494,7 +495,7 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
     if (!group) return null;
     const isOpen = !!categoryPanelOpen[groupKey];
     return (
-      <div className="text-xs">
+      <div className="text-xs flex items-center">
         <button
           type="button"
           onClick={() => toggleCategoryPanel(groupKey)}
@@ -502,6 +503,7 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
         >
           {isOpen ? "Ocultar categorías de este grupo" : "Editar categorías de este grupo"}
         </button>
+        <InfoTip text='Ponle una etiqueta corta a cada valor (ej. "1_hoja") para poder agruparlos después. Ej: si tienes 9 tipos de chapa distintos pero solo importa si van en 1 o 2 hojas, etiqueta cada chapa con "1_hoja" o "2_hojas" — se hace una sola vez y se reutiliza en cualquier tipo de ventana que use este mismo grupo.' />
         {isOpen && (
           <div className="mt-1.5 border border-gray-200 bg-gray-50 rounded-lg p-2.5 space-y-2">
             <p className="text-[11px] text-gray-500">
@@ -579,6 +581,7 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
           >
             Una categoría
           </button>
+          <InfoTip text='"Un valor específico" reacciona a UNA sola opción (ej. solo "Chapa con llave simple"). "Una categoría" reacciona a VARIOS valores agrupados a la vez (ej. las 4 chapas que sean "1 hoja"), sin tener que repetir la misma condición una por una.' />
         </div>
         {mode === "category" ? (
           categories.length > 0 ? (
@@ -741,8 +744,9 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
     return (
       <div className="border border-amber-200 bg-amber-50 rounded-lg p-3 space-y-2">
         <div className="flex items-center justify-between">
-          <p className="text-xs font-semibold text-amber-800">
+          <p className="text-xs font-semibold text-amber-800 flex items-center">
             Variantes por opción <span className="font-normal text-amber-600">(opcional)</span>
+            <InfoTip text='Usa esto cuando la fórmula de corte deba cambiar según lo que el vendedor elija en el cotizador (ej. "con 2 hojas divide el ancho entre 2, con 1 hoja no"). Si esta pieza se corta siempre igual, no toques esta sección.' />
           </p>
           <button
             type="button"
@@ -935,7 +939,10 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Piezas por ventana</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1 flex items-center">
+                  Piezas por ventana
+                  <InfoTip text='Cuántos tramos de este perfil se cortan por ventana, en cada sentido. Un marco típico usa 2 piezas de ancho (arriba/abajo) y 2 de alto (los lados) — si necesitas cantidades distintas por lado, usa los checkboxes de abajo.' />
+                </label>
                 <input
                   type="number"
                   min={1}
