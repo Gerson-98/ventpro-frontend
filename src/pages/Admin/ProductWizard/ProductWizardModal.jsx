@@ -83,6 +83,7 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
   const [previewResult, setPreviewResult] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState("");
+  const [warningsOpen, setWarningsOpen] = useState(false);
 
   // ── Estado de secciones plegables (paso 2/3/4) ─────────────────────────────
   // Todas arrancan cerradas siempre, incluso al editar un producto con datos
@@ -1606,20 +1607,30 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
 
               {previewResult && previewResult.warnings && previewResult.warnings.length > 0 && (
                 <div className="border border-amber-200 bg-amber-50 rounded-lg p-3 space-y-2">
-                  <p className="text-xs font-semibold text-amber-800 flex items-center gap-1.5">
-                    <FaExclamationTriangle size={12} /> Revisar: posibles huecos de configuración
-                  </p>
-                  <p className="text-[11px] text-amber-700">
-                    El sistema detectó posibles huecos de configuración — pueden ser errores reales
-                    (como pasó antes con un accesorio que faltaba en una combinación) o normales (ej.
-                    varios productos físicos distintos que a propósito solo cubren parte de una
-                    categoría cada uno). Revísalos y usa tu criterio.
-                  </p>
-                  <ul className="list-disc list-inside space-y-1 text-[11px] text-amber-800">
-                    {previewResult.warnings.map((w, wIdx) => (
-                      <li key={wIdx}>{w.message}</li>
-                    ))}
-                  </ul>
+                  <button
+                    type="button"
+                    onClick={() => setWarningsOpen((v) => !v)}
+                    className="w-full flex items-center justify-between gap-1.5 text-left"
+                  >
+                    <span className="text-xs font-semibold text-amber-800 flex items-center gap-1.5">
+                      <FaExclamationTriangle size={12} /> Revisar: posibles huecos de configuración
+                      <span className="font-normal text-amber-600">({previewResult.warnings.length})</span>
+                    </span>
+                    <CollapsibleChevron open={warningsOpen} onClick={() => setWarningsOpen((v) => !v)} />
+                  </button>
+                  <CollapsibleSection open={warningsOpen} onToggle={setWarningsOpen}>
+                    <p className="text-[11px] text-amber-700">
+                      El sistema detectó posibles huecos de configuración — pueden ser errores reales
+                      (como pasó antes con un accesorio que faltaba en una combinación) o normales (ej.
+                      varios productos físicos distintos que a propósito solo cubren parte de una
+                      categoría cada uno). Revísalos y usa tu criterio.
+                    </p>
+                    <ul className="list-disc list-inside space-y-1 text-[11px] text-amber-800 mt-2">
+                      {previewResult.warnings.map((w, wIdx) => (
+                        <li key={wIdx}>{w.message}</li>
+                      ))}
+                    </ul>
+                  </CollapsibleSection>
                 </div>
               )}
 
