@@ -7,8 +7,9 @@
 
 import { useState } from "react";
 
-export default function InfoTip({ text }) {
+export default function InfoTip({ text, placement = "bottom" }) {
   const [open, setOpen] = useState(false);
+  const isTop = placement === "top";
 
   return (
     <span className="relative inline-flex items-center align-middle ml-1">
@@ -26,10 +27,16 @@ export default function InfoTip({ text }) {
       {open && (
         <span
           role="tooltip"
-          className="absolute z-30 bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-56 p-2 rounded-lg bg-gray-800 text-white text-[11px] leading-snug shadow-lg pointer-events-none"
+          className={`absolute z-30 left-1/2 -translate-x-1/2 w-56 p-2 rounded-lg bg-gray-800 text-white text-[11px] leading-snug shadow-lg pointer-events-none ${
+            isTop ? "bottom-full mb-1.5" : "top-full mt-1.5"
+          }`}
         >
           {text}
-          <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800" />
+          <span
+            className={`absolute left-1/2 -translate-x-1/2 border-4 border-transparent ${
+              isTop ? "top-full border-t-gray-800" : "bottom-full border-b-gray-800"
+            }`}
+          />
         </span>
       )}
     </span>
