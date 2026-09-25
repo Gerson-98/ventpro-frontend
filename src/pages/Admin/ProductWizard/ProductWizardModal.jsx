@@ -140,6 +140,7 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
               variantes: (p.variantes || []).map((v) => ({
                 option_group: v.option_group,
                 option_key: v.option_key,
+                option_category: v.option_category,
                 piezasAncho: v.piezasAncho,
                 piezasAlto: v.piezasAlto,
                 formulaAncho: v.formulaAncho || [],
@@ -162,6 +163,7 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
               variantes: (product.vidrio?.variantes || []).map((v) => ({
                 option_group: v.option_group,
                 option_key: v.option_key,
+                option_category: v.option_category,
                 piezasAncho: v.piezasAncho,
                 piezasAlto: v.piezasAlto,
                 formulaAncho: v.formulaAncho || [],
@@ -174,6 +176,7 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
               required: a.required ?? true,
               option_group: a.option_group || "",
               option_key: a.option_key || "",
+              option_category: a.option_category || "",
               formula_type: a.formula_type,
               formula_slot: a.formula_slot,
               formula_factor: a.formula_factor,
@@ -223,10 +226,11 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
         formulaAncho: p.formulaAncho || [],
         formulaAlto: p.formulaAlto || [],
         variantes: (p.variantes || [])
-          .filter((v) => v.option_group && v.option_key)
+          .filter((v) => v.option_group && (v.option_key || v.option_category))
           .map((v) => ({
             option_group: v.option_group,
-            option_key: v.option_key,
+            option_key: v.option_category ? undefined : v.option_key,
+            option_category: v.option_category || undefined,
             piezasAncho: v.piezasAncho != null ? Number(v.piezasAncho) : undefined,
             piezasAlto: v.piezasAlto != null ? Number(v.piezasAlto) : undefined,
             formulaAncho: v.formulaAncho,
@@ -248,10 +252,11 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
             formulaAncho: data.vidrio.formulaAncho || [],
             formulaAlto: data.vidrio.formulaAlto || [],
             variantes: (data.vidrio.variantes || [])
-              .filter((v) => v.option_group && v.option_key)
+              .filter((v) => v.option_group && (v.option_key || v.option_category))
               .map((v) => ({
                 option_group: v.option_group,
-                option_key: v.option_key,
+                option_key: v.option_category ? undefined : v.option_key,
+                option_category: v.option_category || undefined,
                 piezasAncho: v.piezasAncho != null ? Number(v.piezasAncho) : undefined,
                 piezasAlto: v.piezasAlto != null ? Number(v.piezasAlto) : undefined,
                 formulaAncho: v.formulaAncho,
@@ -266,7 +271,8 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
           quantity: a.formula_type ? undefined : (Number(a.quantity) || 1),
           required: a.required !== false,
           option_group: a.option_group || undefined,
-          option_key: a.option_key || undefined,
+          option_key: a.option_group && !a.option_category ? (a.option_key || undefined) : undefined,
+          option_category: a.option_group && a.option_category ? a.option_category : undefined,
           formula_type: a.formula_type || undefined,
           formula_slot: a.formula_type ? a.formula_slot : undefined,
           formula_factor: a.formula_type ? Number(a.formula_factor) || 0 : undefined,
@@ -300,15 +306,15 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
       } else if (!a.quantity || a.quantity <= 0) {
         errs.push(`El accesorio "${accName}" necesita una cantidad mayor a 0.`);
       }
-      if (!!a.option_group !== !!a.option_key) errs.push(`El accesorio "${accName}" tiene una condición incompleta.`);
+      if (a.option_group && !!a.option_key === !!a.option_category) errs.push(`El accesorio "${accName}" tiene una condición incompleta.`);
     }
     for (const slot of Object.keys(data.perfiles)) {
       for (const v of data.perfiles[slot].variantes || []) {
-        if (!v.option_group || !v.option_key) errs.push(`"${slot}" tiene una variante sin grupo u opción seleccionada.`);
+        if (!v.option_group || !!v.option_key === !!v.option_category) errs.push(`"${slot}" tiene una variante sin grupo u opción seleccionada.`);
       }
     }
     for (const v of data.vidrio.variantes || []) {
-      if (!v.option_group || !v.option_key) errs.push('El vidrio tiene una variante sin grupo u opción seleccionada.');
+      if (!v.option_group || !!v.option_key === !!v.option_category) errs.push('El vidrio tiene una variante sin grupo u opción seleccionada.');
     }
     return errs;
   }, [data]);
@@ -343,7 +349,7 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
         width: Number(exampleWidth),
         height: Number(exampleHeight),
       });
-      setPreviewResult(res.measurements);
+      setPreviewResult(res);
     } catch (err) {
       const msg = err?.response?.data?.message || "No se pudo calcular la vista previa.";
       setPreviewError(Array.isArray(msg) ? msg.join(" ") : msg);
@@ -424,6 +430,188 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
   const [newGroupError, setNewGroupError] = useState({});
 
   const varianteKey = (target, idx) => `${target.slot || "VIDRIO"}:${idx}`;
+
+  // ── Editor de categorías de un grupo existente (agrupar valores puntuales
+  // bajo una etiqueta común, ej. "1_hoja", para poder condicionar variantes
+  // y accesorios por categoría en vez de por cada valor individual) ─────────
+  const [categoryPanelOpen, setCategoryPanelOpen] = useState({});
+  const [categoryDrafts, setCategoryDrafts] = useState({});
+  const [categorySaving, setCategorySaving] = useState({});
+  const [categoryMsg, setCategoryMsg] = useState({});
+
+  const toggleCategoryPanel = (groupKey) => {
+    setCategoryPanelOpen((prev) => {
+      const opening = !prev[groupKey];
+      if (opening) {
+        const group = optionGroups.find((g) => g.key === groupKey);
+        setCategoryDrafts((d) => ({
+          ...d,
+          [groupKey]: Object.fromEntries((group?.values || []).map((v) => [v.id, v.category || ""])),
+        }));
+        setCategoryMsg((m) => ({ ...m, [groupKey]: "" }));
+      }
+      return { ...prev, [groupKey]: opening };
+    });
+  };
+
+  const updateCategoryDraft = (groupKey, valueId, val) => {
+    setCategoryDrafts((prev) => ({
+      ...prev,
+      [groupKey]: { ...prev[groupKey], [valueId]: val },
+    }));
+  };
+
+  const saveCategoryDrafts = async (groupKey) => {
+    const group = optionGroups.find((g) => g.key === groupKey);
+    if (!group) return;
+    const draft = categoryDrafts[groupKey] || {};
+    setCategorySaving((prev) => ({ ...prev, [groupKey]: true }));
+    setCategoryMsg((prev) => ({ ...prev, [groupKey]: "" }));
+    try {
+      const changed = group.values.filter((v) => (draft[v.id] ?? "") !== (v.category || ""));
+      for (const val of changed) {
+        const newCat = draft[val.id]?.trim() || null;
+        await api.patch(`/option-values/${val.id}`, { category: newCat });
+      }
+      setOptionGroups((prev) =>
+        prev.map((g) =>
+          g.key !== groupKey
+            ? g
+            : { ...g, values: g.values.map((v) => ({ ...v, category: draft[v.id]?.trim() || null })) }
+        )
+      );
+      setCategoryMsg((prev) => ({ ...prev, [groupKey]: "Categorías guardadas." }));
+    } catch (err) {
+      const msg = err?.response?.data?.message || "No se pudieron guardar las categorías.";
+      setCategoryMsg((prev) => ({ ...prev, [groupKey]: Array.isArray(msg) ? msg.join(", ") : msg }));
+    } finally {
+      setCategorySaving((prev) => ({ ...prev, [groupKey]: false }));
+    }
+  };
+
+  const renderCategoryEditor = (groupKey) => {
+    const group = optionGroups.find((g) => g.key === groupKey);
+    if (!group) return null;
+    const isOpen = !!categoryPanelOpen[groupKey];
+    return (
+      <div className="text-xs">
+        <button
+          type="button"
+          onClick={() => toggleCategoryPanel(groupKey)}
+          className="text-gray-500 hover:text-gray-700 underline underline-offset-2"
+        >
+          {isOpen ? "Ocultar categorías de este grupo" : "Editar categorías de este grupo"}
+        </button>
+        {isOpen && (
+          <div className="mt-1.5 border border-gray-200 bg-gray-50 rounded-lg p-2.5 space-y-2">
+            <p className="text-[11px] text-gray-500">
+              Agrupa valores bajo una misma categoría (ej. "1_hoja") para poder elegir toda la
+              categoría en vez de un valor puntual, tanto acá como en accesorios condicionados.
+            </p>
+            <table className="w-full text-[11px]">
+              <tbody>
+                {group.values.map((val) => (
+                  <tr key={val.id}>
+                    <td className="py-1 pr-2 text-gray-700 align-middle">{val.label}</td>
+                    <td className="py-1">
+                      <input
+                        type="text"
+                        value={categoryDrafts[groupKey]?.[val.id] ?? (val.category || "")}
+                        onChange={(e) => updateCategoryDraft(groupKey, val.id, e.target.value)}
+                        placeholder="Sin categoría"
+                        className="w-full border border-gray-300 rounded px-2 py-1"
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {categoryMsg[groupKey] && (
+              <p className={`text-[11px] ${categoryMsg[groupKey].includes("guardad") ? "text-emerald-600" : "text-red-600"}`}>
+                {categoryMsg[groupKey]}
+              </p>
+            )}
+            <button
+              type="button"
+              disabled={categorySaving[groupKey]}
+              onClick={() => saveCategoryDrafts(groupKey)}
+              className="text-xs font-semibold text-white bg-gray-600 hover:bg-gray-700 disabled:opacity-50 px-3 py-1.5 rounded-lg"
+            >
+              {categorySaving[groupKey] ? "Guardando..." : "Guardar categorías"}
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ── Selector de modo "Un valor específico" / "Una categoría" para
+  // condicionar variantes y accesorios ───────────────────────────────────────
+  const renderValueOrCategorySelect = ({
+    groupKey,
+    mode,
+    valueVal,
+    categoryVal,
+    onModeChange,
+    onValueChange,
+    onCategoryChange,
+  }) => {
+    const group = optionGroups.find((g) => g.key === groupKey);
+    const categories = [...new Set((group?.values || []).map((v) => v.category).filter(Boolean))];
+    return (
+      <div className="flex-1 space-y-1">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => onModeChange("value")}
+            className={`px-2 py-0.5 rounded-full text-[10px] font-medium border transition-colors ${
+              mode === "value" ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-500 border-gray-300"
+            }`}
+          >
+            Un valor específico
+          </button>
+          <button
+            type="button"
+            onClick={() => onModeChange("category")}
+            className={`px-2 py-0.5 rounded-full text-[10px] font-medium border transition-colors ${
+              mode === "category" ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-500 border-gray-300"
+            }`}
+          >
+            Una categoría
+          </button>
+        </div>
+        {mode === "category" ? (
+          categories.length > 0 ? (
+            <select
+              value={categoryVal || ""}
+              onChange={(e) => onCategoryChange(e.target.value)}
+              className="w-full text-xs border border-gray-300 rounded-lg px-2 py-1.5"
+            >
+              <option value="">Selecciona la categoría...</option>
+              {categories.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          ) : (
+            <p className="text-[11px] text-amber-600">
+              Este grupo no tiene categorías asignadas todavía. Usa "Editar categorías de este grupo" para crearlas.
+            </p>
+          )
+        ) : (
+          <select
+            value={valueVal || ""}
+            onChange={(e) => onValueChange(e.target.value)}
+            className="w-full text-xs border border-gray-300 rounded-lg px-2 py-1.5"
+          >
+            <option value="">Selecciona el valor...</option>
+            {(group?.values || []).map((val) => (
+              <option key={val.key} value={val.key}>{val.label}</option>
+            ))}
+          </select>
+        )}
+      </div>
+    );
+  };
 
   const startNewGroup = (target, idx) => {
     const k = varianteKey(target, idx);
@@ -655,22 +843,27 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
                   <option value="__new__">+ Crear grupo nuevo...</option>
                 </select>
                 {v.option_group && (
-                  <select
-                    value={v.option_key || ""}
-                    onChange={(e) => updateVariante(target, idx, { option_key: e.target.value })}
-                    className="text-xs border border-gray-300 rounded-lg px-2 py-1.5 flex-1"
-                  >
-                    <option value="">Selecciona el valor...</option>
-                    {(optionGroups.find((g) => g.key === v.option_group)?.values || []).map((val) => (
-                      <option key={val.key} value={val.key}>{val.label}</option>
-                    ))}
-                  </select>
+                  <div className="flex-1">
+                    {renderValueOrCategorySelect({
+                      groupKey: v.option_group,
+                      mode: v._mode || (v.option_category ? "category" : "value"),
+                      valueVal: v.option_key,
+                      categoryVal: v.option_category,
+                      onModeChange: (mode) =>
+                        updateVariante(target, idx, mode === "value"
+                          ? { _mode: "value", option_category: undefined }
+                          : { _mode: "category", option_key: undefined }),
+                      onValueChange: (key) => updateVariante(target, idx, { option_key: key, option_category: undefined, _mode: "value" }),
+                      onCategoryChange: (cat) => updateVariante(target, idx, { option_category: cat, option_key: undefined, _mode: "category" }),
+                    })}
+                  </div>
                 )}
                 <button type="button" onClick={() => removeVariante(target, idx)} className="text-red-400 hover:text-red-600 flex-shrink-0">
                   <FaTrashAlt size={12} />
                 </button>
               </div>
             )}
+            {v.option_group && !draft && renderCategoryEditor(v.option_group)}
             <FormulaBuilder
               label="Fórmula de ancho para esta variante"
               origenLabel="Ancho"
@@ -1240,12 +1433,12 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
                   </div>
 
                   {/* ── Condición: siempre, o solo cuando el cliente elige cierta opción ── */}
-                  <div className="flex items-center gap-2 pl-0.5 pt-1 border-t border-gray-100">
+                  <div className="flex items-start gap-2 pl-0.5 pt-1 border-t border-gray-100">
                     <select
                       value={a.option_group || ""}
                       onChange={(e) => {
                         const group = e.target.value;
-                        updateAccesorio(idx, { option_group: group, option_key: "" });
+                        updateAccesorio(idx, { option_group: group, option_key: "", option_category: "" });
                       }}
                       className="text-xs border border-gray-300 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                     >
@@ -1255,16 +1448,21 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
                       ))}
                     </select>
                     {a.option_group && (
-                      <select
-                        value={a.option_key || ""}
-                        onChange={(e) => updateAccesorio(idx, { option_key: e.target.value })}
-                        className="text-xs border border-gray-300 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-blue-500 focus:outline-none flex-1"
-                      >
-                        <option value="">Selecciona el valor...</option>
-                        {(optionGroups.find((g) => g.key === a.option_group)?.values || []).map((v) => (
-                          <option key={v.key} value={v.key}>{v.label}</option>
-                        ))}
-                      </select>
+                      <div className="flex-1 space-y-1">
+                        {renderValueOrCategorySelect({
+                          groupKey: a.option_group,
+                          mode: a._mode || (a.option_category ? "category" : "value"),
+                          valueVal: a.option_key,
+                          categoryVal: a.option_category,
+                          onModeChange: (mode) =>
+                            updateAccesorio(idx, mode === "value"
+                              ? { _mode: "value", option_category: "" }
+                              : { _mode: "category", option_key: "" }),
+                          onValueChange: (key) => updateAccesorio(idx, { option_key: key, option_category: "", _mode: "value" }),
+                          onCategoryChange: (cat) => updateAccesorio(idx, { option_category: cat, option_key: "", _mode: "category" }),
+                        })}
+                        {renderCategoryEditor(a.option_group)}
+                      </div>
                     )}
                   </div>
                   </CollapsibleSection>
@@ -1315,29 +1513,55 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
               )}
 
               {previewResult && (
-                <div className="overflow-x-auto rounded-lg border border-gray-200">
-                  <table className="min-w-full text-sm">
-                    <thead className="bg-gray-50 text-gray-600 text-xs uppercase">
-                      <tr>
-                        <th className="py-2 px-3 text-left">Pieza</th>
-                        <th className="py-2 px-3 text-right">Ancho de corte</th>
-                        <th className="py-2 px-3 text-right">Alto de corte</th>
-                        <th className="py-2 px-3 text-right">Piezas ancho</th>
-                        <th className="py-2 px-3 text-right">Piezas alto</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {Object.entries(previewResult).map(([slot, m]) => (
-                        <tr key={slot}>
-                          <td className="py-2 px-3 font-medium text-gray-800">{slot}</td>
-                          <td className="py-2 px-3 text-right">{m.piezasAncho > 0 ? `${m.ancho} cm` : "—"}</td>
-                          <td className="py-2 px-3 text-right">{m.piezasAlto > 0 ? `${m.alto} cm` : "—"}</td>
-                          <td className="py-2 px-3 text-right">{m.piezasAncho}</td>
-                          <td className="py-2 px-3 text-right">{m.piezasAlto}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="space-y-3">
+                  {(previewResult.scenarios && previewResult.scenarios.length > 0
+                    ? previewResult.scenarios
+                    : previewResult.measurements
+                    ? [{ label: null, option_group: null, measurements: previewResult.measurements }]
+                    : []
+                  ).map((scenario, sIdx) => (
+                    <div
+                      key={sIdx}
+                      className={`rounded-lg border overflow-hidden ${
+                        scenario.option_group ? "border-blue-300" : "border-gray-200"
+                      }`}
+                    >
+                      {scenario.label && (
+                        <div
+                          className={`px-3 py-2 text-xs font-semibold flex items-center gap-2 ${
+                            scenario.option_group ? "bg-blue-50 text-blue-700" : "bg-gray-50 text-gray-600"
+                          }`}
+                        >
+                          {scenario.option_group && <FaMagic size={11} />}
+                          {scenario.label}
+                        </div>
+                      )}
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full text-sm">
+                          <thead className="bg-gray-50 text-gray-600 text-xs uppercase">
+                            <tr>
+                              <th className="py-2 px-3 text-left">Pieza</th>
+                              <th className="py-2 px-3 text-right">Ancho de corte</th>
+                              <th className="py-2 px-3 text-right">Alto de corte</th>
+                              <th className="py-2 px-3 text-right">Piezas ancho</th>
+                              <th className="py-2 px-3 text-right">Piezas alto</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {Object.entries(scenario.measurements).map(([slot, m]) => (
+                              <tr key={slot}>
+                                <td className="py-2 px-3 font-medium text-gray-800">{slot}</td>
+                                <td className="py-2 px-3 text-right">{m.piezasAncho > 0 ? `${m.ancho} cm` : "—"}</td>
+                                <td className="py-2 px-3 text-right">{m.piezasAlto > 0 ? `${m.alto} cm` : "—"}</td>
+                                <td className="py-2 px-3 text-right">{m.piezasAncho}</td>
+                                <td className="py-2 px-3 text-right">{m.piezasAlto}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -1383,8 +1607,11 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
                     : data.accesorios
                         .map((a) => {
                           const name = accessoryMaterials.find((m) => String(m.id) === a.material_id)?.name || "?";
+                          const groupLabel = optionGroups.find((g) => g.key === a.option_group)?.label || a.option_group;
                           const cond = a.option_group
-                            ? ` — solo si ${optionGroups.find((g) => g.key === a.option_group)?.label || a.option_group} = ${optionGroups.find((g) => g.key === a.option_group)?.values.find((v) => v.key === a.option_key)?.label || a.option_key}`
+                            ? a.option_category
+                              ? ` — solo si ${groupLabel} = categoría "${a.option_category}"`
+                              : ` — solo si ${groupLabel} = ${optionGroups.find((g) => g.key === a.option_group)?.values.find((v) => v.key === a.option_key)?.label || a.option_key}`
                             : "";
                           const qtyLabel = a.formula_type
                             ? `${a.formula_factor}× ${a.formula_type === "PER_M2" ? "m²" : "barras"} de ${a.formula_slot}`
