@@ -1607,17 +1607,21 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
 
               {previewResult && previewResult.warnings && previewResult.warnings.length > 0 && (
                 <div className="border border-amber-200 bg-amber-50 rounded-lg p-3 space-y-2">
-                  <button
-                    type="button"
+                  <div
+                    role="button"
+                    tabIndex={0}
                     onClick={() => setWarningsOpen((v) => !v)}
-                    className="w-full flex items-center justify-between gap-1.5 text-left"
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setWarningsOpen((v) => !v); } }}
+                    className="w-full flex items-center justify-between gap-1.5 text-left cursor-pointer select-none"
                   >
                     <span className="text-xs font-semibold text-amber-800 flex items-center gap-1.5">
                       <FaExclamationTriangle size={12} /> Revisar: posibles huecos de configuración
                       <span className="font-normal text-amber-600">({previewResult.warnings.length})</span>
                     </span>
-                    <CollapsibleChevron open={warningsOpen} onClick={() => setWarningsOpen((v) => !v)} />
-                  </button>
+                    <span onClick={(e) => e.stopPropagation()}>
+                      <CollapsibleChevron open={warningsOpen} onClick={() => setWarningsOpen((v) => !v)} />
+                    </span>
+                  </div>
                   <CollapsibleSection open={warningsOpen} onToggle={setWarningsOpen}>
                     <p className="text-[11px] text-amber-700">
                       El sistema detectó posibles huecos de configuración — pueden ser errores reales
