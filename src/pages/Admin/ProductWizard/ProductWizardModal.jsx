@@ -1330,12 +1330,14 @@ export default function ProductWizardModal({ editingId, onClose, onSaved }) {
                 const condGroup = optionGroups.find((g) => g.key === a.option_group);
                 const condBadge = a.option_group ? (
                   a.option_category ? (
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex-shrink-0" title={`Se agrega si "${condGroup?.label || a.option_group}" está en la categoría "${a.option_category}" (agrupa varios valores)`}>
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex-shrink-0">
                       categoría: {a.option_category}
+                      <InfoTip text={`Este accesorio se agrega para CUALQUIER valor de "${condGroup?.label || a.option_group}" que esté etiquetado con la categoría "${a.option_category}" — agrupa varios valores a la vez (ej. varios tipos de chapa que cuentan como "2 hojas").`} />
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded-full bg-gray-100 text-gray-600 border border-gray-200 flex-shrink-0" title={`Se agrega solo si "${condGroup?.label || a.option_group}" = "${condGroup?.values.find((v) => v.key === a.option_key)?.label || a.option_key}" (un valor puntual)`}>
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded-full bg-gray-100 text-gray-600 border border-gray-200 flex-shrink-0">
                       valor: {condGroup?.values.find((v) => v.key === a.option_key)?.label || a.option_key}
+                      <InfoTip text={`Este accesorio se agrega SOLO cuando "${condGroup?.label || a.option_group}" es exactamente "${condGroup?.values.find((v) => v.key === a.option_key)?.label || a.option_key}" — un único valor puntual, no una categoría.`} />
                     </span>
                   )
                 ) : null;
