@@ -104,6 +104,7 @@ export default function OrderDetail() {
   // Estado del tamaño de marco: derivado de los window_types reales del pedido.
   // Si alguna ventana tiene "MARCO 5 CM" en su tipo → el pedido usa 5 cm.
   const [isSwappingMarco, setIsSwappingMarco] = useState(false);
+  const [swappingWindowId, setSwappingWindowId] = useState(null);
   const currentMarcoSize = (order?.windows ?? []).some(
     w => w.windowType?.name?.includes('MARCO 5 CM')
   ) ? '5.0' : '4.5';
@@ -190,6 +191,7 @@ export default function OrderDetail() {
 
   const handleMarcoSizeToggle = async () => {
     const nextSize = currentMarcoSize === '4.5' ? '5.0' : '4.5';
+    if (!confirm(`Esto va a cambiar TODAS las ventanas corredizas del pedido a Marco ${nextSize === '5.0' ? '5' : '4.5'} cm. Si solo necesitas cambiar una ventana puntual (ej. por un color que solo existe en la otra serie), usa el botón de esa ventana en la tabla en vez de este. ¿Continuar con todas?`)) return;
     setIsSwappingMarco(true);
     try {
       await api.patch(`/orders/${id}/marco-size`, { marcoSize: nextSize });
@@ -198,6 +200,25 @@ export default function OrderDetail() {
       alert('No se pudo cambiar el tamaño del marco.');
     } finally {
       setIsSwappingMarco(false);
+    }
+  };
+
+  // Cambia el marco/serie de UNA sola ventana — para cuando se le cambia el
+  // color a uno que solo existe en la otra serie (ej. imitación madera solo
+  // existe en Marco 5cm/Serie 60), sin tocar el resto de ventanas del pedido.
+  const handleWindowMarcoSizeToggle = async (win) => {
+    const typeName = win.windowType?.name || win.window_type?.name || '';
+    const hasMarco5 = typeName.includes('MARCO 5 CM');
+    const nextSize = hasMarco5 ? '4.5' : '5.0';
+    setSwappingWindowId(win.id);
+    try {
+      await api.patch(`/orders/${id}/windows/${win.id}/marco-size`, { marcoSize: nextSize });
+      await refetch();
+    } catch (err) {
+      const msg = err?.response?.data?.message || 'No se pudo cambiar el tamaño del marco de esta ventana.';
+      alert(Array.isArray(msg) ? msg.join(', ') : msg);
+    } finally {
+      setSwappingWindowId(null);
     }
   };
 
@@ -533,6 +554,10 @@ export default function OrderDetail() {
                     const additionalGlass = isVidrioYDuela && win.options?.vidrio_adicional_id
                       ? glassColors.find(g => g.id === Number(win.options.vidrio_adicional_id))
                       : null;
+                    const winTypeName = win.windowType?.name || win.window_type?.name || '';
+                    const winHasMarco45 = winTypeName.includes('MARCO 45 CM');
+                    const winHasMarco5 = winTypeName.includes('MARCO 5 CM');
+                    const winHasMarcoVariant = winHasMarco45 || winHasMarco5;
                     return (
                       <tr key={win.id} className="hover:bg-slate-50/60 transition-colors">
                         <td className="py-3.5 px-5">
@@ -540,6 +565,24 @@ export default function OrderDetail() {
                             <span className="font-semibold text-gray-800 block leading-tight">
                               {win.displayName || win.window_type?.name || 'Desconocido'}
                             </span>
+                            {canEditMeasurements && winHasMarcoVariant && (
+                              <button
+                                onClick={() => handleWindowMarcoSizeToggle(win)}
+                                disabled={swappingWindowId === win.id}
+                                title={`Marco actual de esta ventana: ${winHasMarco5 ? '5' : '4.5'} cm — click para cambiar solo esta ventana a ${winHasMarco5 ? '4.5' : '5'} cm`}
+                                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border text-[10px] font-mono font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0
+                                  ${winHasMarco5 ? 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100' : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'}`}
+                              >
+                                {swappingWindowId === win.id ? (
+                                  <svg className="animate-spin w-2.5 h-2.5" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                                  </svg>
+                                ) : (
+                                  winHasMarco5 ? '5cm' : '4.5cm'
+                                )}
+                              </button>
+                            )}
                             {win.design_image_url && (
                               <button
                                 onClick={() => setLightboxUrl(resolveImageUrl(win.design_image_url))}
