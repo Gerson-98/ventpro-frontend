@@ -563,7 +563,7 @@ export default function OrderDetail() {
                         <td className="py-3.5 px-5">
                           <div className="flex items-center gap-2">
                             <span className="font-semibold text-gray-800 block leading-tight">
-                              {win.displayName || win.window_type?.name || 'Desconocido'}
+                              {win.displayName || win.windowType?.name || win.window_type?.name || 'Desconocido'}
                             </span>
                             {canEditMeasurements && winHasMarcoVariant && (
                               <button
@@ -674,7 +674,7 @@ export default function OrderDetail() {
                           V{winIdx + 1}
                         </span>
                         <span className="font-semibold text-gray-800 text-sm truncate">
-                          {win.displayName || win.window_type?.name || 'Desconocido'}
+                          {win.displayName || win.windowType?.name || win.window_type?.name || 'Desconocido'}
                         </span>
                         {win.design_image_url && (
                           <button
