@@ -329,6 +329,9 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
     const [calculatingCost, setCalculatingCost] = useState({});
     const [quotationPrecioSugerido, setQuotationPrecioSugerido] = useState(0);
     const [quotationCostoTotal, setQuotationCostoTotal] = useState(0);
+    // true si los precios de materiales/margen actuales darían un mínimo sugerido
+    // distinto al que se guardó cuando se creó esta cotización (>0.5% de diferencia).
+    const [precioSugeridoDesactualizado, setPrecioSugeridoDesactualizado] = useState(false);
     const [validationErrors, setValidationErrors] = useState([]);
     const [useCm, setUseCm] = useState(false);
     const [totalOverride, setTotalOverride] = useState('');
@@ -561,6 +564,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             setCalculatingCost({});
             setQuotationPrecioSugerido(0);
             setQuotationCostoTotal(0);
+            setPrecioSugeridoDesactualizado(false);
             optionGroupsCache.current = {};
         }
     }, [open]);
@@ -571,6 +575,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             setIsEditing(!!quotationToEdit.id);
             setWindowCosts({});
             setCalculatingCost({});
+            setPrecioSugeridoDesactualizado(false);
 
             const buildEditWindows = async () => {
                 const sortedWins = [...(quotationToEdit.quotation_windows || [])]
@@ -640,6 +645,15 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                 );
 
                 if (hasStoredSnapshot) {
+                    // ── Mostrar SIEMPRE el snapshot guardado como precio autoritativo ──
+                    // Este es el precio que el vendedor ya le dio al cliente. Antes,
+                    // el bloque de abajo lo recalculaba en vivo con precios/margen
+                    // ACTUALES y lo pisaba silenciosamente — si un material subió de
+                    // precio o cambió el margen desde que se creó la cotización, el
+                    // vendedor veía un precio "sugerido" distinto (más alto) al que ya
+                    // cotizó, sin haber cambiado nada él. El snapshot es la fuente de
+                    // verdad hasta que el vendedor edite algo (ahí sí se recalcula, vía
+                    // calculateWindowCost, porque el precio realmente cambió).
                     setQuotationPrecioSugerido(Number(quotationToEdit.precio_sugerido_minimo) || 0);
                     setQuotationCostoTotal(Number(quotationToEdit.costo_total_proyecto) || 0);
 
@@ -666,9 +680,15 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                     };
                                 }
                             });
+                            // Solo llenamos el detalle por ventana (útil al editar una
+                            // ventana puntual) — el total de la cotización NO se toca:
+                            // sigue siendo el snapshot guardado arriba.
                             setWindowCosts(newCosts);
-                            setQuotationPrecioSugerido(res.data?.precio_sugerido_minimo || 0);
-                            setQuotationCostoTotal(res.data?.costo_total_proyecto || 0);
+                            const liveTotal = Number(res.data?.precio_sugerido_minimo) || 0;
+                            const storedTotal = Number(quotationToEdit.precio_sugerido_minimo) || 0;
+                            if (storedTotal > 0 && Math.abs(liveTotal - storedTotal) / storedTotal > 0.005) {
+                                setPrecioSugeridoDesactualizado(true);
+                            }
                         } catch {
                             // FIX: NO disparar calculateWindowCost individual por cada ventana.
                             // Causaría N llamadas simultáneas → 429 cuando el backend recién despertó.
@@ -1141,6 +1161,14 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                                 <span className="text-sm font-bold text-amber-700">
                                                     Q {totalPrecioSugerido.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                                                 </span>
+                                                {precioSugeridoDesactualizado && (
+                                                    <span
+                                                        className="text-[9px] text-orange-600 font-medium mt-0.5 cursor-help"
+                                                        title="Este es el precio que se guardó cuando se creó/editó la cotización. Con los precios de materiales o el margen ACTUALES, el mínimo sugerido de hoy sería distinto — revisa antes de reusarlo para una nueva negociación."
+                                                    >
+                                                        ⚠ precio de hoy difiere
+                                                    </span>
+                                                )}
                                             </div>
                                         )}
 
