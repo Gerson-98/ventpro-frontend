@@ -50,7 +50,8 @@ export default function AddClientModal({ open, onClose, onSave, clientToEdit }) 
       onSave(res.data);
     } catch (err) {
       console.error("❌ Error al guardar cliente:", err);
-      alert("No se pudo guardar el cliente.");
+      const backendMessage = err?.response?.data?.message;
+      alert(Array.isArray(backendMessage) ? backendMessage.join('\n') : (backendMessage || "No se pudo guardar el cliente."));
     } finally {
       setLoading(false);
     }

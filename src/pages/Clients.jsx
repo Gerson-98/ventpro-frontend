@@ -75,6 +75,8 @@ export default function Clients() {
       fetchClients();
     } catch (e) {
       console.error("❌ Error al guardar cliente:", e);
+      const backendMessage = e?.response?.data?.message;
+      alert(Array.isArray(backendMessage) ? backendMessage.join('\n') : (backendMessage || "No se pudo guardar el cliente."));
     } finally {
       setSaving(false);
     }
