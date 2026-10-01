@@ -83,10 +83,15 @@ function buildSeries(optimizationData) {
 
     const names = Object.keys(optimizationData);
     const isMachine = (n) => optimizationData[n].some(g => g.machineSeries);
-    // Perfiles individuales primero (marco, batiente…), luego las series de máquina.
+    const isTapajamba = (n) => n.toUpperCase().includes('TAPAJAMBA');
+    // Perfiles individuales primero (marco, batiente…), luego las series de
+    // máquina — EXCEPTO tapajamba, que va al final de todo: es el último
+    // perfil que se corta en el taller ("va hasta el fondo"), después de
+    // las hojas corredizas.
     const ordered = [
-        ...names.filter(n => !isMachine(n)),
+        ...names.filter(n => !isMachine(n) && !isTapajamba(n)),
         ...names.filter(n => isMachine(n)),
+        ...names.filter(n => isTapajamba(n)),
     ];
 
     for (const pName of ordered) {
