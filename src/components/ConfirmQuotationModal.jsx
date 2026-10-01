@@ -26,8 +26,67 @@ export default function ConfirmQuotationModal({
     const [bookedRanges, setBookedRanges] = useState([]);
     const [isScheduleLoading, setIsScheduleLoading] = useState(true);
 
+    // ── Paso previo obligatorio: el vendedor debe confirmar con el cliente
+    // dónde va el marco y si se quitan etiquetas ANTES de poder agendar.
+    // Sin esto no se habilita el calendario — evita que se agende "a ciegas"
+    // y luego el que instala tenga que llamar al cliente para preguntarlo.
+    const MARCO_OPTIONS = [
+        { value: "centro", label: "En el centro" },
+        { value: "orilla_adentro", label: "A la orilla lado adentro" },
+        { value: "orilla_afuera", label: "A la orilla lado afuera" },
+        { value: "otro", label: "Otro" },
+    ];
+    const [step, setStep] = useState("details");
+    const [marcoUbicacion, setMarcoUbicacion] = useState([]);
+    const [marcoUbicacionOtro, setMarcoUbicacionOtro] = useState("");
+    const [quitarEtiquetas, setQuitarEtiquetas] = useState("");
+    const [quitarEtiquetasOtro, setQuitarEtiquetasOtro] = useState("");
+    const [detailsError, setDetailsError] = useState("");
+
+    const toggleMarcoOption = (value) => {
+        setMarcoUbicacion((prev) =>
+            prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]
+        );
+        setDetailsError("");
+    };
+
+    const handleContinueFromDetails = () => {
+        if (marcoUbicacion.length === 0) {
+            setDetailsError("Selecciona al menos una ubicación del marco — llama al cliente si no lo sabes.");
+            return;
+        }
+        if (marcoUbicacion.includes("otro") && !marcoUbicacionOtro.trim()) {
+            setDetailsError("Describe la ubicación del marco en el campo de texto.");
+            return;
+        }
+        if (!quitarEtiquetas) {
+            setDetailsError("Indica si se van a quitar las etiquetas.");
+            return;
+        }
+        if (quitarEtiquetas === "otro" && !quitarEtiquetasOtro.trim()) {
+            setDetailsError("Describe la respuesta sobre las etiquetas en el campo de texto.");
+            return;
+        }
+        setDetailsError("");
+        setStep("calendar");
+    };
+
+    const buildMarcoUbicacionPayload = () =>
+        marcoUbicacion.map((v) =>
+            v === "otro" ? marcoUbicacionOtro.trim() : MARCO_OPTIONS.find((o) => o.value === v)?.label
+        );
+
+    const buildQuitarEtiquetasPayload = () =>
+        quitarEtiquetas === "otro" ? quitarEtiquetasOtro.trim() : quitarEtiquetas === "si" ? "Sí" : "No";
+
     useEffect(() => {
         if (!open) return;
+        setStep("details");
+        setMarcoUbicacion([]);
+        setMarcoUbicacionOtro("");
+        setQuitarEtiquetas("");
+        setQuitarEtiquetasOtro("");
+        setDetailsError("");
         if (initialDates?.from && initialDates?.to) {
             setRange({ from: new Date(initialDates.from), to: new Date(initialDates.to) });
         } else {
@@ -50,7 +109,12 @@ export default function ConfirmQuotationModal({
         fetchScheduledOrders();
     }, [open, excludeOrderId, initialDates]);
 
-    const handleClose = () => { setRange({ from: null, to: null }); setError(""); onClose(); };
+    const handleClose = () => {
+        setRange({ from: null, to: null });
+        setError("");
+        setStep("details");
+        onClose();
+    };
 
     const handleSubmit = async () => {
         if (!range.from || !range.to) {
@@ -63,6 +127,8 @@ export default function ConfirmQuotationModal({
             const payload = {
                 installationStartDate: range.from.toISOString(),
                 installationEndDate: range.to.toISOString(),
+                marcoUbicacion: buildMarcoUbicacionPayload(),
+                quitarEtiquetas: buildQuitarEtiquetasPayload(),
             };
             const response = await api.post(`/quotations/${quotationId}/confirm`, payload);
             onConfirmSuccess(response.data.id);
@@ -130,6 +196,74 @@ export default function ConfirmQuotationModal({
                 {/* Cuerpo scrolleable */}
                 <div className="overflow-y-auto flex-1 px-4 sm:px-6 py-4 sm:py-5 space-y-4">
 
+                    {step === "details" ? (
+                        <>
+                            <p className="text-sm text-gray-600">
+                                Antes de agendar, confirma esto con el cliente por teléfono — queda guardado como nota en el pedido.
+                            </p>
+
+                            <div>
+                                <p className="text-sm font-semibold text-gray-800 mb-2">¿Cuál es la ubicación del marco?</p>
+                                <div className="space-y-2">
+                                    {MARCO_OPTIONS.map((opt) => (
+                                        <label key={opt.value} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={marcoUbicacion.includes(opt.value)}
+                                                onChange={() => toggleMarcoOption(opt.value)}
+                                                className="rounded accent-emerald-600"
+                                            />
+                                            {opt.label}
+                                        </label>
+                                    ))}
+                                </div>
+                                {marcoUbicacion.includes("otro") && (
+                                    <input
+                                        type="text"
+                                        value={marcoUbicacionOtro}
+                                        onChange={(e) => { setMarcoUbicacionOtro(e.target.value); setDetailsError(""); }}
+                                        placeholder="Describe la ubicación del marco"
+                                        className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                    />
+                                )}
+                            </div>
+
+                            <div>
+                                <p className="text-sm font-semibold text-gray-800 mb-2">¿Se van a quitar etiquetas?</p>
+                                <div className="space-y-2">
+                                    {[{ value: "si", label: "Sí" }, { value: "no", label: "No" }, { value: "otro", label: "Otro" }].map((opt) => (
+                                        <label key={opt.value} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                                            <input
+                                                type="radio"
+                                                name="quitarEtiquetas"
+                                                checked={quitarEtiquetas === opt.value}
+                                                onChange={() => { setQuitarEtiquetas(opt.value); setDetailsError(""); }}
+                                                className="accent-emerald-600"
+                                            />
+                                            {opt.label}
+                                        </label>
+                                    ))}
+                                </div>
+                                {quitarEtiquetas === "otro" && (
+                                    <input
+                                        type="text"
+                                        value={quitarEtiquetasOtro}
+                                        onChange={(e) => { setQuitarEtiquetasOtro(e.target.value); setDetailsError(""); }}
+                                        placeholder="Describe la respuesta"
+                                        className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                    />
+                                )}
+                            </div>
+
+                            {detailsError && (
+                                <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-3 py-2.5">
+                                    <AlertTriangle size={15} className="mt-0.5 flex-shrink-0" />
+                                    <span>{detailsError}</span>
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                    <>
                     {/* Leyenda */}
                     <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
                         <div className="flex items-center gap-1.5">
@@ -258,6 +392,8 @@ export default function ConfirmQuotationModal({
                             <span>{error}</span>
                         </div>
                     )}
+                    </>
+                    )}
                 </div>
 
                 {/* Footer — col en móvil, row en sm+ */}
@@ -265,28 +401,34 @@ export default function ConfirmQuotationModal({
                     <Button
                         type="button"
                         variant="outline"
-                        onClick={handleClose}
+                        onClick={step === "calendar" ? () => setStep("details") : handleClose}
                         disabled={loading}
                         className="rounded-xl w-full sm:w-auto"
                     >
-                        Cancelar
+                        {step === "calendar" ? "Atrás" : "Cancelar"}
                     </Button>
-                    <Button onClick={handleSubmit} disabled={!isReady || loading} className={confirmBtnClass}>
-                        {loading ? (
-                            <span className="flex items-center justify-center gap-2">
-                                <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                                </svg>
-                                {isReconfirm ? "Actualizando..." : "Confirmando..."}
-                            </span>
-                        ) : (
-                            <span className="flex items-center justify-center gap-2">
-                                {isReconfirm ? <RefreshCw size={15} /> : <CalendarCheck2 size={15} />}
-                                {isReconfirm ? "Re-confirmar Pedido" : "Confirmar Cotización"}
-                            </span>
-                        )}
-                    </Button>
+                    {step === "details" ? (
+                        <Button onClick={handleContinueFromDetails} className={confirmBtnClass}>
+                            Continuar
+                        </Button>
+                    ) : (
+                        <Button onClick={handleSubmit} disabled={!isReady || loading} className={confirmBtnClass}>
+                            {loading ? (
+                                <span className="flex items-center justify-center gap-2">
+                                    <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                                    </svg>
+                                    {isReconfirm ? "Actualizando..." : "Confirmando..."}
+                                </span>
+                            ) : (
+                                <span className="flex items-center justify-center gap-2">
+                                    {isReconfirm ? <RefreshCw size={15} /> : <CalendarCheck2 size={15} />}
+                                    {isReconfirm ? "Re-confirmar Pedido" : "Confirmar Cotización"}
+                                </span>
+                            )}
+                        </Button>
+                    )}
                 </div>
             </DialogContent>
         </Dialog>
