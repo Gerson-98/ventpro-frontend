@@ -799,7 +799,7 @@ export default function OrderDetail() {
       {/* ── Checklists ── */}
       {canManageChecklist && (
         <div className="mb-6">
-          <ChecklistPanel orderId={Number(id)} isAdmin={isAdmin} />
+          <ChecklistPanel orderId={Number(id)} isAdmin={isAdmin} order={order} />
         </div>
       )}
 

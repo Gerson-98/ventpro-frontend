@@ -27,7 +27,7 @@ const CHECKLIST_TYPES = [
     },
 ];
 
-function ChecklistCard({ typeInfo, data, orderId, onUpdate, isAdmin }) {
+function ChecklistCard({ typeInfo, data, orderId, onUpdate, isAdmin, order }) {
     const { type, label, description, icon, color } = typeInfo;
     const { completed, templates } = data;
 
@@ -108,6 +108,8 @@ function ChecklistCard({ typeInfo, data, orderId, onUpdate, isAdmin }) {
                         isAdmin={isAdmin}
                         resetting={resetting}
                         handleReset={handleReset}
+                        typeInfo={typeInfo}
+                        order={order}
                     />
                 </div>
 
@@ -126,6 +128,8 @@ function ChecklistCard({ typeInfo, data, orderId, onUpdate, isAdmin }) {
                             isAdmin={isAdmin}
                             resetting={resetting}
                             handleReset={handleReset}
+                            typeInfo={typeInfo}
+                            order={order}
                         />
                     </div>
                 </div>
@@ -226,7 +230,17 @@ function ChecklistCard({ typeInfo, data, orderId, onUpdate, isAdmin }) {
 }
 
 // Botones de acción extraídos para no duplicar JSX entre móvil y desktop
-function ActionButtons({ completed, templates, open, setOpen, checkedCount, totalCount, color, isAdmin, resetting, handleReset }) {
+function ActionButtons({ completed, templates, open, setOpen, checkedCount, totalCount, color, isAdmin, resetting, handleReset, typeInfo, order }) {
+    const printBtn = templates.length > 0 && (
+        <button
+            onClick={() => printChecklist(typeInfo, templates, order)}
+            className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded hover:bg-white/60 active:bg-white/80 transition-colors"
+            title="Imprimir hoja en blanco para marcar a mano"
+        >
+            🖨️ Imprimir
+        </button>
+    );
+
     if (completed) {
         return (
             <>
@@ -240,6 +254,7 @@ function ActionButtons({ completed, templates, open, setOpen, checkedCount, tota
                 >
                     {open ? 'Ocultar' : 'Ver detalle'}
                 </button>
+                {printBtn}
                 {isAdmin && (
                     <button
                         onClick={handleReset}
@@ -258,16 +273,74 @@ function ActionButtons({ completed, templates, open, setOpen, checkedCount, tota
     }
 
     return (
-        <button
-            onClick={() => setOpen((o) => !o)}
-            className={`text-xs text-white px-3 py-1.5 rounded-lg font-medium ${color.btn} transition-colors active:opacity-80`}
-        >
-            {open ? 'Cancelar' : 'Completar'}
-        </button>
+        <>
+            <button
+                onClick={() => setOpen((o) => !o)}
+                className={`text-xs text-white px-3 py-1.5 rounded-lg font-medium ${color.btn} transition-colors active:opacity-80`}
+            >
+                {open ? 'Cancelar' : 'Completar'}
+            </button>
+            {printBtn}
+        </>
     );
 }
 
-export default function ChecklistPanel({ orderId, isAdmin }) {
+// ── Imprime una hoja en blanco (casillas vacías para marcar a mano) con los
+// ítems del checklist de "Carga de Camión" + el detalle de ventanas del
+// pedido (tipo, medidas, color PVC, color vidrio) — para que quien carga el
+// camión verifique físicamente todo antes de salir a instalar, sin
+// depender de llenar el checklist en el celular mientras carga.
+function printChecklist(typeInfo, templates, order) {
+    const date = new Date().toLocaleDateString('es-GT', { day: 'numeric', month: 'long', year: 'numeric' });
+    const windowsRows = (order?.windows || []).map((w, i) => `
+        <tr>
+          <td>V${i + 1}</td>
+          <td>${w.displayName || w.windowType?.name || '—'}</td>
+          <td>${w.width_cm} × ${w.height_cm} cm</td>
+          <td>${w.pvcColor?.name || '—'}</td>
+          <td>${w.glassColor?.name || '—'}</td>
+          <td style="width:60px">☐</td>
+        </tr>`).join('');
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${typeInfo.label} — ${order?.project || ''}</title>
+<style>
+  body{font-family:Arial,sans-serif;color:#111;padding:24px;font-size:12px}
+  h1{font-size:16px;margin:0 0 2px}
+  .sub{font-size:11px;color:#666;margin-bottom:16px}
+  h2{font-size:12px;text-transform:uppercase;border-left:4px solid #2563eb;padding-left:8px;margin:20px 0 8px}
+  ul{list-style:none;padding:0;margin:0}
+  li{display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid #eee}
+  li span.box{width:16px;height:16px;border:2px solid #333;flex-shrink:0;display:inline-block}
+  table{width:100%;border-collapse:collapse;margin-top:6px}
+  th,td{border:1px solid #ddd;padding:5px 7px;text-align:left;font-size:11px}
+  th{background:#f3f4f6}
+  .notes{margin-top:20px;border:1px solid #ddd;border-radius:4px;padding:10px;min-height:60px}
+</style></head><body>
+<h1>${typeInfo.label} — ${order?.project || 'Pedido'}</h1>
+<div class="sub">${order?.client?.name ? `Cliente: ${order.client.name} · ` : ''}${date}</div>
+
+<h2>Ítems a verificar</h2>
+<ul>
+  ${templates.map((t) => `<li><span class="box"></span>${t.label}</li>`).join('')}
+</ul>
+
+${windowsRows ? `<h2>Ventanas a llevar — verificar medidas, color PVC y color de vidrio</h2>
+<table>
+  <thead><tr><th>#</th><th>Tipo</th><th>Medidas</th><th>Color PVC</th><th>Color vidrio</th><th>✓</th></tr></thead>
+  <tbody>${windowsRows}</tbody>
+</table>` : ''}
+
+<h2>Observaciones</h2>
+<div class="notes"></div>
+<script>window.onload=()=>{window.print()}<\/script>
+</body></html>`;
+
+    const w = window.open('', '_blank', 'width=900,height=1000');
+    w.document.write(html);
+    w.document.close();
+}
+
+export default function ChecklistPanel({ orderId, isAdmin, order }) {
     const [checklists, setChecklists] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -336,6 +409,7 @@ export default function ChecklistPanel({ orderId, isAdmin }) {
                                 orderId={orderId}
                                 onUpdate={fetchChecklists}
                                 isAdmin={isAdmin}
+                                order={order}
                             />
                         );
                     })}
