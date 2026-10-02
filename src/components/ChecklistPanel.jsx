@@ -292,7 +292,9 @@ function ActionButtons({ completed, templates, open, setOpen, checkedCount, tota
 // depender de llenar el checklist en el celular mientras carga.
 function printChecklist(typeInfo, templates, order) {
     const date = new Date().toLocaleDateString('es-GT', { day: 'numeric', month: 'long', year: 'numeric' });
-    const windowsRows = (order?.windows || []).map((w, i) => `
+    // Carga de Camión ya trae ventanas y accesorios como ítems dinámicos —
+    // la tabla aparte solo hace falta para los otros checklists (fijos).
+    const windowsRows = typeInfo.type === 'carga_camion' ? '' : (order?.windows || []).map((w, i) => `
         <tr>
           <td>V${i + 1}</td>
           <td>${w.displayName || w.windowType?.name || '—'}</td>
