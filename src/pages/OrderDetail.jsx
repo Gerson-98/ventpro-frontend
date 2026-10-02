@@ -106,17 +106,28 @@ export default function OrderDetail() {
   // ventanas cuyas medidas todavía no están confirmadas/rectificadas, para
   // no comprar o cortar material de algo que puede cambiar. Por defecto
   // TODAS están seleccionadas.
-  const [selectedWindowIds, setSelectedWindowIds] = useState([]);
-  useEffect(() => {
-    if (order?.windows) setSelectedWindowIds(order.windows.map((w) => w.id));
-  }, [order?.id]);
+  // Se guarda lo EXCLUIDO (no lo seleccionado): así una ventana nueva agregada
+  // al pedido entra marcada por defecto, y una borrada no deja ids huérfanos.
+  const [excludedWindowIds, setExcludedWindowIds] = useState([]);
+  useEffect(() => { setExcludedWindowIds([]); }, [order?.id]);
+  const allWindowIds = (order?.windows ?? []).map((w) => w.id);
+  const selectedWindowIds = allWindowIds.filter((id) => !excludedWindowIds.includes(id));
   const toggleWindowSelected = (winId) => {
-    setSelectedWindowIds((prev) =>
+    setExcludedWindowIds((prev) =>
       prev.includes(winId) ? prev.filter((id) => id !== winId) : [...prev, winId]
     );
   };
-  const selectAllWindows = () => setSelectedWindowIds((order?.windows ?? []).map((w) => w.id));
-  const deselectAllWindows = () => setSelectedWindowIds([]);
+  const selectAllWindows = () => setExcludedWindowIds([]);
+  const deselectAllWindows = () => setExcludedWindowIds(allWindowIds);
+  const noWindowsSelected = allWindowIds.length > 0 && selectedWindowIds.length === 0;
+
+  // Ventanas incluidas conservando su número V# original (el mismo del
+  // Detalle de Ventanas) — el plan de corte debe decir V5 aunque V1-V4 estén
+  // excluidas.
+  const includedWindowsForPlan = [...(order?.windows ?? [])]
+    .sort((a, b) => a.id - b.id)
+    .map((w, i) => ({ ...w, _vIndex: i + 1 }))
+    .filter((w) => selectedWindowIds.includes(w.id));
 
   // Estado del tamaño de marco: derivado de los window_types reales del pedido.
   // Si alguna ventana tiene "MARCO 5 CM" en su tipo → el pedido usa 5 cm.
@@ -451,12 +462,19 @@ export default function OrderDetail() {
 
         {/* ── Botones de acción — cada uno gated por su propio permiso ── */}
         {showActionsBar && (
-          <div className="flex flex-wrap gap-2 mt-5 pt-4 border-t border-gray-100">
+          <div className="flex flex-wrap items-center gap-2 mt-5 pt-4 border-t border-gray-100">
+            {allWindowIds.length > 0 && selectedWindowIds.length < allWindowIds.length && (
+              <span className="w-full text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+                Los reportes calcularán solo {selectedWindowIds.length} de {allWindowIds.length} ventanas (las marcadas en el detalle).
+              </span>
+            )}
             {canSeeProfilesReport && (
               <Button
                 size="sm"
                 variant="outline"
                 className="flex items-center gap-1.5 text-xs sm:text-sm"
+                disabled={noWindowsSelected}
+                title={noWindowsSelected ? 'Marca al menos una ventana' : undefined}
                 onClick={() => handleGenerateReport(selectedWindowIds)}
               >
                 <FaChartBar size={11} />
@@ -469,6 +487,8 @@ export default function OrderDetail() {
                 size="sm"
                 variant="outline"
                 className="flex items-center gap-1.5 text-xs sm:text-sm"
+                disabled={noWindowsSelected}
+                title={noWindowsSelected ? 'Marca al menos una ventana' : undefined}
                 onClick={() => handleOptimizeCuts(selectedWindowIds)}
               >
                 <FaMagic size={11} />
@@ -481,6 +501,8 @@ export default function OrderDetail() {
                 size="sm"
                 variant="outline"
                 className="flex items-center gap-1.5 text-xs sm:text-sm"
+                disabled={noWindowsSelected}
+                title={noWindowsSelected ? 'Marca al menos una ventana' : undefined}
                 onClick={handleGlassCuts}
               >
                 <FaFileAlt size={11} />
@@ -824,7 +846,7 @@ export default function OrderDetail() {
           projectName={order?.project}
           orderId={order?.id}
           clientName={order?.client?.name}
-          windows={order?.windows || []}
+          windows={includedWindowsForPlan}
         />
       )}
 

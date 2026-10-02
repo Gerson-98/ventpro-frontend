@@ -262,8 +262,9 @@ function WindowsList({ windows }) {
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                         {[...windows].sort((a, b) => a.id - b.id).map((win, i) => {
-                            const bg = chipBg(i);
-                            const label = `V${i + 1}`;
+                            const vNum = win._vIndex ?? (i + 1);
+                            const bg = chipBg(vNum - 1);
+                            const label = `V${vNum}`;
                             const _s = win.displayName, _t = win.windowType?.name, _c = win.windowType?.displayName;
                             const name = (_s && _s !== _t) ? _s : (_c || _s || _t || '—');
                             // Dimensiones con exactamente 1 decimal (p. ej. 88.5, 120.0) —
@@ -335,8 +336,9 @@ export default function CutOptimizationModal({
         if (windows.length > 0) {
             const totalUnits = windows.reduce((s, w) => s + (w.quantity || 1), 0);
             const rows = [...windows].sort((a, b) => a.id - b.id).map((win, i) => {
-                const bg = chipBg(i);
-                const label = `V${i + 1}`;
+                const vNum = win._vIndex ?? (i + 1);
+                const bg = chipBg(vNum - 1);
+                const label = `V${vNum}`;
                 const _s = win.displayName, _t = win.windowType?.name, _c = win.windowType?.displayName;
                 const name = (_s && _s !== _t) ? _s : (_c || _s || _t || '—');
                 // Dimensiones con 1 decimal exacto (sin Math.round) para preservar

@@ -223,7 +223,7 @@ function ChecklistCard({ typeInfo, data, orderId, onUpdate, isAdmin, order }) {
 function ActionButtons({ completed, templates, open, setOpen, checkedCount, totalCount, color, isAdmin, resetting, handleReset, typeInfo, order }) {
     const printBtn = templates.length > 0 && (
         <button
-            onClick={() => printChecklist(typeInfo, templates, order)}
+            onClick={() => printChecklists([{ label: typeInfo.label, icon: typeInfo.icon, templates }], order, typeInfo.label)}
             className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded hover:bg-white/60 active:bg-white/80 transition-colors"
             title="Imprimir hoja en blanco para marcar a mano"
         >
@@ -275,56 +275,70 @@ function ActionButtons({ completed, templates, open, setOpen, checkedCount, tota
     );
 }
 
-// ── Imprime una hoja en blanco (casillas vacías para marcar a mano) con los
-// ítems del checklist de "Carga de Camión" + el detalle de ventanas del
-// pedido (tipo, medidas, color PVC, color vidrio) — para que quien carga el
-// camión verifique físicamente todo antes de salir a instalar, sin
-// depender de llenar el checklist en el celular mientras carga.
-function printChecklist(typeInfo, templates, order) {
+// ── Impresión de checklists: una hoja ordenada por SECCIONES (Ventanas,
+// Accesorios, Herramientas, Limpieza…) con casillas vacías para marcar a
+// mano. Cada ítem trae `group` (los dinámicos: Ventanas/Accesorios); los
+// fijos se agrupan bajo el nombre de su checklist.
+function escapeHtml(s) {
+    return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function buildSections(categories) {
+    const sections = [];
+    categories.forEach((cat) => {
+        const byGroup = new Map();
+        (cat.templates || []).forEach((t) => {
+            const g = t.group || `${cat.icon || ''} ${cat.label}`.trim();
+            if (!byGroup.has(g)) byGroup.set(g, []);
+            byGroup.get(g).push(t.label);
+        });
+        byGroup.forEach((items, title) => sections.push({ title, items }));
+    });
+    return sections;
+}
+
+function printChecklists(categories, order, docTitle) {
     const date = new Date().toLocaleDateString('es-GT', { day: 'numeric', month: 'long', year: 'numeric' });
-    // Carga de Camión ya trae ventanas y accesorios como ítems dinámicos —
-    // la tabla aparte solo hace falta para los otros checklists (fijos).
-    const windowsRows = typeInfo.type === 'carga_camion' ? '' : (order?.windows || []).map((w, i) => `
-        <tr>
-          <td>V${i + 1}</td>
-          <td>${w.displayName || w.windowType?.name || '—'}</td>
-          <td>${w.width_cm} × ${w.height_cm} cm</td>
-          <td>${w.pvcColor?.name || '—'}</td>
-          <td>${w.glassColor?.name || '—'}</td>
-          <td style="width:60px">☐</td>
-        </tr>`).join('');
+    const sections = buildSections(categories).filter((s) => s.items.length > 0);
 
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${typeInfo.label} — ${order?.project || ''}</title>
+    const sectionsHtml = sections.map((s) => `
+      <section>
+        <h2>${escapeHtml(s.title)} <span class="cnt">${s.items.length}</span></h2>
+        <ul>${s.items.map((l) => `<li><span class="box"></span><span class="lbl">${escapeHtml(l)}</span></li>`).join('')}</ul>
+      </section>`).join('');
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(docTitle)} — ${escapeHtml(order?.project || '')}</title>
 <style>
-  body{font-family:Arial,sans-serif;color:#111;padding:24px;font-size:12px}
-  h1{font-size:16px;margin:0 0 2px}
-  .sub{font-size:11px;color:#666;margin-bottom:16px}
-  h2{font-size:12px;text-transform:uppercase;border-left:4px solid #2563eb;padding-left:8px;margin:20px 0 8px}
-  ul{list-style:none;padding:0;margin:0}
-  li{display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid #eee}
-  li span.box{width:16px;height:16px;border:2px solid #333;flex-shrink:0;display:inline-block}
-  table{width:100%;border-collapse:collapse;margin-top:6px}
-  th,td{border:1px solid #ddd;padding:5px 7px;text-align:left;font-size:11px}
-  th{background:#f3f4f6}
-  .notes{margin-top:20px;border:1px solid #ddd;border-radius:4px;padding:10px;min-height:60px}
+  @page{size:letter;margin:14mm}
+  *{box-sizing:border-box}
+  body{font-family:Arial,Helvetica,sans-serif;color:#111;font-size:11.5px;margin:0}
+  header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #111;padding-bottom:8px;margin-bottom:14px}
+  h1{font-size:18px;margin:0;text-transform:uppercase;letter-spacing:.5px}
+  .meta{font-size:11px;color:#444;margin-top:3px}
+  .date{font-size:11px;color:#666;white-space:nowrap}
+  section{margin-bottom:14px;break-inside:avoid;page-break-inside:avoid}
+  h2{font-size:12px;text-transform:uppercase;letter-spacing:.6px;background:#f1f5f9;border-left:5px solid #2563eb;padding:5px 8px;margin:0 0 6px;display:flex;justify-content:space-between}
+  h2 .cnt{font-weight:400;color:#64748b}
+  ul{list-style:none;margin:0;padding:0;columns:2;column-gap:18px}
+  li{display:flex;align-items:flex-start;gap:8px;padding:4px 0;border-bottom:1px dotted #cbd5e1;break-inside:avoid}
+  .box{width:14px;height:14px;border:1.8px solid #111;border-radius:2px;flex-shrink:0;margin-top:1px}
+  .lbl{line-height:1.3}
+  .obs{margin-top:10px;border:1px solid #cbd5e1;border-radius:4px;padding:8px;min-height:70px}
+  .obs b{font-size:11px;text-transform:uppercase;color:#475569}
+  .sign{display:flex;gap:30px;margin-top:22px}
+  .sign div{flex:1;border-top:1px solid #111;padding-top:4px;font-size:10px;color:#475569;text-align:center}
 </style></head><body>
-<h1>${typeInfo.label} — ${order?.project || 'Pedido'}</h1>
-<div class="sub">${order?.client?.name ? `Cliente: ${order.client.name} · ` : ''}${date}</div>
-
-<h2>Ítems a verificar</h2>
-<ul>
-  ${templates.map((t) => `<li><span class="box"></span>${t.label}</li>`).join('')}
-</ul>
-
-${windowsRows ? `<h2>Ventanas a llevar — verificar medidas, color PVC y color de vidrio</h2>
-<table>
-  <thead><tr><th>#</th><th>Tipo</th><th>Medidas</th><th>Color PVC</th><th>Color vidrio</th><th>✓</th></tr></thead>
-  <tbody>${windowsRows}</tbody>
-</table>` : ''}
-
-<h2>Observaciones</h2>
-<div class="notes"></div>
-<script>window.onload=()=>{window.print()}<\/script>
+<header>
+  <div>
+    <h1>${escapeHtml(docTitle)}</h1>
+    <div class="meta"><b>${escapeHtml(order?.project || 'Pedido')}</b>${order?.id ? ` · Pedido #${order.id}` : ''}${order?.client?.name ? ` · Cliente: ${escapeHtml(order.client.name)}` : ''}</div>
+  </div>
+  <div class="date">${date}</div>
+</header>
+${sectionsHtml || '<p>Este checklist no tiene ítems.</p>'}
+<div class="obs"><b>Observaciones</b></div>
+<div class="sign"><div>Responsable de carga</div><div>Instalador</div><div>Revisó</div></div>
+<script>window.onload=()=>{window.print()}</script>
 </body></html>`;
 
     const w = window.open('', '_blank', 'width=900,height=1000');
@@ -366,6 +380,23 @@ export default function ChecklistPanel({ orderId, isAdmin, order }) {
                 </div>
                 {!loading && checklists.length > 0 && (
                     <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => printChecklists(
+                                checklists.map((c) => ({
+                                    label: c.label || c.type,
+                                    icon: c.icon,
+                                    templates: c.completed
+                                        ? c.completed.items.map((i) => ({ label: i.label }))
+                                        : c.templates,
+                                })),
+                                order,
+                                'Checklist de instalación',
+                            )}
+                            className="text-xs font-medium text-gray-600 hover:text-gray-900 border border-gray-200 rounded-lg px-2.5 py-1 hover:bg-gray-50"
+                            title="Imprimir todos los checklists en una sola hoja, ordenados por sección"
+                        >
+                            🖨️ Imprimir todo
+                        </button>
                         <div className="w-20 sm:w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
                             <div
                                 className="h-full bg-green-500 rounded-full transition-all duration-500"
