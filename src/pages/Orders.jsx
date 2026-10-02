@@ -63,6 +63,12 @@ export default function Orders() {
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
+  // ── Antes "loading" tapaba TODA la página (tabla, filtros, stats) en cada
+  // búsqueda — se sentía como si la página entera se recargara por cada
+  // letra escrita. Ahora el spinner de pantalla completa solo aparece en la
+  // carga inicial; en búsquedas/filtros posteriores la tabla se queda visible
+  // con una indicación sutil (ver isRefetching más abajo).
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [showAddClient, setShowAddClient] = useState(false);
   const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -104,6 +110,7 @@ export default function Orders() {
       setOrders([]);
     } finally {
       setLoading(false);
+      setHasLoadedOnce(true);
     }
   }, [filters]);
 
@@ -171,7 +178,7 @@ export default function Orders() {
     return { active, completed, total };
   }, [orders]);
 
-  if (loading) {
+  if (loading && !hasLoadedOnce) {
     return (
       <div className="flex justify-center items-center py-32 text-gray-400">
         <svg className="animate-spin w-6 h-6 mr-3" fill="none" viewBox="0 0 24 24">
@@ -239,6 +246,12 @@ export default function Orders() {
             onChange={handleSearchChange}
             className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
           />
+          {loading && hasLoadedOnce && (
+            <svg className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+            </svg>
+          )}
         </div>
         <div className="flex gap-2">
           <select
