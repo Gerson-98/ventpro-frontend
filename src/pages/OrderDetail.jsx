@@ -101,6 +101,23 @@ export default function OrderDetail() {
   const [glassCutData, setGlassCutData] = useState({});
   const [isGlassLoading, setIsGlassLoading] = useState(false);
 
+  // ── Ventanas seleccionadas para los reportes (Reporte de Perfiles,
+  // Optimizar Cortes, Corte de Vidrio) — el cliente pidió poder excluir
+  // ventanas cuyas medidas todavía no están confirmadas/rectificadas, para
+  // no comprar o cortar material de algo que puede cambiar. Por defecto
+  // TODAS están seleccionadas.
+  const [selectedWindowIds, setSelectedWindowIds] = useState([]);
+  useEffect(() => {
+    if (order?.windows) setSelectedWindowIds(order.windows.map((w) => w.id));
+  }, [order?.id]);
+  const toggleWindowSelected = (winId) => {
+    setSelectedWindowIds((prev) =>
+      prev.includes(winId) ? prev.filter((id) => id !== winId) : [...prev, winId]
+    );
+  };
+  const selectAllWindows = () => setSelectedWindowIds((order?.windows ?? []).map((w) => w.id));
+  const deselectAllWindows = () => setSelectedWindowIds([]);
+
   // Estado del tamaño de marco: derivado de los window_types reales del pedido.
   // Si alguna ventana tiene "MARCO 5 CM" en su tipo → el pedido usa 5 cm.
   const [isSwappingMarco, setIsSwappingMarco] = useState(false);
@@ -177,7 +194,8 @@ export default function OrderDetail() {
     setIsGlassLoading(true);
     setShowGlassModal(true);
     try {
-      const res = await api.get(`/reports/order/${id}/glass-cuts`);
+      const params = selectedWindowIds.length ? { windowIds: selectedWindowIds.join(',') } : {};
+      const res = await api.get(`/reports/order/${id}/glass-cuts`, { params });
       setGlassCutData(res.data);
     } catch {
       alert('No se pudo generar el corte de vidrio.');
@@ -439,7 +457,7 @@ export default function OrderDetail() {
                 size="sm"
                 variant="outline"
                 className="flex items-center gap-1.5 text-xs sm:text-sm"
-                onClick={handleGenerateReport}
+                onClick={() => handleGenerateReport(selectedWindowIds)}
               >
                 <FaChartBar size={11} />
                 <span className="hidden sm:inline">Reporte Perfiles</span>
@@ -451,7 +469,7 @@ export default function OrderDetail() {
                 size="sm"
                 variant="outline"
                 className="flex items-center gap-1.5 text-xs sm:text-sm"
-                onClick={handleOptimizeCuts}
+                onClick={() => handleOptimizeCuts(selectedWindowIds)}
               >
                 <FaMagic size={11} />
                 <span className="hidden sm:inline">Optimizar Cortes</span>
@@ -511,11 +529,27 @@ export default function OrderDetail() {
 
       {/* ── Tabla de ventanas (md+) / Cards (móvil) ── */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm mb-6 overflow-hidden">
-        <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-          <h2 className="text-base font-bold text-gray-800">Detalle de Ventanas</h2>
-          <span className="text-xs font-semibold text-gray-400 bg-gray-100 px-2.5 py-1 rounded-lg">
-            {windowCount} ítem{windowCount !== 1 ? 's' : ''}
-          </span>
+        <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex flex-wrap justify-between items-center gap-2">
+          <div className="flex items-center gap-3">
+            <h2 className="text-base font-bold text-gray-800">Detalle de Ventanas</h2>
+            <span className="text-xs font-semibold text-gray-400 bg-gray-100 px-2.5 py-1 rounded-lg">
+              {windowCount} ítem{windowCount !== 1 ? 's' : ''}
+            </span>
+          </div>
+          {windowCount > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-gray-400">
+                {selectedWindowIds.length} de {windowCount} confirmadas para reportes
+              </span>
+              <button onClick={selectAllWindows} className="text-[11px] font-medium text-blue-600 hover:text-blue-800">
+                Seleccionar todas
+              </button>
+              <span className="text-gray-300">·</span>
+              <button onClick={deselectAllWindows} className="text-[11px] font-medium text-blue-600 hover:text-blue-800">
+                Deseleccionar todas
+              </button>
+            </div>
+          )}
         </div>
 
         {windowCount === 0 ? (
@@ -526,6 +560,7 @@ export default function OrderDetail() {
             <div className="hidden md:block overflow-x-auto">
               <table className="min-w-full text-sm">
                 <colgroup>
+                  <col className="w-10" />
                   <col className="w-auto" />
                   <col className="w-16" />
                   <col className="w-28" />
@@ -537,6 +572,14 @@ export default function OrderDetail() {
                 </colgroup>
                 <thead>
                   <tr className="bg-gray-50/70 border-b border-gray-100">
+                    <th className="py-3 px-3 text-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedWindowIds.length === windowCount}
+                        onChange={() => (selectedWindowIds.length === windowCount ? deselectAllWindows() : selectAllWindows())}
+                        title="Seleccionar/deseleccionar todas"
+                      />
+                    </th>
                     <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Tipo</th>
                     <th className="py-3 px-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">#V</th>
                     <th className="py-3 px-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Medidas (cm)</th>
@@ -559,7 +602,15 @@ export default function OrderDetail() {
                     const winHasMarco5 = winTypeName.includes('MARCO 5 CM');
                     const winHasMarcoVariant = winHasMarco45 || winHasMarco5;
                     return (
-                      <tr key={win.id} className="hover:bg-slate-50/60 transition-colors">
+                      <tr key={win.id} className={`hover:bg-slate-50/60 transition-colors ${!selectedWindowIds.includes(win.id) ? 'opacity-40' : ''}`}>
+                        <td className="py-3.5 px-3 text-center">
+                          <input
+                            type="checkbox"
+                            checked={selectedWindowIds.includes(win.id)}
+                            onChange={() => toggleWindowSelected(win.id)}
+                            title="Incluir en Reporte de Perfiles / Optimizar Cortes / Corte de Vidrio"
+                          />
+                        </td>
                         <td className="py-3.5 px-5">
                           <div className="flex items-center gap-2">
                             <span className="font-semibold text-gray-800 block leading-tight">
@@ -666,10 +717,16 @@ export default function OrderDetail() {
                   ? glassColors.find(g => g.id === Number(win.options.vidrio_adicional_id))
                   : null;
                 return (
-                  <div key={win.id} className="p-4">
+                  <div key={win.id} className={`p-4 ${!selectedWindowIds.includes(win.id) ? 'opacity-40' : ''}`}>
                     {/* Fila: número + nombre */}
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <div className="flex items-center gap-2 min-w-0">
+                        <input
+                          type="checkbox"
+                          checked={selectedWindowIds.includes(win.id)}
+                          onChange={() => toggleWindowSelected(win.id)}
+                          className="flex-shrink-0"
+                        />
                         <span className="font-mono text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md flex-shrink-0">
                           V{winIdx + 1}
                         </span>

@@ -10,11 +10,12 @@ export default function useOrderReports(id) {
   const [optimizationData, setOptimizationData] = useState({});
   const [isOptimizationLoading, setIsOptimizationLoading] = useState(false);
 
-  const handleGenerateReport = async () => {
+  const handleGenerateReport = async (windowIds) => {
     setIsReportLoading(true);
     setShowReportModal(true);
     try {
-      const response = await api.get(`/reports/order/${id}/profiles`);
+      const params = windowIds?.length ? { windowIds: windowIds.join(',') } : {};
+      const response = await api.get(`/reports/order/${id}/profiles`, { params });
       setReportData(response.data);
     } catch (error) {
       console.error("Error al generar el reporte:", error);
@@ -25,11 +26,12 @@ export default function useOrderReports(id) {
     }
   };
 
-  const handleOptimizeCuts = async () => {
+  const handleOptimizeCuts = async (windowIds) => {
     setIsOptimizationLoading(true);
     setShowOptimizationModal(true);
     try {
-      const response = await api.get(`/reports/order/${id}/optimize-cuts`);
+      const params = windowIds?.length ? { windowIds: windowIds.join(',') } : {};
+      const response = await api.get(`/reports/order/${id}/optimize-cuts`, { params });
       setOptimizationData(response.data);
     } catch (error) {
       console.error("Error al optimizar los cortes:", error);
