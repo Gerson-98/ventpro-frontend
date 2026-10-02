@@ -9,6 +9,8 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import AddClientModal from "@/components/AddClientModal";
+import { FaPlus } from "react-icons/fa";
 import "react-day-picker/dist/style.css";
 
 export default function ConfirmQuotationModal({
@@ -41,7 +43,19 @@ export default function ConfirmQuotationModal({
     const [marcoUbicacionOtro, setMarcoUbicacionOtro] = useState("");
     const [quitarEtiquetas, setQuitarEtiquetas] = useState("");
     const [quitarEtiquetasOtro, setQuitarEtiquetasOtro] = useState("");
+    const [referenciasInstalacion, setReferenciasInstalacion] = useState("");
     const [detailsError, setDetailsError] = useState("");
+
+    // ── Cliente real — se confirma por teléfono la primera vez que se
+    // confirma la cotización (no se vuelve a pedir al re-confirmar).
+    const [clients, setClients] = useState([]);
+    const [selectedClientId, setSelectedClientId] = useState("");
+    const [showAddClientModal, setShowAddClientModal] = useState(false);
+
+    useEffect(() => {
+        if (!open || isReconfirm) return;
+        api.get('/clients').then((res) => setClients(res.data || [])).catch(() => {});
+    }, [open, isReconfirm]);
 
     const toggleMarcoOption = (value) => {
         setMarcoUbicacion((prev) =>
@@ -67,6 +81,10 @@ export default function ConfirmQuotationModal({
             setDetailsError("Describe la respuesta sobre las etiquetas en el campo de texto.");
             return;
         }
+        if (!selectedClientId) {
+            setDetailsError("Selecciona o crea el cliente real — llama al cliente si no tienes sus datos.");
+            return;
+        }
         setDetailsError("");
         setStep("calendar");
     };
@@ -81,11 +99,14 @@ export default function ConfirmQuotationModal({
 
     useEffect(() => {
         if (!open) return;
-        setStep("details");
+        // Re-confirmar: ya se preguntó esto una vez, se va directo al calendario.
+        setStep(isReconfirm ? "calendar" : "details");
         setMarcoUbicacion([]);
         setMarcoUbicacionOtro("");
         setQuitarEtiquetas("");
         setQuitarEtiquetasOtro("");
+        setReferenciasInstalacion("");
+        setSelectedClientId("");
         setDetailsError("");
         if (initialDates?.from && initialDates?.to) {
             setRange({ from: new Date(initialDates.from), to: new Date(initialDates.to) });
@@ -107,7 +128,7 @@ export default function ConfirmQuotationModal({
             }
         };
         fetchScheduledOrders();
-    }, [open, excludeOrderId, initialDates]);
+    }, [open, excludeOrderId, initialDates, isReconfirm]);
 
     const handleClose = () => {
         setRange({ from: null, to: null });
@@ -127,8 +148,12 @@ export default function ConfirmQuotationModal({
             const payload = {
                 installationStartDate: range.from.toISOString(),
                 installationEndDate: range.to.toISOString(),
-                marcoUbicacion: buildMarcoUbicacionPayload(),
-                quitarEtiquetas: buildQuitarEtiquetasPayload(),
+                ...(isReconfirm ? {} : {
+                    marcoUbicacion: buildMarcoUbicacionPayload(),
+                    quitarEtiquetas: buildQuitarEtiquetasPayload(),
+                    clientId: Number(selectedClientId),
+                    referenciasInstalacion: referenciasInstalacion.trim() || undefined,
+                }),
             };
             const response = await api.post(`/quotations/${quotationId}/confirm`, payload);
             onConfirmSuccess(response.data.id);
@@ -253,6 +278,43 @@ export default function ConfirmQuotationModal({
                                         className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                                     />
                                 )}
+                            </div>
+
+                            <div>
+                                <div className="flex items-center justify-between mb-2">
+                                    <p className="text-sm font-semibold text-gray-800">Cliente real</p>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowAddClientModal(true)}
+                                        className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 hover:text-emerald-800"
+                                    >
+                                        <FaPlus size={10} /> Nuevo cliente
+                                    </button>
+                                </div>
+                                <select
+                                    value={selectedClientId}
+                                    onChange={(e) => { setSelectedClientId(e.target.value); setDetailsError(""); }}
+                                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                >
+                                    <option value="">Selecciona un cliente…</option>
+                                    {clients.map((c) => (
+                                        <option key={c.id} value={c.id}>{c.name}{c.phone ? ` — ${c.phone}` : ''}</option>
+                                    ))}
+                                </select>
+                                <p className="text-xs text-gray-400 mt-1">
+                                    Confirma con el cliente su nombre, teléfono y dirección — reemplaza cualquier nombre genérico con el que se haya cotizado.
+                                </p>
+                            </div>
+
+                            <div>
+                                <p className="text-sm font-semibold text-gray-800 mb-2">Referencias de instalación (opcional)</p>
+                                <textarea
+                                    value={referenciasInstalacion}
+                                    onChange={(e) => setReferenciasInstalacion(e.target.value)}
+                                    placeholder="Código de garita, portón, piso, referencias del lugar…"
+                                    rows={2}
+                                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                />
                             </div>
 
                             {detailsError && (
@@ -431,6 +493,16 @@ export default function ConfirmQuotationModal({
                     )}
                 </div>
             </DialogContent>
+            <AddClientModal
+                open={showAddClientModal}
+                onClose={() => setShowAddClientModal(false)}
+                onSave={(newClient) => {
+                    setShowAddClientModal(false);
+                    setClients((prev) => [...prev, newClient]);
+                    setSelectedClientId(String(newClient.id));
+                    setDetailsError("");
+                }}
+            />
         </Dialog>
     );
 }
