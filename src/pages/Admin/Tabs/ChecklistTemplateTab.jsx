@@ -174,7 +174,7 @@ export default function ChecklistTemplateTab() {
                             ) : (
                                 /* Modo vista */
                                 <div className="px-3 sm:px-4 py-3">
-                                    {/* Fila 1 (móvil): número + label + badge */}
+                                    {/* Fila 1: número + label + badge (+ acciones inline en sm+) */}
                                     <div className="flex items-center gap-2 sm:gap-3">
                                         <span className="text-xs font-bold text-gray-400 w-5 text-center flex-shrink-0">
                                             {idx + 1}
@@ -188,6 +188,29 @@ export default function ChecklistTemplateTab() {
                                         >
                                             {template.active ? 'Activo' : 'Inactivo'}
                                         </span>
+                                        {/* Acciones desktop — antes este bloque existía pero quedó
+                                            oculto con display:none de un refactor anterior, así que
+                                            en pantallas sm+ no había forma de editar un ítem. */}
+                                        <div className="hidden sm:flex items-center gap-1 flex-shrink-0">
+                                            <button
+                                                onClick={() => { setEditingId(template.id); setEditLabel(template.label); }}
+                                                className="text-xs text-blue-600 border border-blue-200 rounded-md px-2.5 py-1 hover:bg-blue-50"
+                                            >
+                                                Editar
+                                            </button>
+                                            <button
+                                                onClick={() => handleToggleActive(template)}
+                                                className="text-xs text-gray-500 border border-gray-200 rounded-md px-2.5 py-1 hover:bg-gray-50"
+                                            >
+                                                {template.active ? 'Desactivar' : 'Activar'}
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete(template.id)}
+                                                className="text-xs text-red-500 border border-red-100 rounded-md px-2.5 py-1 hover:bg-red-50"
+                                            >
+                                                Eliminar
+                                            </button>
+                                        </div>
                                     </div>
 
                                     {/* Fila 2 (móvil): acciones — siempre visibles */}
@@ -211,14 +234,6 @@ export default function ChecklistTemplateTab() {
                                             Eliminar
                                         </button>
                                     </div>
-
-                                    {/* Acciones desktop — inline en la fila */}
-                                </div>
-                            )}
-
-                            {/* Acciones desktop pegadas a la derecha — solo sm+ */}
-                            {editingId !== template.id && (
-                                <div className="hidden sm:flex items-center gap-1 absolute right-0 top-0 bottom-0 pr-4" style={{ display: 'none' }}>
                                 </div>
                             )}
                         </div>

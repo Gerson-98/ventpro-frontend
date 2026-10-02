@@ -536,20 +536,6 @@ export default function OrderDetail() {
               {windowCount} ítem{windowCount !== 1 ? 's' : ''}
             </span>
           </div>
-          {windowCount > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] text-gray-400">
-                {selectedWindowIds.length} de {windowCount} confirmadas para reportes
-              </span>
-              <button onClick={selectAllWindows} className="text-[11px] font-medium text-blue-600 hover:text-blue-800">
-                Seleccionar todas
-              </button>
-              <span className="text-gray-300">·</span>
-              <button onClick={deselectAllWindows} className="text-[11px] font-medium text-blue-600 hover:text-blue-800">
-                Deseleccionar todas
-              </button>
-            </div>
-          )}
         </div>
 
         {windowCount === 0 ? (
