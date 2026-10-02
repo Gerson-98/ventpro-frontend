@@ -3,32 +3,47 @@
 import { useEffect, useState } from 'react';
 import api from '@/services/api';
 
-const TYPES = [
-    { value: 'carga_camion', label: '🚛 Carga de Camión', labelShort: '🚛 Carga', color: 'blue' },
-    { value: 'verificacion_instalacion', label: '🔧 Verificación de Instalación', labelShort: '🔧 Verificación', color: 'green' },
-    { value: 'regreso', label: '↩️ Regreso', labelShort: '↩️ Regreso', color: 'purple' },
+// Antes el tipo de checklist era un enum fijo de 3 valores (cambiar la
+// lista requería tocar código y migrar la base de datos). Ahora las
+// categorías viven en la tabla checklist_categories — se pueden crear,
+// renombrar o desactivar desde acá mismo.
+const COLOR_CLASSES = [
+    'bg-blue-50 border-blue-200 text-blue-700',
+    'bg-green-50 border-green-200 text-green-700',
+    'bg-purple-50 border-purple-200 text-purple-700',
+    'bg-amber-50 border-amber-200 text-amber-700',
+    'bg-rose-50 border-rose-200 text-rose-700',
+    'bg-cyan-50 border-cyan-200 text-cyan-700',
 ];
 
-const COLOR_CLASSES = {
-    blue: 'bg-blue-50 border-blue-200 text-blue-700',
-    green: 'bg-green-50 border-green-200 text-green-700',
-    purple: 'bg-purple-50 border-purple-200 text-purple-700',
-};
-
 export default function ChecklistTemplateTab() {
+    const [categories, setCategories] = useState([]);
     const [templates, setTemplates] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [activeType, setActiveType] = useState('carga_camion');
+    const [activeSlug, setActiveSlug] = useState(null);
     const [newLabel, setNewLabel] = useState('');
     const [saving, setSaving] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [editLabel, setEditLabel] = useState('');
 
-    const fetchTemplates = async () => {
+    // Crear nueva categoría
+    const [showNewCategory, setShowNewCategory] = useState(false);
+    const [newCatLabel, setNewCatLabel] = useState('');
+    const [newCatIcon, setNewCatIcon] = useState('📋');
+    const [newCatDynamic, setNewCatDynamic] = useState(false);
+    const [savingCategory, setSavingCategory] = useState(false);
+
+    const fetchAll = async () => {
         setLoading(true);
         try {
-            const res = await api.get('/checklists/templates');
-            setTemplates(res.data);
+            const [catsRes, tplRes] = await Promise.all([
+                api.get('/checklists/categories'),
+                api.get('/checklists/templates'),
+            ]);
+            const cats = catsRes.data || [];
+            setCategories(cats);
+            setTemplates(tplRes.data || []);
+            setActiveSlug((prev) => prev && cats.some((c) => c.slug === prev) ? prev : (cats[0]?.slug ?? null));
         } catch (err) {
             console.error(err);
         } finally {
@@ -37,24 +52,26 @@ export default function ChecklistTemplateTab() {
     };
 
     useEffect(() => {
-        fetchTemplates();
+        fetchAll();
     }, []);
 
+    const activeCategory = categories.find((c) => c.slug === activeSlug);
     const filtered = templates
-        .filter((t) => t.type === activeType)
+        .filter((t) => t.category_id === activeCategory?.id)
         .sort((a, b) => a.sort_order - b.sort_order);
+    const colorClass = COLOR_CLASSES[categories.findIndex((c) => c.slug === activeSlug) % COLOR_CLASSES.length] || COLOR_CLASSES[0];
 
     const handleAdd = async () => {
-        if (!newLabel.trim()) return;
+        if (!newLabel.trim() || !activeCategory) return;
         setSaving(true);
         try {
             await api.post('/checklists/templates', {
-                type: activeType,
+                categorySlug: activeCategory.slug,
                 label: newLabel.trim(),
                 sort_order: filtered.length,
             });
             setNewLabel('');
-            fetchTemplates();
+            fetchAll();
         } finally {
             setSaving(false);
         }
@@ -62,10 +79,8 @@ export default function ChecklistTemplateTab() {
 
     const handleToggleActive = async (template) => {
         try {
-            await api.patch(`/checklists/templates/${template.id}`, {
-                active: !template.active,
-            });
-            fetchTemplates();
+            await api.patch(`/checklists/templates/${template.id}`, { active: !template.active });
+            fetchAll();
         } catch (err) {
             console.error(err);
         }
@@ -76,7 +91,7 @@ export default function ChecklistTemplateTab() {
         try {
             await api.patch(`/checklists/templates/${id}`, { label: editLabel.trim() });
             setEditingId(null);
-            fetchTemplates();
+            fetchAll();
         } catch (err) {
             console.error(err);
         }
@@ -86,40 +101,123 @@ export default function ChecklistTemplateTab() {
         if (!confirm('¿Eliminar este ítem? Se borrará de los checklists existentes.')) return;
         try {
             await api.delete(`/checklists/templates/${id}`);
-            fetchTemplates();
+            fetchAll();
         } catch (err) {
             console.error(err);
         }
     };
 
-    const activeTypeInfo = TYPES.find((t) => t.value === activeType);
+    const handleCreateCategory = async () => {
+        if (!newCatLabel.trim()) return;
+        setSavingCategory(true);
+        try {
+            const res = await api.post('/checklists/categories', {
+                slug: newCatLabel.trim(),
+                label: newCatLabel.trim(),
+                icon: newCatIcon.trim() || '📋',
+                dynamic: newCatDynamic,
+            });
+            setNewCatLabel('');
+            setNewCatIcon('📋');
+            setNewCatDynamic(false);
+            setShowNewCategory(false);
+            await fetchAll();
+            setActiveSlug(res.data.slug);
+        } catch (err) {
+            alert(err?.response?.data?.message || 'No se pudo crear la categoría.');
+        } finally {
+            setSavingCategory(false);
+        }
+    };
+
+    const handleDeleteCategory = async (category) => {
+        if (!confirm(`¿Eliminar la categoría "${category.label}"? Se borran también sus ítems y el historial de checklists hechos con ella en todos los pedidos.`)) return;
+        try {
+            await api.delete(`/checklists/categories/${category.id}`);
+            fetchAll();
+        } catch (err) {
+            alert(err?.response?.data?.message || 'No se pudo eliminar la categoría.');
+        }
+    };
 
     return (
         <div className="px-1">
-            <div className="mb-4 sm:mb-6">
-                <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 mb-1">Ítems de Checklists</h2>
-                <p className="text-xs sm:text-sm text-gray-500">
-                    Configura los ítems que aparecerán en cada checklist de los pedidos.
-                </p>
+            <div className="mb-4 sm:mb-6 flex items-start justify-between gap-3">
+                <div>
+                    <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 mb-1">Ítems de Checklists</h2>
+                    <p className="text-xs sm:text-sm text-gray-500">
+                        Configura los ítems que aparecerán en cada checklist de los pedidos.
+                    </p>
+                </div>
+                <button
+                    onClick={() => setShowNewCategory((v) => !v)}
+                    className="flex-shrink-0 text-xs sm:text-sm font-medium px-3 py-2 rounded-lg border border-blue-200 text-blue-600 hover:bg-blue-50"
+                >
+                    + Checklist
+                </button>
             </div>
+
+            {showNewCategory && (
+                <div className="mb-4 p-3 sm:p-4 bg-blue-50/60 border border-blue-200 rounded-xl space-y-2">
+                    <p className="text-xs font-semibold text-blue-700">Nuevo checklist</p>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                        <input
+                            type="text"
+                            placeholder="Emoji"
+                            value={newCatIcon}
+                            onChange={(e) => setNewCatIcon(e.target.value)}
+                            className="w-full sm:w-16 text-sm border border-gray-300 rounded-lg px-3 py-2 text-center"
+                        />
+                        <input
+                            type="text"
+                            placeholder="Nombre del checklist (ej. Control de Calidad)"
+                            value={newCatLabel}
+                            onChange={(e) => setNewCatLabel(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleCreateCategory()}
+                            className="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-2"
+                        />
+                    </div>
+                    <label className="flex items-center gap-2 text-xs text-gray-600">
+                        <input type="checkbox" checked={newCatDynamic} onChange={(e) => setNewCatDynamic(e.target.checked)} />
+                        Incluir automáticamente las ventanas y accesorios del pedido (como "Carga de Camión")
+                    </label>
+                    <div className="flex justify-end gap-2">
+                        <button onClick={() => setShowNewCategory(false)} className="text-xs px-3 py-1.5 text-gray-500 hover:bg-gray-100 rounded-md">
+                            Cancelar
+                        </button>
+                        <button
+                            onClick={handleCreateCategory}
+                            disabled={savingCategory || !newCatLabel.trim()}
+                            className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                        >
+                            {savingCategory ? 'Creando...' : 'Crear checklist'}
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* ── Tabs — scroll horizontal en móvil ── */}
             <div className="flex gap-1 sm:gap-2 mb-4 sm:mb-6 border-b border-gray-200 overflow-x-auto scrollbar-none -mx-1 px-1">
-                {TYPES.map((t) => (
+                {categories.map((c) => (
                     <button
-                        key={t.value}
-                        onClick={() => setActiveType(t.value)}
-                        className={`flex-shrink-0 px-3 sm:px-4 py-2 -mb-px text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeType === t.value
+                        key={c.slug}
+                        onClick={() => setActiveSlug(c.slug)}
+                        className={`flex-shrink-0 px-3 sm:px-4 py-2 -mb-px text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeSlug === c.slug
                             ? 'border-blue-600 text-blue-600'
                             : 'border-transparent text-gray-500 hover:text-gray-700'
                             }`}
                     >
-                        {/* Etiqueta corta en móvil, completa en sm+ */}
-                        <span className="sm:hidden">{t.labelShort}</span>
-                        <span className="hidden sm:inline">{t.label}</span>
+                        {c.icon} {c.label}
+                        {c.dynamic && <span className="ml-1 text-[9px] text-gray-400">(dinámico)</span>}
                     </button>
                 ))}
             </div>
+
+            {activeCategory?.dynamic && (
+                <div className="mb-3 text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">
+                    Este checklist ya incluye automáticamente las ventanas y accesorios de cada pedido — los ítems de aquí abajo se SUMAN a esos (ej. herramientas generales).
+                </div>
+            )}
 
             {loading ? (
                 <div className="space-y-2">
@@ -174,7 +272,6 @@ export default function ChecklistTemplateTab() {
                             ) : (
                                 /* Modo vista */
                                 <div className="px-3 sm:px-4 py-3">
-                                    {/* Fila 1: número + label + badge (+ acciones inline en sm+) */}
                                     <div className="flex items-center gap-2 sm:gap-3">
                                         <span className="text-xs font-bold text-gray-400 w-5 text-center flex-shrink-0">
                                             {idx + 1}
@@ -182,15 +279,12 @@ export default function ChecklistTemplateTab() {
                                         <span className="flex-1 text-sm text-gray-700 min-w-0">{template.label}</span>
                                         <span
                                             className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border flex-shrink-0 ${template.active
-                                                ? COLOR_CLASSES[activeTypeInfo.color]
+                                                ? colorClass
                                                 : 'bg-gray-100 text-gray-400 border-gray-200'
                                                 }`}
                                         >
                                             {template.active ? 'Activo' : 'Inactivo'}
                                         </span>
-                                        {/* Acciones desktop — antes este bloque existía pero quedó
-                                            oculto con display:none de un refactor anterior, así que
-                                            en pantallas sm+ no había forma de editar un ítem. */}
                                         <div className="hidden sm:flex items-center gap-1 flex-shrink-0">
                                             <button
                                                 onClick={() => { setEditingId(template.id); setEditLabel(template.label); }}
@@ -238,30 +332,40 @@ export default function ChecklistTemplateTab() {
                             )}
                         </div>
                     ))}
-
-                    {/* Esto reemplaza el layout anterior para desktop de acciones inline */}
-                    {/* Reestructuramos el map para sm+ con flex en una sola fila */}
                 </div>
             )}
 
             {/* Agregar nuevo ítem */}
-            <div className="flex gap-2 mt-4 pt-4 border-t border-gray-100">
-                <input
-                    type="text"
-                    placeholder={`Nuevo ítem para ${activeTypeInfo?.labelShort ?? activeTypeInfo?.label}...`}
-                    value={newLabel}
-                    onChange={(e) => setNewLabel(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-                    className="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
-                />
-                <button
-                    onClick={handleAdd}
-                    disabled={saving || !newLabel.trim()}
-                    className="flex-shrink-0 px-3 sm:px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                    {saving ? '...' : '+ Agregar'}
-                </button>
-            </div>
+            {activeCategory && (
+                <div className="flex gap-2 mt-4 pt-4 border-t border-gray-100">
+                    <input
+                        type="text"
+                        placeholder={`Nuevo ítem para ${activeCategory.icon} ${activeCategory.label}...`}
+                        value={newLabel}
+                        onChange={(e) => setNewLabel(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+                        className="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    />
+                    <button
+                        onClick={handleAdd}
+                        disabled={saving || !newLabel.trim()}
+                        className="flex-shrink-0 px-3 sm:px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                        {saving ? '...' : '+ Agregar'}
+                    </button>
+                </div>
+            )}
+
+            {activeCategory && (
+                <div className="mt-3 text-right">
+                    <button
+                        onClick={() => handleDeleteCategory(activeCategory)}
+                        className="text-[11px] text-red-400 hover:text-red-600"
+                    >
+                        Eliminar checklist "{activeCategory.label}"
+                    </button>
+                </div>
+            )}
         </div>
     );
 }

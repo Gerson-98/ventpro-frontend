@@ -3,28 +3,18 @@
 import { useEffect, useState } from 'react';
 import api from '@/services/api';
 
-const CHECKLIST_TYPES = [
-    {
-        type: 'carga_camion',
-        label: 'Carga de Camión',
-        description: 'Antes de salir a instalación',
-        icon: '🚛',
-        color: { bg: 'bg-blue-50', border: 'border-blue-200', badge: 'bg-blue-100 text-blue-700 border-blue-300', btn: 'bg-blue-600 hover:bg-blue-700', dot: 'bg-blue-500' },
-    },
-    {
-        type: 'verificacion_instalacion',
-        label: 'Verificación de Instalación',
-        description: 'Al llegar al sitio',
-        icon: '🔧',
-        color: { bg: 'bg-green-50', border: 'border-green-200', badge: 'bg-green-100 text-green-700 border-green-300', btn: 'bg-green-600 hover:bg-green-700', dot: 'bg-green-500' },
-    },
-    {
-        type: 'regreso',
-        label: 'Regreso',
-        description: 'Confirmar materiales devueltos',
-        icon: '↩️',
-        color: { bg: 'bg-purple-50', border: 'border-purple-200', badge: 'bg-purple-100 text-purple-700 border-purple-300', btn: 'bg-purple-600 hover:bg-purple-700', dot: 'bg-purple-500' },
-    },
+// Antes esto era un array fijo (3 tipos hardcodeados, hacían falta cambios
+// de código para agregar un checklist nuevo). Ahora las categorías vienen
+// del backend (tabla checklist_categories, configurable en Admin → Ítems
+// de Checklists) — este array es solo la paleta de colores, asignada por
+// posición a lo que venga del servidor.
+const COLOR_PALETTE = [
+    { bg: 'bg-blue-50', border: 'border-blue-200', badge: 'bg-blue-100 text-blue-700 border-blue-300', btn: 'bg-blue-600 hover:bg-blue-700', dot: 'bg-blue-500' },
+    { bg: 'bg-green-50', border: 'border-green-200', badge: 'bg-green-100 text-green-700 border-green-300', btn: 'bg-green-600 hover:bg-green-700', dot: 'bg-green-500' },
+    { bg: 'bg-purple-50', border: 'border-purple-200', badge: 'bg-purple-100 text-purple-700 border-purple-300', btn: 'bg-purple-600 hover:bg-purple-700', dot: 'bg-purple-500' },
+    { bg: 'bg-amber-50', border: 'border-amber-200', badge: 'bg-amber-100 text-amber-700 border-amber-300', btn: 'bg-amber-600 hover:bg-amber-700', dot: 'bg-amber-500' },
+    { bg: 'bg-rose-50', border: 'border-rose-200', badge: 'bg-rose-100 text-rose-700 border-rose-300', btn: 'bg-rose-600 hover:bg-rose-700', dot: 'bg-rose-500' },
+    { bg: 'bg-cyan-50', border: 'border-cyan-200', badge: 'bg-cyan-100 text-cyan-700 border-cyan-300', btn: 'bg-cyan-600 hover:bg-cyan-700', dot: 'bg-cyan-500' },
 ];
 
 function ChecklistCard({ typeInfo, data, orderId, onUpdate, isAdmin, order }) {
@@ -397,11 +387,13 @@ export default function ChecklistPanel({ orderId, isAdmin, order }) {
                 </div>
             ) : (
                 <div className="space-y-3">
-                    {CHECKLIST_TYPES.map((typeInfo) => {
-                        const data = checklists.find((c) => c.type === typeInfo.type) || {
-                            type: typeInfo.type,
-                            completed: null,
-                            templates: [],
+                    {checklists.map((data, idx) => {
+                        const typeInfo = {
+                            type: data.type,
+                            label: data.label || data.type,
+                            description: '',
+                            icon: data.icon || '📋',
+                            color: COLOR_PALETTE[idx % COLOR_PALETTE.length],
                         };
                         return (
                             <ChecklistCard
