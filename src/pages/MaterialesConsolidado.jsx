@@ -68,17 +68,46 @@ function Spinner({ className = 'w-4 h-4' }) {
 }
 
 // ── Panel de selección de pedidos ──
-function OrdersPanel({ orders, selectedIds, loadingOrders, running, toggleOrder, toggleAll, onProfiles, onCuts, onGlass, mode }) {
+function OrdersPanel({ orders, allCount, selectedIds, loadingOrders, running, toggleOrder, toggleAll, onProfiles, onCuts, onGlass, mode, search, setSearch, statusFilter, setStatusFilter, monthFilter, setMonthFilter }) {
     return (
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden h-full flex flex-col">
             <div className="px-4 py-3.5 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
                 <div className="flex items-center gap-2">
                     <FaLayerGroup size={13} className="text-blue-600" />
-                    <p className="text-sm font-semibold text-gray-800">Pedidos</p>
+                    <p className="text-sm font-semibold text-gray-800">Pedidos ({orders.length}{orders.length !== allCount ? ` de ${allCount}` : ''})</p>
                 </div>
                 <button onClick={toggleAll} className="text-xs text-blue-600 hover:underline font-medium">
-                    {selectedIds.size === orders.length ? 'Deseleccionar todos' : 'Seleccionar todos'}
+                    {selectedIds.size === orders.length && orders.length > 0 ? 'Deseleccionar todos' : 'Seleccionar todos'}
                 </button>
+            </div>
+
+            {/* ── Filtros: buscador, estado, mes ── */}
+            <div className="px-4 py-2.5 border-b border-gray-100 flex-shrink-0 space-y-2">
+                <input
+                    type="text"
+                    placeholder="Buscar por proyecto o cliente..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="w-full text-xs px-3 py-1.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-blue-400 outline-none"
+                />
+                <div className="flex gap-2">
+                    <select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        className="flex-1 text-xs px-2 py-1.5 border border-gray-200 rounded-lg outline-none"
+                    >
+                        <option value="todos">Todos los estados</option>
+                        {Object.entries(ORDER_STATUS_LABELS).filter(([k]) => k !== 'cancelado').map(([k, v]) => (
+                            <option key={k} value={k}>{v}</option>
+                        ))}
+                    </select>
+                    <input
+                        type="month"
+                        value={monthFilter}
+                        onChange={(e) => setMonthFilter(e.target.value)}
+                        className="text-xs px-2 py-1.5 border border-gray-200 rounded-lg outline-none"
+                    />
+                </div>
             </div>
 
             <div className="flex-1 overflow-y-auto">
@@ -178,6 +207,13 @@ export default function MaterialesConsolidado() {
     const [generatingPDF, setGeneratingPDF] = useState(false);
     const [showOrdersDrawer, setShowOrdersDrawer] = useState(false);
 
+    // ── Filtros — antes se mostraban TODOS los pedidos activos sin manera de
+    // acotar la lista (podía ser un listado enorme). Por defecto se muestran
+    // solo los "en fabricación", que es lo que más le interesa a producción.
+    const [search, setSearch] = useState('');
+    const [statusFilter, setStatusFilter] = useState('en_fabricacion');
+    const [monthFilter, setMonthFilter] = useState('');
+
     useEffect(() => {
         // /orders devuelve respuesta paginada { data, total, page, limit, totalPages }
         // — el wrapper anterior leía r.data como array (regresión silenciosa al
@@ -211,8 +247,24 @@ export default function MaterialesConsolidado() {
         resetResults();
     };
 
+    const filteredOrders = useMemo(() => {
+        const term = search.trim().toLowerCase();
+        return orders.filter((o) => {
+            if (statusFilter !== 'todos' && o.status !== statusFilter) return false;
+            if (monthFilter) {
+                const d = o.fabricationStartDate || o.createdAt;
+                if (!d || !String(d).startsWith(monthFilter)) return false;
+            }
+            if (term) {
+                const haystack = `${o.project || ''} ${o.client?.name || ''}`.toLowerCase();
+                if (!haystack.includes(term)) return false;
+            }
+            return true;
+        });
+    }, [orders, search, statusFilter, monthFilter]);
+
     const toggleAll = () => {
-        setSelectedIds(selectedIds.size === orders.length ? new Set() : new Set(orders.map((o) => o.id)));
+        setSelectedIds(selectedIds.size === filteredOrders.length ? new Set() : new Set(filteredOrders.map((o) => o.id)));
         resetResults();
     };
 
@@ -341,9 +393,10 @@ export default function MaterialesConsolidado() {
     const grandTotal = consolidatedData ? consolidatedData.reduce((sum, i) => sum + (i.precioTotal || 0), 0) : 0;
 
     const panelProps = {
-        orders, selectedIds, loadingOrders, running,
+        orders: filteredOrders, allCount: orders.length, selectedIds, loadingOrders, running,
         toggleOrder, toggleAll,
         onProfiles: handleProfiles, onCuts: handleCuts, onGlass: handleGlass, mode,
+        search, setSearch, statusFilter, setStatusFilter, monthFilter, setMonthFilter,
     };
 
     return (
@@ -572,6 +625,7 @@ export default function MaterialesConsolidado() {
                     isLoading={false}
                     onClose={() => setShowGlassModal(false)}
                     projectName={(glassCutsData.orders || []).map((o) => o.project).join(' + ')}
+                    windowLabels={glassCutsData.windows || []}
                 />
             )}
         </div>

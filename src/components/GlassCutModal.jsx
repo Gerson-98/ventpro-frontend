@@ -250,7 +250,7 @@ function VisualView({ glassData }) {
 }
 
 // ─── Modal principal ──────────────────────────────────────────────────────────
-export default function GlassCutModal({ glassCutData = {}, isLoading, onClose, projectName }) {
+export default function GlassCutModal({ glassCutData = {}, isLoading, onClose, projectName, windowLabels = [] }) {
     const [viewMode, setViewMode] = useState('visual'); // 'visual' | 'table'
 
     const glassTypes = Object.entries(glassCutData);
@@ -362,6 +362,10 @@ body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;padd
   <span>Planchas optimizadas<b>${totalPlanchas}</b></span>
   <span>Piezas totales<b>${totalPieces}</b></span>
 </div>
+${windowLabels.length > 0 ? `<div style="margin-bottom:16px;padding:8px 10px;background:#f9fafb;border-radius:3px;border:1px solid #e5e7eb">
+  <div style="font-size:9px;font-weight:900;text-transform:uppercase;color:#666;margin-bottom:4px">Ventanas incluidas — a qué proyecto pertenece cada V#</div>
+  <div style="font-size:10px;color:#333;line-height:1.6">${windowLabels.map((w) => `<b>${w.label}</b> → ${w.project}`).join(' &nbsp;&nbsp; ')}</div>
+</div>` : ''}
 ${bodyHtml}
 <script>window.onload=()=>{window.print()}<\/script>
 </body></html>`;
@@ -420,6 +424,25 @@ ${bodyHtml}
 
                 {/* Body */}
                 <div className="overflow-y-auto max-h-[80vh] min-h-[200px]">
+                    {/* ── Leyenda V# → proyecto — antes, al combinar varios pedidos,
+                        no había forma de saber a qué proyecto pertenecía cada V#
+                        dentro de las planchas combinadas. ── */}
+                    {!isLoading && windowLabels.length > 0 && (
+                        <div className="px-6 py-3 border-b border-gray-100 bg-gray-50/60">
+                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1.5">
+                                Ventanas incluidas — a qué proyecto pertenece cada V#
+                            </p>
+                            <div className="flex flex-wrap gap-x-4 gap-y-1">
+                                {windowLabels.map((w) => (
+                                    <span key={w.label} className="text-xs text-gray-700">
+                                        <span className="font-mono font-bold text-indigo-600">{w.label}</span>
+                                        {' → '}
+                                        <span className="font-medium">{w.project}</span>
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                     {isLoading ? (
                         <div className="flex flex-col items-center justify-center py-24 gap-4 text-gray-400">
                             <svg className="animate-spin w-8 h-8" fill="none" viewBox="0 0 24 24">
