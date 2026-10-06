@@ -429,6 +429,12 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
     // tanto el total se marca como "calculando".
     const costWindowsPayload = useMemo(() => buildCostPayload(quotation.windows), [quotation.windows]);
     const costSignature = useMemo(() => JSON.stringify(costWindowsPayload), [costWindowsPayload]);
+    // Al abrir el modal, el backend precalienta su cache de costos para que el
+    // primer cálculo no pague las consultas en frío (silencioso si falla).
+    useEffect(() => {
+        if (open) api.get('/cost-calculator/warmup').catch(() => {});
+    }, [open]);
+
     const baselineSignature = useRef(null);   // firma al abrir una cotización guardada
     const calcSeq = useRef(0);
     const [isCalculatingTotal, setIsCalculatingTotal] = useState(false);
