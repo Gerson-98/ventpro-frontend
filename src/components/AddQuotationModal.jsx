@@ -271,6 +271,23 @@ function WindowTotalCell({ win, globalPricePerM2, onChange }) {
     );
 }
 
+// Ventanas completas, en el formato que espera /cost-calculator/quotation.
+// "key" identifica la ventana para pintar su costo en la fila.
+function buildCostPayload(windows) {
+    return (windows || [])
+        .filter(w => w.window_type_id && w.width_m && w.height_m && w.color_id)
+        .map(w => ({
+            key: w.tempId || w.id,
+            window_type_id: Number(w.window_type_id),
+            width_cm: parseFloat(w.width_m) * 100,
+            height_cm: parseFloat(w.height_m) * 100,
+            color_id: Number(w.color_id),
+            glass_color_id: w.glass_color_id ? Number(w.glass_color_id) : undefined,
+            options: w.options || {},
+            quantity: Number(w.quantity) || 1,
+        }));
+}
+
 export default function AddQuotationModal({ open, onClose, onSave, quotationToEdit }) {
     const { user } = useAuth();
     const isAdmin = user?.role === 'ADMIN';
@@ -401,87 +418,62 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             : parseFloat(displayValue);
     };
 
-    const abortControllers = useRef({});
+    // ── Precio sugerido: UN solo cálculo del proyecto completo ────────────────
+    // Antes cada ventana editada disparaba su propio cálculo y, al volver, un
+    // segundo cálculo del lote; en cotizaciones grandes (20+ ventanas) varias
+    // respuestas viajaban a la vez y la última en LLEGAR (no la última en
+    // pedirse) pisaba el total, y borrar una ventana ni recalculaba. Resultado:
+    // el vendedor confirmaba con un total viejo y al reabrir salía el real.
+    // Ahora: una firma de todo lo que afecta el costo -> un cálculo (debounce)
+    // -> solo se aplica la respuesta de la petición más reciente, y mientras
+    // tanto el total se marca como "calculando".
+    const costWindowsPayload = useMemo(() => buildCostPayload(quotation.windows), [quotation.windows]);
+    const costSignature = useMemo(() => JSON.stringify(costWindowsPayload), [costWindowsPayload]);
+    const baselineSignature = useRef(null);   // firma al abrir una cotización guardada
+    const calcSeq = useRef(0);
+    const [isCalculatingTotal, setIsCalculatingTotal] = useState(false);
 
-    const calculateWindowCost = useCallback(async (win) => {
-        if (!win.window_type_id || !win.width_m || !win.height_m || !win.color_id) return;
-        const key = win.tempId || win.id;
+    // Compatibilidad: otras partes llaman a estas funciones tras editar; el
+    // efecto de abajo ya reacciona al cambio, así que no hacen nada extra.
+    const calculateWindowCost = useCallback(() => {}, []);
+    const debouncedCalculateCost = useCallback(() => {}, []);
 
-        if (abortControllers.current[key]) {
-            abortControllers.current[key].abort();
+    useEffect(() => {
+        if (!open) return;
+        if (baselineSignature.current === costSignature) return; // nada cambió vs lo guardado
+        if (costWindowsPayload.length === 0) {
+            calcSeq.current += 1;
+            setQuotationPrecioSugerido(0);
+            setQuotationCostoTotal(0);
+            setWindowCosts({});
+            setIsCalculatingTotal(false);
+            return;
         }
-        const controller = new AbortController();
-        abortControllers.current[key] = controller;
-
-        setCalculatingCost(prev => ({ ...prev, [key]: true }));
-        try {
-            const response = await api.post('/cost-calculator/window', {
-                window_type_id: Number(win.window_type_id),
-                width_cm: parseFloat(win.width_m) * 100,
-                height_cm: parseFloat(win.height_m) * 100,
-                color_id: Number(win.color_id),
-                glass_color_id: win.glass_color_id ? Number(win.glass_color_id) : undefined,
-                options: win.options || {},
-                quantity: Number(win.quantity) || 1,
-            }, { signal: controller.signal });
-            if (!controller.signal.aborted) {
-                setWindowCosts(prev => ({
-                    ...prev,
-                    [key]: {
-                        costo_total: response.data.costo_total,
-                        precio_sugerido_minimo: response.data.precio_sugerido_minimo,
-                    },
-                }));
-
-                setQuotation(prev => {
-                    const windowsCompletas = prev.windows.filter(w =>
-                        w.window_type_id && w.width_m && w.height_m && w.color_id
-                    );
-                    if (windowsCompletas.length > 0) {
-                        const batchPayload = windowsCompletas.map(w => ({
-                            window_type_id: Number(w.window_type_id),
-                            width_cm: parseFloat(w.width_m) * 100,
-                            height_cm: parseFloat(w.height_m) * 100,
-                            color_id: Number(w.color_id),
-                            glass_color_id: w.glass_color_id ? Number(w.glass_color_id) : undefined,
-                            options: w.options || {},
-                            quantity: Number(w.quantity) || 1,
-                        }));
-                        api.post('/cost-calculator/quotation', { windows: batchPayload })
-                            .then(res => {
-                                setQuotationPrecioSugerido(res.data?.precio_sugerido_minimo || 0);
-                                setQuotationCostoTotal(res.data?.costo_total_proyecto || 0);
-                            })
-                            .catch(() => { });
-                    } else {
-                        setQuotationPrecioSugerido(0);
-                        setQuotationCostoTotal(0);
-                    }
-                    return prev;
+        setIsCalculatingTotal(true);
+        const seq = ++calcSeq.current;
+        const timer = setTimeout(async () => {
+            try {
+                const res = await api.post('/cost-calculator/quotation', {
+                    windows: costWindowsPayload.map(({ key: _key, ...rest }) => rest),
                 });
+                if (seq !== calcSeq.current) return; // llegó una respuesta vieja: se descarta
+                setQuotationPrecioSugerido(res.data?.precio_sugerido_minimo || 0);
+                setQuotationCostoTotal(res.data?.costo_total_proyecto || 0);
+                const porVentana = res.data?.por_ventana || [];
+                const next = {};
+                costWindowsPayload.forEach((w, i) => {
+                    if (porVentana[i]) next[w.key] = { costo_total: porVentana[i].costo_total, precio_sugerido_minimo: porVentana[i].precio_sugerido_minimo };
+                });
+                setWindowCosts(next);
+                setIsCalculatingTotal(false);
+            } catch (error) {
+                if (seq !== calcSeq.current) return;
+                console.error('Error calculando costo:', error);
+                setIsCalculatingTotal(false);
             }
-        } catch (error) {
-            if (error?.code === 'ERR_CANCELED' || error?.name === 'AbortError' || error?.name === 'CanceledError') return;
-            console.error('Error calculando costo:', error);
-        } finally {
-            if (!controller.signal.aborted) {
-                setCalculatingCost(prev => ({ ...prev, [key]: false }));
-                delete abortControllers.current[key];
-            }
-        }
-    }, []);
-
-    const debounceTimers = useRef({});
-    const debouncedCalculateCost = useCallback((win) => {
-        const key = win.tempId || win.id;
-        if (debounceTimers.current[key]) {
-            clearTimeout(debounceTimers.current[key]);
-        }
-        debounceTimers.current[key] = setTimeout(() => {
-            delete debounceTimers.current[key];
-            calculateWindowCost(win);
-        }, 700);
-    }, [calculateWindowCost]);
+        }, 600);
+        return () => clearTimeout(timer);
+    }, [costSignature, open]);   // eslint-disable-line react-hooks/exhaustive-deps
 
     const optionGroupsCache = useRef({});
 
@@ -565,6 +557,9 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             setQuotationPrecioSugerido(0);
             setQuotationCostoTotal(0);
             setPrecioSugeridoDesactualizado(false);
+            baselineSignature.current = null;
+            calcSeq.current += 1;
+            setIsCalculatingTotal(false);
             optionGroupsCache.current = {};
         }
     }, [open]);
@@ -635,6 +630,9 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                     reference_image_url: quotationToEdit.reference_image_url || '',
                     windows,
                 });
+                baselineSignature.current = quotationToEdit.id && quotationToEdit.precio_sugerido_minimo != null
+                    ? JSON.stringify(buildCostPayload(windows))
+                    : null;
 
                 const hasStoredSnapshot =
                     quotationToEdit.id &&
@@ -730,6 +728,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             buildEditWindows();
         } else {
             setIsEditing(false);
+            baselineSignature.current = null;
             setWindowCosts({});
             setCalculatingCost({});
             setQuotationPrecioSugerido(0);
@@ -979,7 +978,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
     };
 
     const handleIgualMinimo = () => {
-        if (totalPrecioSugerido <= 0 || totalM2 <= 0) return;
+        if (isCalculatingTotal || totalPrecioSugerido <= 0 || totalM2 <= 0) return;
         const newPricePerM2 = totalPrecioSugerido / totalM2;
         setQuotation(prev => ({
             ...prev,
@@ -1155,11 +1154,11 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
 
                                         {totalM2 > 0 && totalPrecioSugerido > 0 && <div className="w-px h-8 bg-gray-200" />}
 
-                                        {totalPrecioSugerido > 0 && (
+                                        {(totalPrecioSugerido > 0 || isCalculatingTotal) && (
                                             <div className="flex flex-col items-center">
                                                 <span className="text-[10px] text-amber-600 font-semibold uppercase tracking-wide">Mín. sugerido</span>
                                                 <span className="text-sm font-bold text-amber-700">
-                                                    Q {totalPrecioSugerido.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                                    {isCalculatingTotal ? 'Calculando…' : `Q ${totalPrecioSugerido.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
                                                 </span>
                                                 {precioSugeridoDesactualizado && (
                                                     <span
