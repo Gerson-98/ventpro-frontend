@@ -349,6 +349,8 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
     // true si los precios de materiales/margen actuales darían un mínimo sugerido
     // distinto al que se guardó cuando se creó esta cotización (>0.5% de diferencia).
     const [precioSugeridoDesactualizado, setPrecioSugeridoDesactualizado] = useState(false);
+    // Precio/costo calculados con margen y materiales de hoy (solo si difieren del guardado).
+    const [precioHoy, setPrecioHoy] = useState(null);
     const [validationErrors, setValidationErrors] = useState([]);
     const [useCm, setUseCm] = useState(false);
     const [totalOverride, setTotalOverride] = useState('');
@@ -465,6 +467,8 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                 if (seq !== calcSeq.current) return; // llegó una respuesta vieja: se descarta
                 setQuotationPrecioSugerido(res.data?.precio_sugerido_minimo || 0);
                 setQuotationCostoTotal(res.data?.costo_total_proyecto || 0);
+                setPrecioSugeridoDesactualizado(false);
+                setPrecioHoy(null);
                 const porVentana = res.data?.por_ventana || [];
                 const next = {};
                 costWindowsPayload.forEach((w, i) => {
@@ -563,6 +567,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             setQuotationPrecioSugerido(0);
             setQuotationCostoTotal(0);
             setPrecioSugeridoDesactualizado(false);
+            setPrecioHoy(null);
             baselineSignature.current = null;
             calcSeq.current += 1;
             setIsCalculatingTotal(false);
@@ -577,6 +582,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             setWindowCosts({});
             setCalculatingCost({});
             setPrecioSugeridoDesactualizado(false);
+            setPrecioHoy(null);
 
             const buildEditWindows = async () => {
                 const sortedWins = [...(quotationToEdit.quotation_windows || [])]
@@ -692,6 +698,10 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                             const storedTotal = Number(quotationToEdit.precio_sugerido_minimo) || 0;
                             if (storedTotal > 0 && Math.abs(liveTotal - storedTotal) / storedTotal > 0.005) {
                                 setPrecioSugeridoDesactualizado(true);
+                                setPrecioHoy({
+                                    precio: liveTotal,
+                                    costo: Number(res.data?.costo_total_proyecto) || 0,
+                                });
                             }
                         } catch {
                             // FIX: NO disparar calculateWindowCost individual por cada ventana.
@@ -1166,13 +1176,20 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                                 <span className="text-sm font-bold text-amber-700">
                                                     {isCalculatingTotal ? 'Calculando…' : `Q ${totalPrecioSugerido.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
                                                 </span>
-                                                {precioSugeridoDesactualizado && (
-                                                    <span
-                                                        className="text-[9px] text-orange-600 font-medium mt-0.5 cursor-help"
-                                                        title="Este es el precio que se guardó cuando se creó/editó la cotización. Con los precios de materiales o el margen ACTUALES, el mínimo sugerido de hoy sería distinto — revisa antes de reusarlo para una nueva negociación."
+                                                {precioSugeridoDesactualizado && precioHoy && (
+                                                    <button
+                                                        type="button"
+                                                        className="text-xs text-orange-600 leading-none mt-0.5 hover:scale-110 transition-transform"
+                                                        title={`Precio de hoy: Q ${precioHoy.precio.toLocaleString('en-US', { minimumFractionDigits: 2 })}. Clic para actualizar.`}
+                                                        onClick={() => {
+                                                            setQuotationPrecioSugerido(precioHoy.precio);
+                                                            setQuotationCostoTotal(precioHoy.costo);
+                                                            setPrecioSugeridoDesactualizado(false);
+                                                            setPrecioHoy(null);
+                                                        }}
                                                     >
-                                                        ⚠ precio de hoy difiere
-                                                    </span>
+                                                        ⚠
+                                                    </button>
                                                 )}
                                             </div>
                                         )}
