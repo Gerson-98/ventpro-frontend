@@ -166,6 +166,9 @@ function Piece({ cut, bg, minW = 42 }) {
         >
             <span className="text-[12px] font-black text-gray-800 leading-none select-none">{len}</span>
             <span className="text-[10px] font-semibold text-gray-600 leading-none mt-0.5 select-none">{dc}V{num}</span>
+            {cut.angle && (
+                <span className="text-[8px] font-bold text-red-700 leading-none mt-0.5 select-none whitespace-nowrap">{cut.angle}</span>
+            )}
         </div>
     );
 }
@@ -313,6 +316,7 @@ export default function CutOptimizationModal({
     orderId,
     clientName,
     windows = [],
+    notes = [],
 }) {
     const { items } = buildSeries(optimizationData);
 
@@ -403,7 +407,7 @@ export default function CutOptimizationModal({
                     const bg = it.type === 'single'
                         ? winBg(cut.windowLabel)
                         : ci % 2 === 0 ? it.palette.bg : it.palette.alt;
-                    seriesHtml += `<div class="pc" style="width:${pct}%;background:${bg}"><span class="top">${len}</span><span class="bot">${dc}V${num}</span></div>`;
+                    seriesHtml += `<div class="pc" style="width:${pct}%;background:${bg}"><span class="top">${len}</span><span class="bot">${dc}V${num}</span>${cut.angle ? `<span class="ang">${cut.angle}</span>` : ''}</div>`;
                 });
                 if (parseFloat(wastePct) > 0.5) {
                     const wt = fmtWaste(row.waste);
@@ -416,6 +420,13 @@ export default function CutOptimizationModal({
         }
 
         const orderLabel = orderId ? `Pedido #${orderId}` : '';
+
+        // ── Notas (del pedido y de la cotización) — info de fabricación ───────
+        const escHtml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const noteList = [...new Set((Array.isArray(notes) ? notes : [notes]).map(n => (n || '').trim()).filter(Boolean))];
+        const notesHtml = noteList.length > 0
+            ? `<div class="notes"><div class="notes-t">Notas</div>${noteList.map(n => `<div class="notes-b">${escHtml(n)}</div>`).join('')}</div>`
+            : '';
 
         const html = `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
 <title>Plan de Corte — ${[orderLabel, projectName].filter(Boolean).join(' · ')}</title>
@@ -461,6 +472,10 @@ body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;padd
 .pc{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;border-right:1px solid rgba(255,255,255,.6);min-width:30px;overflow:hidden;flex-shrink:0}
 .pc .top{font-size:12px;font-weight:900;color:#333;line-height:1}
 .pc .bot{font-size:10px;font-weight:600;color:#555;line-height:1;margin-top:2px}
+.pc .ang{font-size:8px;font-weight:900;color:#b91c1c;line-height:1;margin-top:2px;white-space:nowrap}
+.notes{margin:0 0 14px;padding:8px 12px;border:2px solid #111;border-radius:4px;background:#fffbe6;page-break-inside:avoid}
+.notes-t{font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px}
+.notes-b{font-size:12px;white-space:pre-wrap;line-height:1.4}
 .pc.waste{background:#fff!important;border-left:1px dashed #aaa;flex:1}
 .pc.waste span{font-size:9px;color:#aaa;writing-mode:vertical-rl;transform:rotate(180deg)}
 .ruler{display:flex;align-items:center;margin-left:130px;margin-top:2px;margin-bottom:8px}
@@ -486,6 +501,7 @@ body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;padd
   <span>Desperdicio<b>${totalWaste.toFixed(0)} cm</b></span>
 </div>
 
+${notesHtml}
 ${windowsHtml || `<div class="sec-title">Plan de corte de perfiles — Barra: 580 cm</div>`}
 <div>${seriesHtml}</div>
 

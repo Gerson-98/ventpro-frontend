@@ -154,6 +154,22 @@ export default function WindowTypesTab() {
     }
   };
 
+  // Marco en "U" (puertas): 2 verticales 45°/90° + travesaño 45°/45°, sin pieza
+  // inferior. Solo afecta el plan de corte.
+  const handleToggleMarcoU = async (type) => {
+    const next = !type.marco_en_u;
+    if (!confirm(next
+      ? "¿Marcar este tipo como MARCO EN U (puerta)?\nEn el plan de corte el marco llevará 3 piezas: travesaño superior 45°/45° y 2 verticales 45° arriba / 90° abajo."
+      : "¿Quitar 'Marco en U'? El marco volverá a cortarse como siempre.")) return;
+    try {
+      await api.patch(`/window-types/${type.id}`, { marco_en_u: next });
+      fetchData();
+    } catch (err) {
+      const msg = err?.response?.data?.message || "No se pudo cambiar 'Marco en U'.";
+      alert(Array.isArray(msg) ? msg.join(", ") : msg);
+    }
+  };
+
   const handleDelete = async (id) => {
     if (!confirm("¿Seguro que deseas eliminar este tipo de ventana?\nEsta acción no se puede deshacer.")) return;
     try {
@@ -286,6 +302,11 @@ export default function WindowTypesTab() {
                           <FaMagic size={8} /> Asistente
                         </span>
                       )}
+                      {t.marco_en_u && (
+                        <span className="ml-2 inline-flex items-center px-1.5 py-0.5 text-[10px] rounded-full bg-orange-50 text-orange-700 border border-orange-200">
+                          Marco en U
+                        </span>
+                      )}
                       {t.active === false && (
                         <span className="ml-2 inline-flex items-center px-1.5 py-0.5 text-[10px] rounded-full bg-gray-100 text-gray-500 border border-gray-200">
                           Inactivo
@@ -339,6 +360,13 @@ export default function WindowTypesTab() {
                           </button>
                         )}
                         <button
+                          onClick={() => handleToggleMarcoU(t)}
+                          className={`text-xs font-black leading-none px-1.5 rounded border transition-colors ${t.marco_en_u ? "bg-orange-100 text-orange-700 border-orange-300" : "text-gray-400 border-gray-200 hover:text-orange-600"}`}
+                          title={t.marco_en_u ? "Marco en U: ACTIVO (clic para quitar)" : "Marcar como marco en U (puertas)"}
+                        >
+                          ∩
+                        </button>
+                        <button
                           onClick={() => handleToggleActive(t)}
                           className={`transition-colors ${t.active === false ? "text-emerald-500 hover:text-emerald-700" : "text-amber-500 hover:text-amber-700"}`}
                           title={t.active === false ? "Reactivar" : "Desactivar"}
@@ -383,6 +411,13 @@ export default function WindowTypesTab() {
                         <FaCopy size={12} />
                       </button>
                     )}
+                    <button
+                      onClick={() => handleToggleMarcoU(t)}
+                      className={`px-2 py-1 text-xs font-black leading-none rounded-lg border ${t.marco_en_u ? "bg-orange-100 text-orange-700 border-orange-300" : "text-gray-400 border-gray-200"}`}
+                      title={t.marco_en_u ? "Marco en U: ACTIVO" : "Marcar como marco en U"}
+                    >
+                      ∩
+                    </button>
                     <button
                       onClick={() => handleToggleActive(t)}
                       className={`p-1.5 rounded-lg border ${t.active === false ? "text-emerald-500 border-emerald-100 active:bg-emerald-50" : "text-amber-500 border-amber-100 active:bg-amber-50"}`}

@@ -847,6 +847,7 @@ export default function OrderDetail() {
           orderId={order?.id}
           clientName={order?.client?.name}
           windows={includedWindowsForPlan}
+          notes={[order?.notes, order?.generatedFromQuotation?.notes]}
         />
       )}
 
