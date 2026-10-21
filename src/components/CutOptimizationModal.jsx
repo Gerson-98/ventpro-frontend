@@ -149,14 +149,56 @@ function buildSeries(optimizationData) {
     return { items };
 }
 
+// ─── Forma de los cortes de un marco en "U" ────────────────────────────────────
+// Dibuja la pieza con su corte real: extremo a 45° inclinado, extremo a 90°
+// recto. La medida mostrada es la de la punta larga del inglete. Los dos
+// verticales (45°/90°) se dibujan en espejo (mirror alterna 0/1).
+const MITER = 12; // px de inclinación visual
+function miterShape(angle, mirror) {
+    if (angle === '45°/45°') {
+        return {
+            clip: `polygon(${MITER}px 0, calc(100% - ${MITER}px) 0, 100% 100%, 0 100%)`,
+            left: '45°', right: '45°',
+        };
+    }
+    if (angle === '45°/90°') {
+        return mirror
+            ? { clip: `polygon(0 0, 100% 0, calc(100% - ${MITER}px) 100%, 0 100%)`, left: '90° ABAJO', right: '45° ARRIBA' }
+            : { clip: `polygon(${MITER}px 0, 100% 0, 100% 100%, 0 100%)`, left: '45° ARRIBA', right: '90° ABAJO' };
+    }
+    return null;
+}
+
 // ─── Una pieza en la barra ────────────────────────────────────────────────────
-function Piece({ cut, bg, minW = 42 }) {
+function Piece({ cut, bg, minW = 42, mirror = 0 }) {
     const { vNum, dim } = parseLabel(cut.windowLabel);
     const num = vNum.replace('V', '');
     const dc = dim === 'A' ? 'AN' : dim === 'H' ? 'AL' : '';
     const n = cut.length;
     const len = Number.isInteger(n) ? `${n}` : `${n}`.replace('.', ',');
     const pct = (cut.length / 580) * 100;
+
+    const shape = cut.angle ? miterShape(cut.angle, mirror) : null;
+    if (shape) {
+        return (
+            <div
+                title={`${fmt(cut)} · ${cut.angle}`}
+                className="relative flex-shrink-0 bg-white"
+                style={{ width: `${pct}%`, minWidth: Math.max(minW, 90), height: '100%' }}
+            >
+                <div
+                    className="absolute inset-0 flex flex-col items-center justify-center overflow-hidden"
+                    style={{ background: bg, clipPath: shape.clip }}
+                >
+                    <span className="text-[12px] font-black text-gray-800 leading-none select-none">{len}</span>
+                    <span className="text-[10px] font-semibold text-gray-600 leading-none mt-0.5 select-none">{dc}V{num}</span>
+                    <div className="flex justify-between w-full px-3 mt-1 text-[8px] font-bold text-red-700 leading-none select-none whitespace-nowrap">
+                        <span>{shape.left}</span><span>{shape.right}</span>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div
@@ -166,9 +208,6 @@ function Piece({ cut, bg, minW = 42 }) {
         >
             <span className="text-[12px] font-black text-gray-800 leading-none select-none">{len}</span>
             <span className="text-[10px] font-semibold text-gray-600 leading-none mt-0.5 select-none">{dc}V{num}</span>
-            {cut.angle && (
-                <span className="text-[8px] font-bold text-red-700 leading-none mt-0.5 select-none whitespace-nowrap">{cut.angle}</span>
-            )}
         </div>
     );
 }
@@ -187,12 +226,13 @@ function BarRow({ rowLabel, cuts, waste, palette, singleMode = false }) {
                     <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide leading-tight">{rowLabel}</span>
                 </div>
                 <div className="flex overflow-hidden border border-gray-300" style={{ flex: 1, height: BAR_H }}>
-                    {cuts.map((cut, ci) => {
+                    {(() => { let vm = 0; return cuts.map((cut, ci) => {
+                        const mirror = cut.angle === '45°/90°' ? (vm++ % 2) : 0;
                         const bg = singleMode
                             ? winBg(cut.windowLabel)
                             : ci % 2 === 0 ? palette.bg : palette.alt;
-                        return <Piece key={ci} cut={cut} bg={bg} />;
-                    })}
+                        return <Piece key={ci} cut={cut} bg={bg} mirror={mirror} />;
+                    }); })()}
                     {wastePct > 0.5 && (
                         <div
                             className="flex items-center justify-center border-l border-dashed border-gray-400 bg-white flex-shrink-0"
@@ -397,6 +437,7 @@ export default function CutOptimizationModal({
             for (const row of rows) {
                 const wastePct = ((row.waste || 0) / 580 * 100).toFixed(2);
                 seriesHtml += `<div class="brow"><div class="rlbl">${row.lbl}</div><div class="bwrp">`;
+                let vmPrint = 0;
                 row.cuts.forEach((cut, ci) => {
                     const { vNum, dim } = parseLabel(cut.windowLabel);
                     const num = vNum.replace('V', '');
@@ -407,7 +448,12 @@ export default function CutOptimizationModal({
                     const bg = it.type === 'single'
                         ? winBg(cut.windowLabel)
                         : ci % 2 === 0 ? it.palette.bg : it.palette.alt;
-                    seriesHtml += `<div class="pc" style="width:${pct}%;background:${bg}"><span class="top">${len}</span><span class="bot">${dc}V${num}</span>${cut.angle ? `<span class="ang">${cut.angle}</span>` : ''}</div>`;
+                    const shape = cut.angle ? miterShape(cut.angle, cut.angle === '45°/90°' ? (vmPrint++ % 2) : 0) : null;
+                    if (shape) {
+                        seriesHtml += `<div class="pc" style="width:${pct}%;min-width:90px;background:#fff;padding:0"><div class="mit" style="background:${bg};clip-path:${shape.clip}"><span class="top">${len}</span><span class="bot">${dc}V${num}</span><span class="ang"><i>${shape.left}</i><i>${shape.right}</i></span></div></div>`;
+                    } else {
+                        seriesHtml += `<div class="pc" style="width:${pct}%;background:${bg}"><span class="top">${len}</span><span class="bot">${dc}V${num}</span></div>`;
+                    }
                 });
                 if (parseFloat(wastePct) > 0.5) {
                     const wt = fmtWaste(row.waste);
@@ -423,7 +469,9 @@ export default function CutOptimizationModal({
 
         // ── Notas (del pedido y de la cotización) — info de fabricación ───────
         const escHtml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        const noteList = [...new Set((Array.isArray(notes) ? notes : [notes]).map(n => (n || '').trim()).filter(Boolean))];
+        const allNotes = [...new Set((Array.isArray(notes) ? notes : [notes]).map(n => (n || '').trim()).filter(Boolean))];
+        // El pedido ya copia la nota de la cotización dentro de sus notas: no repetirla.
+        const noteList = allNotes.filter((n, i) => !allNotes.some((o, j) => j !== i && o.length > n.length && o.includes(n)));
         const notesHtml = noteList.length > 0
             ? `<div class="notes"><div class="notes-t">Notas</div>${noteList.map(n => `<div class="notes-b">${escHtml(n)}</div>`).join('')}</div>`
             : '';
@@ -472,7 +520,9 @@ body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;padd
 .pc{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;border-right:1px solid rgba(255,255,255,.6);min-width:30px;overflow:hidden;flex-shrink:0}
 .pc .top{font-size:12px;font-weight:900;color:#333;line-height:1}
 .pc .bot{font-size:10px;font-weight:600;color:#555;line-height:1;margin-top:2px}
-.pc .ang{font-size:8px;font-weight:900;color:#b91c1c;line-height:1;margin-top:2px;white-space:nowrap}
+.pc .mit{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.pc .ang{display:flex;justify-content:space-between;width:100%;padding:0 12px;font-size:8px;font-weight:900;color:#b91c1c;line-height:1;margin-top:3px;white-space:nowrap}
+.pc .ang i{font-style:normal}
 .notes{margin:0 0 14px;padding:8px 12px;border:2px solid #111;border-radius:4px;background:#fffbe6;page-break-inside:avoid}
 .notes-t{font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px}
 .notes-b{font-size:12px;white-space:pre-wrap;line-height:1.4}
