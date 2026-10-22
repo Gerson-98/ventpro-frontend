@@ -57,6 +57,7 @@ export default function Orders() {
   const isAdmin = user?.role === 'ADMIN';
   const { hasPermission } = usePermissions();
   const canSeeFinancials = hasPermission('orders.view_financials');
+  const canChangeStatus = hasPermission('orders.change_status');
   const navigate = useNavigate();
 
   const [orders, setOrders] = useState([]);
@@ -75,7 +76,10 @@ export default function Orders() {
     project: '', clientId: '', total: '', status: ORDER_STATUS.EN_PROCESO,
   });
   const [searchInput, setSearchInput] = useState('');
-  const [filters, setFilters] = useState({ status: 'all', month: 'all', search: '' });
+  // Por defecto solo se cargan los pedidos del MES EN CURSO (más rápido). Para ver
+  // otro mes o todos, se elige en el selector de meses.
+  const [filters, setFilters] = useState({ status: 'all', month: String(new Date().getMonth() + 1), search: '' });
+  const [updatingStatusId, setUpdatingStatusId] = useState(null);
   const [deleteModal, setDeleteModal] = useState({ open: false, order: null });
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -169,6 +173,58 @@ export default function Orders() {
     } finally {
       setIsDeleting(false);
     }
+  };
+
+  // ── Cambio rápido de estado desde el listado (sin entrar al pedido) ─────────
+  const handleQuickStatus = async (order, newStatus) => {
+    if (!newStatus || newStatus === order.status) return;
+    if (newStatus === ORDER_STATUS.CANCELADO) {
+      const ok = confirm(
+        `¿Cancelar el pedido #${order.id} — ${order.project}?
+
+La cotización asociada quedará desvinculada y disponible para editarse de nuevo.`
+      );
+      if (!ok) return;
+    }
+    const previousStatus = order.status;
+    setUpdatingStatusId(order.id);
+    setOrders(prev => prev.map(o => (o.id === order.id ? { ...o, status: newStatus } : o)));
+    try {
+      await api.patch(`/orders/${order.id}/status`, { status: newStatus });
+    } catch (err) {
+      setOrders(prev => prev.map(o => (o.id === order.id ? { ...o, status: previousStatus } : o)));
+      console.error('❌ Error al cambiar el estado:', err);
+      alert(err.response?.data?.message || 'No se pudo actualizar el estado.');
+    } finally {
+      setUpdatingStatusId(null);
+    }
+  };
+
+  // Selector de estado con el mismo estilo del badge; solo si el usuario puede cambiar estados.
+  const StatusControl = ({ order, compact = false }) => {
+    const style = getStatusStyle(order.status);
+    if (!canChangeStatus) {
+      return (
+        <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${compact ? 'px-2 py-0.5' : 'px-2.5 py-1'} rounded-full border ${style.badge}`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
+          {getStatusLabel(order.status)}
+        </span>
+      );
+    }
+    return (
+      <select
+        value={order.status || ''}
+        disabled={updatingStatusId === order.id}
+        onClick={(e) => e.stopPropagation()}
+        onChange={(e) => handleQuickStatus(order, e.target.value)}
+        title="Cambiar estado del pedido"
+        className={`text-xs font-semibold ${compact ? 'px-2 py-0.5' : 'px-2.5 py-1'} rounded-full border cursor-pointer outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-60 disabled:cursor-wait ${style.badgeFull}`}
+      >
+        {ORDER_STATUS_LIST.map(s => (
+          <option key={s.value} value={s.value}>{s.label}</option>
+        ))}
+      </select>
+    );
   };
 
   const metrics = useMemo(() => {
@@ -272,7 +328,8 @@ export default function Orders() {
           </select>
         </div>
         <span className="text-xs text-gray-400 font-medium sm:ml-auto">
-          {orders.length} pedido{orders.length !== 1 ? 's' : ''}
+          {filters.month === 'all' ? 'Todos los meses' : `${months.find(m => String(m.value) === String(filters.month))?.label} ${new Date().getFullYear()}`}
+          {' · '}{orders.length} pedido{orders.length !== 1 ? 's' : ''}
         </span>
       </div>
 
@@ -303,7 +360,6 @@ export default function Orders() {
                 <tbody className="divide-y divide-gray-50">
                   {orders.map((order) => {
                     const clientData = order.client || order.clients;
-                    const style = getStatusStyle(order.status);
                     return (
                       <tr
                         key={order.id}
@@ -327,11 +383,8 @@ export default function Orders() {
                         <td className="py-3.5 px-5 text-xs text-gray-500">
                           {order.generatedFromQuotation?.user?.name || <span className="text-gray-300 italic">—</span>}
                         </td>
-                        <td className="py-3.5 px-5 text-center">
-                          <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${style.badge}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
-                            {getStatusLabel(order.status)}
-                          </span>
+                        <td className="py-3.5 px-5 text-center" onClick={(e) => e.stopPropagation()}>
+                          {StatusControl({ order })}
                         </td>
                         <td className="py-3.5 px-5 text-xs text-indigo-600">
                           {order.fabricationStartDate ? (
@@ -373,7 +426,6 @@ export default function Orders() {
             <div className="md:hidden divide-y divide-gray-100">
               {orders.map((order) => {
                 const clientData = order.client || order.clients;
-                const style = getStatusStyle(order.status);
                 return (
                   <div
                     key={order.id}
@@ -386,10 +438,7 @@ export default function Orders() {
                         #{order.id}
                       </span>
                       <div className="flex items-center gap-2">
-                        <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border ${style.badge}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
-                          {getStatusLabel(order.status)}
-                        </span>
+                        {StatusControl({ order, compact: true })}
                         {isAdmin && (
                           <button
                             onClick={(e) => { e.stopPropagation(); setDeleteModal({ open: true, order }); }}

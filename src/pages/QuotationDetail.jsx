@@ -6,13 +6,16 @@ import api from '@/services/api';
 import {
     FaFilePdf, FaCheckCircle, FaEdit, FaWhatsapp,
     FaPhone, FaCamera, FaCalculator, FaArrowLeft,
-    FaBoxOpen, FaStickyNote, FaUnlock, FaExclamationTriangle, FaLeaf,
+    FaBoxOpen, FaStickyNote, FaUnlock, FaExclamationTriangle, FaLeaf, FaMagic, FaRuler,
 } from 'react-icons/fa';
 import AddQuotationModal from '@/components/AddQuotationModal';
 import { generateDocumentPDF } from '@/lib/generateDocumentPDF';
 import ConfirmQuotationModal from '@/components/ConfirmQuotationModal';
 import ProfilesReportModal from '../components/ProfilesReportModal';
+import CutOptimizationModal from '@/components/CutOptimizationModal';
+import GlassCutModal from '@/components/GlassCutModal';
 import { useAuth } from '@/context/AuthContext';
+import { usePermissions } from '@/context/PermissionsContext';
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle,
     DialogFooter, DialogDescription,
@@ -44,6 +47,10 @@ export default function QuotationDetail() {
     const navigate = useNavigate();
     const { user } = useAuth();
     const isAdmin = user?.role === 'ADMIN';
+    const { hasPermission } = usePermissions();
+    // Planes de corte de la cotización (para revisar el cálculo sin confirmarla como pedido).
+    const canSeeCutOptimizer = isAdmin || hasPermission('reports.cut_optimizer');
+    const canSeeGlassCut = isAdmin || hasPermission('reports.glass_cut');
 
     const [quotation, setQuotation] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -56,6 +63,12 @@ export default function QuotationDetail() {
     const [reportData, setReportData] = useState([]);
     const [isReportLoading, setIsReportLoading] = useState(false);
     const [lightboxUrl, setLightboxUrl] = useState(null);
+    const [showCutsModal, setShowCutsModal] = useState(false);
+    const [cutsData, setCutsData] = useState({});
+    const [isCutsLoading, setIsCutsLoading] = useState(false);
+    const [showGlassModal, setShowGlassModal] = useState(false);
+    const [glassCutData, setGlassCutData] = useState({});
+    const [isGlassLoading, setIsGlassLoading] = useState(false);
 
     // ── Estilo Madera ─────────────────────────────────────────────────────────
     const [maderaDialogOpen, setMaderaDialogOpen] = useState(false);
@@ -117,6 +130,34 @@ export default function QuotationDetail() {
             setIsReportModalOpen(false);
         } finally {
             setIsReportLoading(false);
+        }
+    };
+
+    const handleOptimizeCuts = async () => {
+        setIsCutsLoading(true);
+        setShowCutsModal(true);
+        try {
+            const res = await api.get(`/reports/quotation/${quotation.id}/optimize-cuts`);
+            setCutsData(res.data);
+        } catch {
+            alert('No se pudo generar el plan de corte.');
+            setShowCutsModal(false);
+        } finally {
+            setIsCutsLoading(false);
+        }
+    };
+
+    const handleGlassCuts = async () => {
+        setIsGlassLoading(true);
+        setShowGlassModal(true);
+        try {
+            const res = await api.get(`/reports/quotation/${quotation.id}/glass-cuts`);
+            setGlassCutData(res.data);
+        } catch {
+            alert('No se pudo generar el corte de vidrio.');
+            setShowGlassModal(false);
+        } finally {
+            setIsGlassLoading(false);
         }
     };
 
@@ -398,6 +439,30 @@ export default function QuotationDetail() {
                             >
                                 <FaCalculator size={12} />
                                 <span>Materiales</span>
+                            </button>
+                        )}
+
+                        {canSeeCutOptimizer && (
+                            <button
+                                onClick={handleOptimizeCuts}
+                                title="Ver el plan de corte de barras de esta cotización"
+                                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-all"
+                            >
+                                <FaMagic size={12} />
+                                <span className="hidden sm:inline">Plan de corte</span>
+                                <span className="sm:hidden">Cortes</span>
+                            </button>
+                        )}
+
+                        {canSeeGlassCut && (
+                            <button
+                                onClick={handleGlassCuts}
+                                title="Ver el plan de corte de vidrio de esta cotización"
+                                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium rounded-xl border border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 transition-all"
+                            >
+                                <FaRuler size={12} />
+                                <span className="hidden sm:inline">Corte de vidrio</span>
+                                <span className="sm:hidden">Vidrio</span>
                             </button>
                         )}
 
@@ -819,6 +884,27 @@ export default function QuotationDetail() {
                         const targetOrderId = newOrderId || quotation.generatedOrder?.id;
                         navigate(`/orders/${targetOrderId}`);
                     }}
+                />
+            )}
+
+            {showCutsModal && (
+                <CutOptimizationModal
+                    isLoading={isCutsLoading}
+                    optimizationData={cutsData}
+                    onClose={() => setShowCutsModal(false)}
+                    projectName={quotation?.project}
+                    clientName={quotation?.client?.name}
+                    windows={quotation?.quotation_windows || []}
+                    notes={[quotation?.notes]}
+                />
+            )}
+
+            {showGlassModal && (
+                <GlassCutModal
+                    isLoading={isGlassLoading}
+                    glassCutData={glassCutData}
+                    onClose={() => setShowGlassModal(false)}
+                    projectName={quotation?.project}
                 />
             )}
 
