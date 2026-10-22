@@ -152,7 +152,8 @@ function buildSeries(optimizationData) {
 // ─── Forma de los cortes de un marco en "U" ────────────────────────────────────
 // Dibuja la pieza con su corte real: extremo a 45° inclinado, extremo a 90°
 // recto. La medida mostrada es la de la punta larga del inglete. Los dos
-// verticales (45°/90°) se dibujan en espejo (mirror alterna 0/1).
+// verticales (45°/90°) se dibujan en espejo (reflejo: la cara larga queda del
+// mismo lado en ambos, solo cambia el extremo que lleva el inglete).
 const MITER = 12; // px de inclinación visual
 function miterShape(angle, mirror) {
     if (angle === '45°/45°') {
@@ -163,7 +164,7 @@ function miterShape(angle, mirror) {
     }
     if (angle === '45°/90°') {
         return mirror
-            ? { clip: `polygon(0 0, 100% 0, calc(100% - ${MITER}px) 100%, 0 100%)`, left: '90° ABAJO', right: '45° ARRIBA' }
+            ? { clip: `polygon(0 0, calc(100% - ${MITER}px) 0, 100% 100%, 0 100%)`, left: '90° ABAJO', right: '45° ARRIBA' }
             : { clip: `polygon(${MITER}px 0, 100% 0, 100% 100%, 0 100%)`, left: '45° ARRIBA', right: '90° ABAJO' };
     }
     return null;

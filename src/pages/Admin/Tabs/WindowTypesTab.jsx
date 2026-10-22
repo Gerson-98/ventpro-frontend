@@ -5,6 +5,17 @@ import { FaTrashAlt, FaEdit, FaSearch, FaExclamationTriangle, FaMagic, FaCopy, F
 import api from "@/services/api";
 import ProductWizardModal from "../ProductWizard/ProductWizardModal";
 
+const MARCO_U_AYUDA = `MARCO EN U (puertas)
+
+Actívalo en puertas cuyo marco NO es un cuadro cerrado, sino una 'U' invertida que apoya en el piso.
+
+En el plan de corte el marco llevará solo 3 piezas (sin pieza inferior):
+• 2 verticales: 45° arriba y 90° abajo (recto, contra el piso)
+• 1 travesaño superior: 45° en los dos extremos
+
+Las piezas se dibujan con su corte y el largo es la medida en la punta larga del inglete.
+Solo cambia el plan de corte, no los costos.`;
+
 const EMPTY_FORM = {
   name: "",
   displayName: "",
@@ -362,7 +373,7 @@ export default function WindowTypesTab() {
                         <button
                           onClick={() => handleToggleMarcoU(t)}
                           className={`text-xs font-black leading-none px-1.5 rounded border transition-colors ${t.marco_en_u ? "bg-orange-100 text-orange-700 border-orange-300" : "text-gray-400 border-gray-200 hover:text-orange-600"}`}
-                          title={t.marco_en_u ? "Marco en U: ACTIVO (clic para quitar)" : "Marcar como marco en U (puertas)"}
+                          title={(t.marco_en_u ? "ACTIVO — clic para quitarlo\n\n" : "Clic para activarlo\n\n") + MARCO_U_AYUDA}
                         >
                           ∩
                         </button>
@@ -414,7 +425,7 @@ export default function WindowTypesTab() {
                     <button
                       onClick={() => handleToggleMarcoU(t)}
                       className={`px-2 py-1 text-xs font-black leading-none rounded-lg border ${t.marco_en_u ? "bg-orange-100 text-orange-700 border-orange-300" : "text-gray-400 border-gray-200"}`}
-                      title={t.marco_en_u ? "Marco en U: ACTIVO" : "Marcar como marco en U"}
+                      title={(t.marco_en_u ? "ACTIVO — toca para quitarlo\n\n" : "Toca para activarlo\n\n") + MARCO_U_AYUDA}
                     >
                       ∩
                     </button>
