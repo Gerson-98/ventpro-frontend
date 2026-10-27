@@ -4,8 +4,9 @@ import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "@/services/api";
 import { useAuth } from "@/context/AuthContext";
-import { FaPlus, FaSearch, FaChevronLeft, FaChevronRight, FaTrash } from "react-icons/fa";
+import { FaPlus, FaSearch, FaChevronLeft, FaChevronRight, FaTrash, FaTimes, FaFilter } from "react-icons/fa";
 import AddQuotationModal from "@/components/AddQuotationModal";
+import QuotationStatsPanel from "@/components/QuotationStatsPanel";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -47,7 +48,15 @@ export default function Quotations() {
     const [filters, setFilters] = useState({ quotationStatus: 'all', clientStatus: 'all', search: '' });
     const [deleteModal, setDeleteModal] = useState({ open: false, quotation: null });
     const [isDeleting, setIsDeleting] = useState(false);
+    // Filtro "de detalle" que viene del panel de estadísticas (vendedor, día, bajo mínimo…)
+    const [drill, setDrill] = useState(null);
+    const listRef = useRef(null);
     const navigate = useNavigate();
+
+    const handleDrill = (d) => {
+        setDrill(d);
+        setTimeout(() => listRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+    };
 
     // ── Debounce: actualiza filters.search 400ms después de que el usuario deja de escribir ──
     const debounceRef = useRef(null);
@@ -68,6 +77,14 @@ export default function Quotations() {
             if (filters.search) params.search = filters.search;
             if (filters.quotationStatus !== 'all') params.status = filters.quotationStatus;
             if (filters.clientStatus !== 'all') params.clientStatus = filters.clientStatus;
+            if (drill) {
+                if (drill.userId) params.userId = drill.userId;
+                if (drill.from) params.from = drill.from;
+                if (drill.to) params.to = drill.to;
+                if (drill.belowMin) params.belowMin = 1;
+                if (drill.followUpDays) params.followUpDays = drill.followUpDays;
+                if (drill.status) params.status = drill.status;
+            }
             const response = await api.get("/quotations", { params });
             const { data, total, totalPages } = response.data;
             setQuotations(data);
@@ -77,7 +94,7 @@ export default function Quotations() {
         } finally {
             setLoading(false);
         }
-    }, [filters]);
+    }, [filters, drill]);
 
     useEffect(() => { fetchQuotations(1); }, [fetchQuotations]);
 
@@ -134,6 +151,25 @@ export default function Quotations() {
                         <span className="sm:hidden">Nueva</span>
                     </button>
                 </div>
+
+                {/* ── Estadísticas de actividad (solo administrador) ── */}
+                {isAdmin && <QuotationStatsPanel onDrill={handleDrill} />}
+
+                {/* ── Filtro activo desde el panel ── */}
+                <div ref={listRef} className="scroll-mt-4" />
+                {drill && (
+                    <div className="mb-3 flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-800 rounded-xl px-3 py-2 text-sm">
+                        <FaFilter size={11} className="flex-shrink-0" />
+                        <span className="min-w-0 truncate">Mostrando: <b>{drill.label}</b> · {pagination.total} {pagination.total !== 1 ? 'cotizaciones' : 'cotización'}</span>
+                        <button
+                            type="button"
+                            onClick={() => setDrill(null)}
+                            className="ml-auto inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-white border border-blue-200 hover:bg-blue-100 flex-shrink-0"
+                        >
+                            <FaTimes size={10} /> Quitar filtro
+                        </button>
+                    </div>
+                )}
 
                 {/* ── Filtros ── */}
                 <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-3 sm:p-4 mb-5 flex flex-col sm:flex-row flex-wrap gap-3 items-stretch sm:items-center">
