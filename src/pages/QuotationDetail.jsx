@@ -421,7 +421,7 @@ export default function QuotationDetail() {
                     </div>
 
                     {/* Botones de acción — scroll horizontal en móvil si hay muchos */}
-                    <div className="flex flex-wrap gap-2 w-full sm:w-auto sm:justify-end">
+                    <div className="flex flex-wrap gap-2 w-full sm:w-auto sm:max-w-[55%] sm:justify-end">
                         <button
                             onClick={() => setIsEditModalOpen(true)}
                             disabled={isConfirmado}
