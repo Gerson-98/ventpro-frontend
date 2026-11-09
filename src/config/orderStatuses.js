@@ -12,7 +12,7 @@ export const ORDER_STATUS = {
 };
 
 export const ORDER_STATUS_LABELS = {
-  [ORDER_STATUS.EN_PROCESO]: 'En Proceso',
+  [ORDER_STATUS.EN_PROCESO]: 'En Espera',
   [ORDER_STATUS.EN_FABRICACION]: 'En Fabricación',
   [ORDER_STATUS.FABRICADO]: 'Fabricado',
   [ORDER_STATUS.AGENDADO]: 'Agendado',

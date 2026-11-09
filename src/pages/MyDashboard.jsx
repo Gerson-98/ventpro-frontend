@@ -6,7 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { FaSearch, FaCalendarAlt, FaClipboardList, FaCheckCircle, FaClock } from "react-icons/fa";
 
 const ORDER_STATUS_LABELS = {
-    en_proceso: 'En Proceso',
+    en_proceso: 'En Espera',
     en_fabricacion: 'En Fabricación',
     fabricado: 'Fabricado',
     agendado: 'Agendado',

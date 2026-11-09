@@ -240,7 +240,12 @@ export default function QuotationDetail() {
                 const originalType = allTypes.find(t => t.id === win.window_type_id);
                 let newTypeId = win.window_type_id;
 
-                if (originalType && !is5cm(originalType.name)) {
+                // Cada ventana conserva su serie: una Serie 80 (marco 45) sigue en
+                // Serie 80 al pasar a imitación madera. Solo cambia el color.
+                // (Si el color no está habilitado para ese tipo en el catálogo,
+                // el editor igual lo muestra; se habilita desde el catálogo.)
+                const KEEP_SERIES = true;
+                if (!KEEP_SERIES && originalType && !is5cm(originalType.name)) {
                     const base = baseName(originalType.name);
 
                     // 1er intento: coincidencia exacta de nombres normalizados

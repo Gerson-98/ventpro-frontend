@@ -12,7 +12,7 @@ import ScheduleInstallationModal from '@/components/ScheduleInstallationModal';
 import { FaCalendarAlt, FaUser, FaTimes, FaEye, FaSearch, FaCalendarCheck } from 'react-icons/fa';
 
 const STATUS_CONFIG = {
-    en_proceso: { label: 'En Proceso', color: '#3b82f6', bg: 'bg-blue-500', light: 'bg-blue-50 text-blue-700 border-blue-200' },
+    en_proceso: { label: 'En Espera', color: '#3b82f6', bg: 'bg-blue-500', light: 'bg-blue-50 text-blue-700 border-blue-200' },
     en_fabricacion: { label: 'En Fabricación', color: '#f97316', bg: 'bg-orange-500', light: 'bg-orange-50 text-orange-700 border-orange-200' },
     fabricado: { label: 'Fabricado', color: '#f59e0b', bg: 'bg-amber-500', light: 'bg-amber-50 text-amber-700 border-amber-200' },
     agendado: { label: 'Agendado', color: '#8b5cf6', bg: 'bg-violet-500', light: 'bg-violet-50 text-violet-700 border-violet-200' },

@@ -11,7 +11,7 @@ const fmt = (n) => new Intl.NumberFormat('es-GT', { style: 'currency', currency:
 const fmtPct = (n) => `${(n || 0).toFixed(1)}%`;
 
 const STATUS_LABELS = {
-    en_proceso: 'En Proceso', en_fabricacion: 'En Fabricación',
+    en_proceso: 'En Espera', en_fabricacion: 'En Fabricación',
     fabricado: 'Fabricado', agendado: 'Agendado', en_ruta: 'En Ruta', completado: 'Completado',
 };
 const STATUS_COLORS = {

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import {
   FaMoneyBillWave, FaFilePdf, FaArrowLeft, FaFileAlt, FaChartBar,
   FaMagic, FaCalendarAlt,
+  FaEdit, FaCopy, FaTrash, FaLock, FaLockOpen,
   FaCamera, FaFileInvoice, FaPhoneAlt, FaUser, FaExternalLinkAlt, FaStickyNote,
 } from 'react-icons/fa';
 import AddWindowModal from '@/components/AddWindowModal';
@@ -177,6 +178,52 @@ export default function OrderDetail() {
     }
   };
 
+  // Precio final congelado: editar medidas no cambia el total pactado.
+  const handleLockToggle = async () => {
+    const lock = !order.priceLocked;
+    const msg = lock
+      ? `¿Congelar el precio final del pedido en ${formatCurrency(order.total)}? Aunque cambies medidas o ventanas, el total NO cambiará.`
+      : '¿Descongelar el precio? Al editar o agregar ventanas el total volverá a calcularse con la suma de las ventanas.';
+    if (!confirm(msg)) return;
+    try {
+      await api.patch(`/orders/${id}`, { priceLocked: lock });
+      await refetch();
+    } catch {
+      alert('No se pudo cambiar el congelado del precio.');
+    }
+  };
+
+  const handleChangeFinalPrice = async () => {
+    const raw = prompt('Nuevo precio final del pedido (Q):', String(Number(order.total || 0).toFixed(2)));
+    if (raw === null) return;
+    const value = parseFloat(String(raw).replace(/,/g, ''));
+    if (!Number.isFinite(value) || value <= 0) { alert('Escribe un monto válido.'); return; }
+    try {
+      await api.patch(`/orders/${id}`, { total: value, priceLocked: true });
+      await refetch();
+    } catch {
+      alert('No se pudo cambiar el precio final.');
+    }
+  };
+
+  // Mes contable (solo admin): mueve el pedido a otro mes en listas y reportes.
+  const accountingMonthValue = (() => {
+    if (order?.accountingDate) return String(order.accountingDate).slice(0, 7);
+    const d = new Date(order?.createdAt);
+    return Number.isNaN(d.getTime()) ? '' : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  })();
+
+  const handleAccountingMonth = async (value) => {
+    if (!value || value === accountingMonthValue) return;
+    if (!confirm(`¿Contar este pedido en el mes ${value}? Cambia en qué mes aparece en Pedidos, Ganancias y el dashboard. No cambia ninguna fecha real.`)) return;
+    try {
+      await api.patch(`/orders/${id}`, { accountingMonth: value });
+      await refetch();
+    } catch (err) {
+      alert(err?.response?.data?.message || 'No se pudo cambiar el mes.');
+    }
+  };
+
   const handleDelete = async (winId) => {
     if (!confirm('¿Eliminar esta ventana del pedido?')) return;
     try {
@@ -320,6 +367,21 @@ export default function OrderDetail() {
                   <FaExternalLinkAlt size={9} />
                 </Link>
               )}
+              {isAdmin && (
+                <label className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600 bg-gray-50 px-2.5 py-1 rounded-full border border-gray-200" title="Mes en que se cuenta este pedido (ventas/ganancias)">
+                  <FaCalendarAlt size={10} />
+                  <span>Mes contable</span>
+                  <input
+                    type="month"
+                    value={accountingMonthValue}
+                    onChange={(e) => handleAccountingMonth(e.target.value)}
+                    className="bg-transparent text-xs font-semibold outline-none"
+                  />
+                  {order.accountingDate && (
+                    <span className="text-[10px] text-amber-600">(manual)</span>
+                  )}
+                </label>
+              )}
             </div>
 
             {/* Proyecto */}
@@ -372,7 +434,21 @@ export default function OrderDetail() {
                   {includeIva && (
                     <p className="text-xs text-green-600 font-medium mt-0.5">IVA incluido (12%)</p>
                   )}
+                  {order.priceLocked && (
+                    <p className="text-xs text-emerald-700 font-semibold mt-0.5 inline-flex items-center gap-1"><FaLock size={10} /> Precio final congelado</p>
+                  )}
                 </div>
+                {canEditMeasurements && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button onClick={handleLockToggle} title={order.priceLocked ? 'Descongelar precio' : 'Congelar precio final'} className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold ${order.priceLocked ? 'bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'}`}>
+                      {order.priceLocked ? <FaLockOpen size={11} /> : <FaLock size={11} />}
+                      <span>{order.priceLocked ? 'Descongelar' : 'Congelar precio'}</span>
+                    </button>
+                    <button onClick={handleChangeFinalPrice} title="Cambiar el precio final del pedido" className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100 text-xs font-semibold">
+                      <FaEdit size={11} /><span>Cambiar precio</span>
+                    </button>
+                  </div>
+                )}
                 <div className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-xl border border-gray-200">
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input
@@ -577,6 +653,7 @@ export default function OrderDetail() {
                   <col className="w-28" />
                   <col className="w-16" />
                   <col className="w-28" />
+                  {canEditMeasurements && <col className="w-44" />}
                 </colgroup>
                 <thead>
                   <tr className="bg-gray-50/70 border-b border-gray-100">
@@ -597,6 +674,7 @@ export default function OrderDetail() {
                     <th className="py-3 px-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Vidrio</th>
                     <th className="py-3 px-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Cant.</th>
                     {canSeeFinancials && <th className="py-3 px-5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Precio</th>}
+                    {canEditMeasurements && <th className="py-3 px-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Acciones</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -698,6 +776,15 @@ export default function OrderDetail() {
                             {formatCurrency(win.price)}
                           </td>
                         )}
+                        {canEditMeasurements && (
+                          <td className="py-3.5 px-3">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button onClick={() => openEditModal(win)} title="Editar medidas y datos de esta ventana" className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-semibold"><FaEdit size={11} /><span>Editar</span></button>
+                              <button onClick={() => handleDuplicate(win.id)} title="Duplicar ventana" className="inline-flex items-center px-2 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"><FaCopy size={11} /></button>
+                              <button onClick={() => handleDelete(win.id)} title="Eliminar ventana" className="inline-flex items-center px-2 py-1.5 rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100"><FaTrash size={11} /></button>
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     );
                   })}
@@ -787,6 +874,13 @@ export default function OrderDetail() {
                         </span>
                       </span>
                     </div>
+                    {canEditMeasurements && (
+<div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
+  <button onClick={() => openEditModal(win)} title="Editar medidas y datos de esta ventana" className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-semibold"><FaEdit size={11} /><span>Editar</span></button>
+  <button onClick={() => handleDuplicate(win.id)} title="Duplicar ventana" className="inline-flex items-center px-2 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"><FaCopy size={11} /></button>
+  <button onClick={() => handleDelete(win.id)} title="Eliminar ventana" className="inline-flex items-center px-2 py-1.5 rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100"><FaTrash size={11} /></button>
+</div>
+)}
                   </div>
                 );
               })}

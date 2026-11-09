@@ -8,7 +8,7 @@ import GlassCutModal from '@/components/GlassCutModal';
 import { FaFilePdf, FaCheckSquare, FaSquare, FaLayerGroup, FaCut, FaBoxes, FaGem } from 'react-icons/fa';
 
 const ORDER_STATUS_LABELS = {
-    en_proceso: 'En Proceso',
+    en_proceso: 'En Espera',
     en_fabricacion: 'En Fabricación',
     fabricado: 'Fabricado',
     agendado: 'Agendado',

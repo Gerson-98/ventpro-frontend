@@ -1626,7 +1626,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                                                     {(() => {
                                                                         const selectedType = windowTypes.find(wt => wt.id === Number(win.window_type_id));
                                                                         const availableColors = selectedType?.pvcLinks?.length
-                                                                            ? pvcColors.filter(c => selectedType.pvcLinks.some(l => l.pvcColor_id === c.id))
+                                                                            ? pvcColors.filter(c => c.id === Number(win.color_id) || selectedType.pvcLinks.some(l => l.pvcColor_id === c.id))
                                                                             : pvcColors;
                                                                         return (
                                                                             <select
