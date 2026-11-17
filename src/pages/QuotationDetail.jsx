@@ -240,31 +240,16 @@ export default function QuotationDetail() {
                 const originalType = allTypes.find(t => t.id === win.window_type_id);
                 let newTypeId = win.window_type_id;
 
-                // Cada ventana conserva su serie: una Serie 80 (marco 45) sigue en
-                // Serie 80 al pasar a imitación madera. Solo cambia el color.
-                // (Si el color no está habilitado para ese tipo en el catálogo,
-                // el editor igual lo muestra; se habilita desde el catálogo.)
-                const KEEP_SERIES = true;
-                if (!KEEP_SERIES && originalType && !is5cm(originalType.name)) {
+                // Estilo madera siempre va en Serie 80 (marco 45): las ventanas que
+                // ya están en Serie 80 se dejan igual; las de marco 5 cm (Serie 60)
+                // pasan a su equivalente de marco 45 cm.
+                if (originalType && is5cm(originalType.name)) {
                     const base = baseName(originalType.name);
-
-                    // 1er intento: coincidencia exacta de nombres normalizados
-                    let equiv = allTypes.find(t => is5cm(t.name) && baseName(t.name) === base);
-
-                    // 2do intento (fallback): el nombre normalizado del tipo 5cm está
-                    // contenido en el del original (cubre casos con palabras extra residuales).
-                    // Se elige el candidato con la base más larga (más específico).
-                    if (!equiv) {
-                        const candidates = allTypes
-                            .filter(t => is5cm(t.name) && baseName(t.name).length > 0 && base.includes(baseName(t.name)))
-                            .sort((a, b) => baseName(b.name).length - baseName(a.name).length);
-                        equiv = candidates[0] ?? null;
-                    }
-
+                    const equiv = allTypes.find(t => !is5cm(t.name) && /(?<!\d)45\s*cm/i.test(t.name || '') && baseName(t.name) === base);
                     if (equiv) {
                         newTypeId = equiv.id;
                     } else {
-                        console.warn(`[EstiloMadera] Sin equivalente 5cm para "${originalType.name}" (base: "${base}") — se mantiene el tipo original`);
+                        console.warn(`[EstiloMadera] Sin equivalente Serie 80 para "${originalType.name}" — se mantiene el tipo original`);
                     }
                 }
 
@@ -822,7 +807,7 @@ export default function QuotationDetail() {
                             Estilo Madera
                         </DialogTitle>
                         <DialogDescription id="madera-desc" className="text-sm text-gray-500 mt-1">
-                            Selecciona el color PVC madera. Se creará una nueva cotización con marco 5cm donde aplique.
+                            Selecciona el color PVC madera. Se creará una nueva cotización en Serie 80 (las ventanas Serie 60 pasan a su equivalente Serie 80).
                         </DialogDescription>
                     </DialogHeader>
 

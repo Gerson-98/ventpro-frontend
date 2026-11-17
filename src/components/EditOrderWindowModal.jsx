@@ -220,6 +220,10 @@ export default function EditOrderWindowModal({ open, onClose, onSave, windowData
     const handleOptionChange = (optName, optValue) => {
         const newOptions = { ...form.options, [optName]: optValue };
         let newDisplayName = buildDisplayName(selectedTypeName, newOptions);
+        // Si la opción no forma parte del nombre (ej. vidrio adicional), se
+        // conserva el nombre comercial que ya tenía la ventana en vez de
+        // reemplazarlo por el nombre interno del tipo.
+        if (!newDisplayName || newDisplayName === selectedTypeName) newDisplayName = form.displayName;
 
         // Para variantes 3H necesitamos resolver el window_type_id real
         let newWindowTypeId = form.window_type_id;
@@ -482,6 +486,8 @@ export default function EditOrderWindowModal({ open, onClose, onSave, windowData
                                     className="w-full p-2.5 border border-gray-300 rounded-lg text-sm text-center font-mono outline-none focus:ring-2 focus:ring-blue-500"
                                     required
                                     min="1"
+                                    step="any"
+                                    inputMode="decimal"
                                 />
                             </div>
                             <div>
@@ -493,6 +499,8 @@ export default function EditOrderWindowModal({ open, onClose, onSave, windowData
                                     className="w-full p-2.5 border border-gray-300 rounded-lg text-sm text-center font-mono outline-none focus:ring-2 focus:ring-blue-500"
                                     required
                                     min="1"
+                                    step="any"
+                                    inputMode="decimal"
                                 />
                             </div>
                             <div>
@@ -590,7 +598,11 @@ export default function EditOrderWindowModal({ open, onClose, onSave, windowData
                                 value={form.price}
                                 onChange={(e) => setForm(prev => ({ ...prev, price: e.target.value }))}
                                 className="w-full p-2.5 border border-blue-300 bg-blue-50 rounded-lg text-sm font-bold text-blue-700 text-right outline-none focus:ring-2 focus:ring-blue-500"
-                                step="0.01"
+                                // "any": los precios guardados suelen traer más de 2 decimales
+                                // (ej. 2775.3767…) y con step 0.01 el navegador bloqueaba el
+                                // botón Guardar ("Ingresa un valor válido") → no se guardaban
+                                // ni las medidas.
+                                step="any"
                                 min="0"
                             />
                         </div>

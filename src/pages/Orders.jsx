@@ -563,6 +563,7 @@ La cotización asociada quedará desvinculada y disponible para editarse de nuev
               <Label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Total (Q) — opcional</Label>
               <Input
                 type="number"
+                step="any"
                 value={formData.total}
                 onChange={(e) => setFormData(prev => ({ ...prev, total: e.target.value }))}
                 placeholder="0.00"

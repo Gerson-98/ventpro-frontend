@@ -219,7 +219,7 @@ export default function AddWindowModal({ orderId, onClose, onSave }) {
           <div className="flex items-center gap-4">
             <div className="bg-blue-50 p-2 rounded-lg border border-blue-100">
               <label className="block text-[10px] font-bold text-blue-600 uppercase">Precio Global m²</label>
-              <input type="number" value={globalPricePerM2} onChange={(e) => setGlobalPricePerM2(e.target.value)} className="w-32 bg-transparent text-lg font-bold outline-none" placeholder="Q 0.00" />
+              <input type="number" step="any" value={globalPricePerM2} onChange={(e) => setGlobalPricePerM2(e.target.value)} className="w-32 bg-transparent text-lg font-bold outline-none" placeholder="Q 0.00" />
             </div>
             <button onClick={onClose} className="text-gray-400 hover:text-red-500 text-3xl transition-colors">&times;</button>
           </div>
@@ -258,9 +258,9 @@ export default function AddWindowModal({ orderId, onClose, onSave }) {
                       </td>
                       <td className="p-3">
                         <div className="flex gap-1 items-center bg-gray-50 p-1 rounded-lg">
-                          <input type="number" placeholder="An" value={win.width_cm} onChange={(e) => handleWindowChange(index, 'width_cm', e.target.value)} className="w-full p-1 bg-transparent text-center font-mono" required />
+                          <input type="number" step="any" placeholder="An" value={win.width_cm} onChange={(e) => handleWindowChange(index, 'width_cm', e.target.value)} className="w-full p-1 bg-transparent text-center font-mono" required />
                           <span className="text-gray-400">×</span>
-                          <input type="number" placeholder="Al" value={win.height_cm} onChange={(e) => handleWindowChange(index, 'height_cm', e.target.value)} className="w-full p-1 bg-transparent text-center font-mono" required />
+                          <input type="number" step="any" placeholder="Al" value={win.height_cm} onChange={(e) => handleWindowChange(index, 'height_cm', e.target.value)} className="w-full p-1 bg-transparent text-center font-mono" required />
                         </div>
                         {win.previewCortes && (
                           <div className="text-[9px] text-gray-400 mt-1 flex justify-between px-1 uppercase font-bold">
@@ -273,7 +273,7 @@ export default function AddWindowModal({ orderId, onClose, onSave }) {
                         <input type="number" value={win.quantity} onChange={(e) => handleWindowChange(index, 'quantity', e.target.value)} className="w-full p-2 border rounded-lg text-center font-bold" min="1" required />
                       </td>
                       <td className="p-3">
-                        <input type="number" placeholder={globalPricePerM2 || "0.00"} value={win.price_per_m2} onChange={(e) => handleWindowChange(index, 'price_per_m2', e.target.value)} className="w-full p-2 border rounded-lg text-center font-mono text-blue-700 font-bold" />
+                        <input type="number" step="any" placeholder={globalPricePerM2 || "0.00"} value={win.price_per_m2} onChange={(e) => handleWindowChange(index, 'price_per_m2', e.target.value)} className="w-full p-2 border rounded-lg text-center font-mono text-blue-700 font-bold" />
                       </td>
                       <td className="p-3 space-y-2">
                         <div className="grid grid-cols-2 gap-2">

@@ -253,7 +253,7 @@ function WindowTotalCell({ win, globalPricePerM2, onChange }) {
         <div className="flex flex-col gap-1">
             <input
                 type="number"
-                step="0.01"
+                step="any"
                 name="price_per_m2"
                 value={win.price_per_m2}
                 onChange={onChange}
@@ -642,6 +642,17 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                     reference_image_url: quotationToEdit.reference_image_url || '',
                     windows,
                 });
+                // Si el total guardado era un precio pactado a mano (no cuadra con
+                // m² × precio/m²), se muestra ese mismo total al editar — si no,
+                // al volver a guardar se perdía por redondeo del precio/m².
+                if (quotationToEdit.id && Number(quotationToEdit.total_price) > 0) {
+                    const gp = parseFloat(quotationToEdit.price_per_m2) || 0;
+                    const sub = windows.reduce((acc, w) =>
+                        acc + w.width_m * w.height_m * (w.quantity || 1) * (parseFloat(w.price_per_m2) || gp), 0);
+                    const computed = Number((sub * (quotationToEdit.include_iva ? 1.05 : 1)).toFixed(2));
+                    const saved = Number(Number(quotationToEdit.total_price).toFixed(2));
+                    if (Math.abs(saved - computed) >= 0.01) setTotalOverride(String(saved));
+                }
                 baselineSignature.current = quotationToEdit.id && quotationToEdit.precio_sugerido_minimo != null
                     ? JSON.stringify(buildCostPayload(windows))
                     : null;
@@ -988,8 +999,33 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
         const val = e.target.value;
         setTotalOverride(val);
         if (val !== '' && totalM2 > 0) {
-            const newPrice = (parseFloat(val) || 0) / totalM2;
-            setQuotation(prev => ({ ...prev, price_per_m2: parseFloat(newPrice.toFixed(4)) }));
+            // El total escrito incluye IVA si está activado → se quita antes de
+            // repartir. Las ventanas con precio/m² propio conservan su monto; el
+            // resto del total se reparte en el precio/m² global. (Antes se dividía
+            // el total CON IVA entre todos los m², así que al volver a guardar sin
+            // tocar el total, este subía un 5% o no cuadraba.)
+            const target = (parseFloat(val) || 0) / (quotation.include_iva ? 1.05 : 1);
+            let fixedAmount = 0;
+            let freeM2 = 0;
+            for (const win of quotation.windows) {
+                const m2 = (parseFloat(win.width_m) || 0) * (parseFloat(win.height_m) || 0) * (parseInt(win.quantity) || 0);
+                const own = parseFloat(win.price_per_m2) || 0;
+                if (own > 0) fixedAmount += m2 * own;
+                else freeM2 += m2;
+            }
+            if (freeM2 > 0 && target - fixedAmount > 0) {
+                const newPrice = (target - fixedAmount) / freeM2;
+                setQuotation(prev => ({ ...prev, price_per_m2: parseFloat(newPrice.toFixed(4)) }));
+            } else {
+                // Todas las ventanas tienen precio propio (o el total es menor que
+                // ellas): se pasa todo al precio global, igual que "Igualar mínimo".
+                const newPrice = target / totalM2;
+                setQuotation(prev => ({
+                    ...prev,
+                    price_per_m2: parseFloat(newPrice.toFixed(4)),
+                    windows: prev.windows.map(win => ({ ...win, price_per_m2: '' })),
+                }));
+            }
         }
     };
 
@@ -1317,7 +1353,10 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                             <label className="block text-sm font-medium text-gray-700 mb-1">Precio Global por m²</label>
                                             <input
                                                 type="number"
-                                                step="0.01"
+                                                // "any": al escribir el Total a mano (o "Igualar mínimo") este
+                                                // precio queda con 4 decimales; con step 0.01 el navegador
+                                                // bloqueaba el Guardar y no se guardaba el precio general.
+                                                step="any"
                                                 name="price_per_m2"
                                                 value={quotation.price_per_m2}
                                                 onChange={(e) => setQuotation(p => ({ ...p, price_per_m2: e.target.value }))}
@@ -1495,7 +1534,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                                                     <div className="flex items-center justify-center gap-1">
                                                                         <input
                                                                             type="number"
-                                                                            step={useCm ? "0.1" : "any"}
+                                                                            step="any"
                                                                             name="width_m"
                                                                             value={toDisplay(win.width_m)}
                                                                             onChange={(e) => {
@@ -1510,7 +1549,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                                                         <span className="text-gray-400">×</span>
                                                                         <input
                                                                             type="number"
-                                                                            step={useCm ? "0.1" : "any"}
+                                                                            step="any"
                                                                             name="height_m"
                                                                             value={toDisplay(win.height_m)}
                                                                             onChange={(e) => {

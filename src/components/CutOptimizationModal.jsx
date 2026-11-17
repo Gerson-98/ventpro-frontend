@@ -96,9 +96,16 @@ function buildSeries(optimizationData) {
 
     for (const pName of ordered) {
         const groups = optimizationData[pName];
-        let groupIdx = 0;
 
         for (const group of groups) {
+            // Cada grupo es un color de PVC distinto (el backend separa los
+            // cortes por color). El color va en el título del bloque para que
+            // en el taller se sepa a qué color corresponde cada barra cuando
+            // el proyecto mezcla colores (ej. Nogal Claro + PVC Blanco). La
+            // numeración de series reinicia por color.
+            const colorLbl = (group.color || '').trim();
+            const groupTitle = colorLbl ? `${pName} — COLOR: ${colorLbl}` : pName;
+            let groupIdx = 0;
             if (group.machineSeries && group.series?.length > 0) {
                 // Etiquetas: nombre completo de la hoja + "MOSQUITERO"
                 const [hojaFull = '', mosqFull = ''] = pName.split(' + ');
@@ -116,7 +123,7 @@ function buildSeries(optimizationData) {
                         type: 'machine',
                         idx,
                         groupIdx,
-                        groupName: pName,
+                        groupName: groupTitle,
                         hojaLbl,
                         mosqLbl,
                         hojaBars: s.hojaBars ?? 2,
@@ -135,7 +142,7 @@ function buildSeries(optimizationData) {
                         type: 'single',
                         idx,
                         groupIdx,
-                        groupName: rowLbl,
+                        groupName: groupTitle,
                         rowLbl,
                         cuts: [...bar.cuts].sort((a, z) => z.length - a.length),
                         waste: bar.waste,
