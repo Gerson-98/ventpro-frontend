@@ -268,6 +268,9 @@ export const generateDocumentPDF = async (data, mode = 'quotation') => {
     const isIvaIncluded = data.include_iva !== undefined
       ? (data.include_iva === true || data.include_iva === "true")
       : (data.generatedFromQuotation?.include_iva === true);
+    // Tasa de IVA (5 o 12). Pedido: la propia o la de su cotización de origen.
+    const ivaRateRaw = data.iva_rate ?? data.generatedFromQuotation?.iva_rate;
+    const ivaRate = Number(ivaRateRaw) === 12 ? 12 : 5;
 
     // RECALCULO DINÁMICO: Sumamos los precios de las ventanas que están en el PDF
     const items2 = isOrder ? (data.windows || []) : (data.quotation_windows || []);
@@ -286,7 +289,7 @@ export const generateDocumentPDF = async (data, mode = 'quotation') => {
 
     if (isIvaIncluded) {
       subtotalExento = rawTotal;
-      ivaMonto = subtotalExento * 0.05;
+      ivaMonto = subtotalExento * (ivaRate / 100);
       totalFinal = subtotalExento + ivaMonto;
     } else {
       subtotalExento = rawTotal;
@@ -321,7 +324,7 @@ export const generateDocumentPDF = async (data, mode = 'quotation') => {
     if (isIvaIncluded) {
       doc.setFont("helvetica", "bold");
       doc.setTextColor(40, 40, 40);
-      doc.text("*PRECIOS MÁS IVA (5%)", margin.left, bottomBlockY + 12);
+      doc.text(`*PRECIOS MÁS IVA (${ivaRate}%)`, margin.left, bottomBlockY + 12);
 
       doc.setFontSize(9);
       doc.setFont("helvetica", "normal");
@@ -329,7 +332,7 @@ export const generateDocumentPDF = async (data, mode = 'quotation') => {
       doc.text(formatCurrency(subtotalExento), tableEndX, currentY + 4, { align: 'right' });
 
       currentY += 6;
-      doc.text("IVA (5%):", totalBoxStartX, currentY + 4);
+      doc.text(`IVA (${ivaRate}%):`, totalBoxStartX, currentY + 4);
       doc.text(formatCurrency(ivaMonto), tableEndX, currentY + 4, { align: 'right' });
       currentY += 8;
     } else {

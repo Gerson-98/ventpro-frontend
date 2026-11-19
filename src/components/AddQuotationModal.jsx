@@ -337,6 +337,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
         clientId: '',
         price_per_m2: '',
         include_iva: false,
+        iva_rate: 5,
         notes: '',
         reference_image_url: '',
         windows: [],
@@ -537,6 +538,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                 clientId: draft.clientId || '',
                 price_per_m2: draft.price_per_m2 || '',
                 include_iva: Boolean(draft.include_iva),
+                iva_rate: Number(draft.iva_rate) === 12 ? 12 : 5,
                 notes: draft.notes || '',
                 reference_image_url: draft.reference_image_url || '',
                 windows: restoredWindows,
@@ -638,6 +640,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                     clientId: quotationToEdit.clientId || '',
                     price_per_m2: quotationToEdit.price_per_m2 || '',
                     include_iva: Boolean(quotationToEdit.include_iva),
+                    iva_rate: Number(quotationToEdit.iva_rate) === 12 ? 12 : 5,
                     notes: quotationToEdit.notes || '',
                     reference_image_url: quotationToEdit.reference_image_url || '',
                     windows,
@@ -649,7 +652,8 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                     const gp = parseFloat(quotationToEdit.price_per_m2) || 0;
                     const sub = windows.reduce((acc, w) =>
                         acc + w.width_m * w.height_m * (w.quantity || 1) * (parseFloat(w.price_per_m2) || gp), 0);
-                    const computed = Number((sub * (quotationToEdit.include_iva ? 1.05 : 1)).toFixed(2));
+                    const editMult = quotationToEdit.include_iva ? 1 + (Number(quotationToEdit.iva_rate) === 12 ? 12 : 5) / 100 : 1;
+                    const computed = Number((sub * editMult).toFixed(2));
                     const saved = Number(Number(quotationToEdit.total_price).toFixed(2));
                     if (Math.abs(saved - computed) >= 0.01) setTotalOverride(String(saved));
                 }
@@ -765,6 +769,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                 clientId: '',
                 price_per_m2: '',
                 include_iva: false,
+                iva_rate: 5,
                 notes: '',
                 reference_image_url: '',
                 windows: [],
@@ -960,6 +965,8 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
         setQuotation(prev => ({ ...prev, windows: updatedWindows }));
     };
 
+    const ivaRate = Number(quotation.iva_rate) === 12 ? 12 : 5;
+
     const calculateGrandTotal = () => {
         if (!quotation.windows?.length) return { subTotal: 0, ivaTax: 0, total: 0 };
         const subTotal = quotation.windows.reduce((acc, win) => {
@@ -969,7 +976,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             const p = parseFloat(win.price_per_m2) || parseFloat(quotation.price_per_m2) || 0;
             return acc + (w * h * q * p);
         }, 0);
-        const ivaTax = quotation.include_iva ? subTotal * 0.05 : 0;
+        const ivaTax = quotation.include_iva ? subTotal * (ivaRate / 100) : 0;
         return {
             subTotal: Number(subTotal.toFixed(2)),
             ivaTax: Number(ivaTax.toFixed(2)),
@@ -1004,7 +1011,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             // resto del total se reparte en el precio/m² global. (Antes se dividía
             // el total CON IVA entre todos los m², así que al volver a guardar sin
             // tocar el total, este subía un 5% o no cuadraba.)
-            const target = (parseFloat(val) || 0) / (quotation.include_iva ? 1.05 : 1);
+            const target = (parseFloat(val) || 0) / (quotation.include_iva ? 1 + ivaRate / 100 : 1);
             let fixedAmount = 0;
             let freeM2 = 0;
             for (const win of quotation.windows) {
@@ -1069,11 +1076,14 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
         return errors;
     };
 
-    const handleIvaToggle = (e) => {
+    // IVA: "sin" | 5 | 12. Un solo selector para activar/desactivar y elegir tasa.
+    const handleIvaOption = (opt) => {
         if (ivaToggleLocked) return;
         setIvaToggleLocked(true);
-        setQuotation(p => ({ ...p, include_iva: e.target.checked }));
-        setTimeout(() => setIvaToggleLocked(false), 500);
+        setQuotation(p => (opt === 'sin'
+            ? { ...p, include_iva: false }
+            : { ...p, include_iva: true, iva_rate: opt }));
+        setTimeout(() => setIvaToggleLocked(false), 300);
     };
 
     const handleSubmit = async (e) => {
@@ -1098,6 +1108,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
             clientId: Number(quotation.clientId) || null,
             price_per_m2: quotation.price_per_m2 ? Number(quotation.price_per_m2) : null,
             include_iva: Boolean(quotation.include_iva),
+            iva_rate: ivaRate,
             total_price: finalTotal,
             notes: quotation.notes || null,
             reference_image_url: quotation.reference_image_url || null,
@@ -1241,7 +1252,7 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                             </div>
                                             {quotation.include_iva && (
                                                 <div className="flex items-center gap-2 text-xs text-green-600">
-                                                    <span>IVA (5%):</span>
+                                                    <span>IVA ({ivaRate}%):</span>
                                                     <span className="font-medium">
                                                         Q {totalsInRealTime.ivaTax.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                                                     </span>
@@ -1365,18 +1376,30 @@ export default function AddQuotationModal({ open, onClose, onSave, quotationToEd
                                         </div>
                                     </div>
 
-                                    <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg border border-blue-100">
-                                        <input
-                                            type="checkbox"
-                                            id="include_iva"
-                                            checked={quotation.include_iva}
-                                            onChange={handleIvaToggle}
-                                            disabled={ivaToggleLocked}
-                                            className="w-4 h-4 text-blue-600 rounded cursor-pointer"
-                                        />
-                                        <label htmlFor="include_iva" className="text-sm font-bold text-blue-800 cursor-pointer select-none">
-                                            ¿Incluir IVA (5%) en esta cotización?
-                                        </label>
+                                    <div className="flex flex-wrap items-center gap-2 sm:gap-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                                        <span className="text-sm font-bold text-blue-800">IVA en esta cotización:</span>
+                                        <div role="radiogroup" aria-label="IVA" className="inline-flex rounded-lg border border-blue-200 bg-white overflow-hidden">
+                                            {[
+                                                { key: 'sin', label: 'Sin IVA' },
+                                                { key: 5, label: 'IVA 5%' },
+                                                { key: 12, label: 'IVA 12%' },
+                                            ].map(opt => {
+                                                const active = opt.key === 'sin' ? !quotation.include_iva : (quotation.include_iva && ivaRate === opt.key);
+                                                return (
+                                                    <button
+                                                        key={opt.key}
+                                                        type="button"
+                                                        role="radio"
+                                                        aria-checked={active}
+                                                        disabled={ivaToggleLocked}
+                                                        onClick={() => handleIvaOption(opt.key)}
+                                                        className={`px-3 py-1.5 text-xs sm:text-sm font-semibold border-r last:border-r-0 border-blue-200 transition-colors ${active ? 'bg-blue-600 text-white' : 'text-blue-800 hover:bg-blue-100'}`}
+                                                    >
+                                                        {opt.label}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
 
                                     <div>

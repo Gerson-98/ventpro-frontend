@@ -274,6 +274,7 @@ export default function QuotationDetail() {
                 clientId: quotation.clientId,
                 price_per_m2: quotation.price_per_m2,
                 include_iva: quotation.include_iva,
+                iva_rate: quotation.iva_rate,
                 notes: quotation.notes,
                 reference_image_url: quotation.reference_image_url,
                 client: quotation.client,
@@ -370,7 +371,7 @@ export default function QuotationDetail() {
                             </span>
                             {quotation.include_iva && (
                                 <span className="text-xs font-semibold px-2.5 py-1 rounded-lg border bg-violet-50 text-violet-700 border-violet-200">
-                                    IVA incluido
+                                    IVA incluido ({Number(quotation.iva_rate) === 12 ? 12 : 5}%)
                                 </span>
                             )}
                         </div>

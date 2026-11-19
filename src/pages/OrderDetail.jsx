@@ -321,7 +321,12 @@ export default function OrderDetail() {
     );
   }
 
-  const displayedTotal = includeIva ? (order.total || 0) * 1.12 : (order.total || 0);
+  // El total del pedido YA incluye el IVA elegido en la cotización (se copia
+  // tal cual al confirmar). Antes aquí se multiplicaba otra vez por 1.12, lo
+  // que mostraba el IVA dos veces. La lista de Pedidos y Ganancias ya usaban
+  // el total sin multiplicar.
+  const displayedTotal = order.total || 0;
+  const orderIvaRate = Number(order.iva_rate) === 12 ? 12 : 5;
   const windowCount = order.windows?.length || 0;
   const clientData = order.client;
 
@@ -432,7 +437,7 @@ export default function OrderDetail() {
                   <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Total</p>
                   <p className="text-2xl sm:text-3xl font-black text-gray-900">{formatCurrency(displayedTotal)}</p>
                   {includeIva && (
-                    <p className="text-xs text-green-600 font-medium mt-0.5">IVA incluido (12%)</p>
+                    <p className="text-xs text-green-600 font-medium mt-0.5">IVA incluido ({orderIvaRate}%)</p>
                   )}
                   {order.priceLocked && (
                     <p className="text-xs text-emerald-700 font-semibold mt-0.5 inline-flex items-center gap-1"><FaLock size={10} /> Precio final congelado</p>
@@ -793,7 +798,7 @@ export default function OrderDetail() {
                   <tfoot className="border-t-2 border-gray-200 bg-gray-50/70">
                     <tr>
                       <td colSpan={7} className="py-3 px-5 text-sm font-semibold text-gray-600 text-right">
-                        {includeIva ? 'Total con IVA (12%)' : 'Total del pedido'}
+                        {includeIva ? `Total con IVA (${orderIvaRate}%)` : 'Total del pedido'}
                       </td>
                       <td className="py-3 px-5 text-right font-mono font-black text-gray-900 text-base">
                         {formatCurrency(displayedTotal)}
@@ -888,7 +893,7 @@ export default function OrderDetail() {
               {canSeeFinancials && (
                 <div className="px-4 py-3 bg-gray-50/70 border-t-2 border-gray-200 flex justify-between items-center">
                   <span className="text-sm font-semibold text-gray-600">
-                    {includeIva ? 'Total con IVA (12%)' : 'Total del pedido'}
+                    {includeIva ? `Total con IVA (${orderIvaRate}%)` : 'Total del pedido'}
                   </span>
                   <span className="font-mono font-black text-gray-900">{formatCurrency(displayedTotal)}</span>
                 </div>
